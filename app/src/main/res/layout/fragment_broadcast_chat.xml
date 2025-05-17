@@ -1,0 +1,132 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#2B2B2B">
+
+    <!-- Top Bar -->
+    <LinearLayout
+        android:id="@+id/header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="8dp">
+
+        <!-- Back Arrow -->
+        <ImageButton
+            android:id="@+id/btn_back"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Back"
+            android:src="@drawable/ic_back"
+            app:tint="#FFFFFF" />
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/chat_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:text="Nearby"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingStart="8dp" />
+    </LinearLayout>
+
+    <!-- Chat messages area -->
+    <ScrollView
+        android:id="@+id/chat_scroll_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_below="@id/header"
+        android:layout_above="@id/message_input_container"
+        android:fillViewport="true"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"> <!-- Reduced padding for sides -->
+
+        <LinearLayout
+            android:id="@+id/chat_message_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="4dp"> <!-- Adjusted top padding for the first message -->
+
+            <!-- Sample message from another user
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:id="@+id/message_user_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/balloon_left"
+                    android:padding="10dp"
+                    android:text="User 1\n\t\t Hello!"
+                    android:textColor="#000000"
+                    android:layout_marginEnd="16dp" />
+            </LinearLayout> -->
+
+            <!-- Sample message from the user
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:id="@+id/message_user_self"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/balloon_right"
+                    android:padding="10dp"
+                    android:text="Hi there!"
+                    android:textColor="#FFFFFF"
+                    android:gravity="end" />
+            </LinearLayout>-->
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Message input area -->
+    <LinearLayout
+        android:id="@+id/message_input_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:background="#1F1F1F"
+        android:layout_marginBottom="4dp"> <!-- Added margin to prevent being cut off -->
+
+        <!-- Input text field -->
+        <EditText
+            android:id="@+id/message_input"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:hint="Type a message"
+            android:background="@drawable/input_background"
+            android:padding="10dp"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp" />
+
+        <!-- Send button -->
+        <ImageButton
+            android:id="@+id/btn_send"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:src="@drawable/ic_send"
+            android:contentDescription="Send"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="#FFFFFF"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+
+</RelativeLayout>

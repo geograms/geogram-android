@@ -1,0 +1,51 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme -->
+    <style name="Base.Theme.geogram" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Dark theme customization -->
+        <item name="colorPrimary">@color/black</item>
+        <item name="colorPrimaryVariant">@color/black</item>
+        <item name="colorOnPrimary">@color/neon_green</item>
+
+        <item name="colorSecondary">@color/black</item>
+        <item name="colorSecondaryVariant">@color/neon_blue</item>
+        <item name="colorOnSecondary">@color/white</item>
+
+        <!-- Background and text -->
+        <item name="android:colorBackground">@color/black</item>
+        <item name="android:textColor">@color/neon_green</item>
+
+        <!-- Ripple effect -->
+        <item name="colorControlHighlight">@color/neon_green</item>
+
+        <!-- Tabs and buttons -->
+        <item name="colorAccent">@color/neon_blue</item>
+
+        <!-- Status bar -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+
+
+    <style name="Theme.geogram" parent="Base.Theme.geogram" />
+
+    <style name="Theme.OffGridTelephone" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary colors -->
+        <item name="colorPrimary">@color/black</item>
+        <item name="colorPrimaryVariant">@color/dark_gray</item>
+        <item name="colorOnPrimary">@color/neon_green</item>
+
+        <!-- Secondary colors -->
+        <item name="colorSecondary">@color/dark_gray</item>
+        <item name="colorSecondaryVariant">@color/neon_blue</item>
+        <item name="colorOnSecondary">@color/white</item>
+
+        <!-- Background and text -->
+        <item name="android:colorBackground">@color/black</item>
+        <item name="android:textColor">@color/neon_green</item>
+
+        <!-- Ripple effect -->
+        <item name="colorControlHighlight">@color/neon_green</item>
+
+        <!-- Status bar -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+</resources>

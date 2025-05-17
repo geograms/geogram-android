@@ -1,0 +1,33 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Navigation Drawer Menu -->
+    <item
+        android:id="@+id/nav_broadcast"
+        android:icon="@drawable/ic_tap_and_play"
+        android:title="Nearby" />
+    <!--
+    <item
+        android:id="@+id/nav_groups"
+        android:icon="@drawable/ic_group"
+        android:title="Groups" />
+    <item
+        android:id="@+id/nav_collections"
+        android:icon="@drawable/ic_folder_shared"
+        android:title="Collections" />
+    -->
+    <item
+        android:id="@+id/nav_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="Settings" />
+    <item
+        android:id="@+id/nav_networks"
+        android:icon="@drawable/ic_tethering"
+        android:title="Network" />
+    <item
+        android:id="@+id/nav_debug"
+        android:icon="@drawable/ic_debug"
+        android:title="Developer options" />
+    <item
+        android:id="@+id/nav_about"
+        android:icon="@drawable/ic_info"
+        android:title="About" />
+</menu>

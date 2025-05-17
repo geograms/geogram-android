@@ -1,0 +1,19 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Main bubble -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="16dp" />
+            <solid android:color="#276749" /> <!-- Dark green bubble -->
+        </shape>
+    </item>
+
+    <!-- Speech tail -->
+    <item android:right="0dp" android:bottom="8dp">
+        <rotate android:fromDegrees="135">
+            <shape android:shape="rectangle">
+                <size android:width="12dp" android:height="12dp" />
+                <solid android:color="#276749" /> <!-- Matches bubble color -->
+            </shape>
+        </rotate>
+    </item>
+</layer-list>

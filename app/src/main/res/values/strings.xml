@@ -1,0 +1,85 @@
+<resources>
+    <string name="app_name" translatable="false">geogram</string>
+    <string name="go">Go</string>
+    <string name="about">About Geogram</string>
+    <string-array name="spinner_options">
+         <item>Choose an action..</item>
+         <item>Search for users</item>
+         <item>Ping user</item>
+         <item>Test file download</item>
+         <item>Clear the log window</item>
+     </string-array>
+    <string-array name="beacon_types">
+        <item>Fixed Location</item>
+        <item>Person</item>
+        <item>Vehicle</item>
+        <item>Object</item>
+    </string-array>
+    <string-array name="color_options">
+        <item>Black</item>
+        <item>Blue</item>
+        <item>Green</item>
+        <item>Cyan</item>
+        <item>Red</item>
+        <item>Magenta</item>
+        <item>Pink</item>
+        <item>Brown</item>
+        <item>Dark Gray</item>
+        <item>Light Blue</item>
+        <item>Light Green</item>
+        <item>Light Cyan</item>
+        <item>Light Red</item>
+        <item>Yellow</item>
+        <item>White</item>
+    </string-array>
+
+    <string-array name="expiry_options">
+        <item>1 Week</item>
+        <item>1 Month</item>
+        <item>6 Months</item>
+        <item>1 Year</item>
+        <item>5 Years</item>
+    </string-array>
+
+    <string name="about_text">
+    Our goal is to build an inexpensive communication network between a region of people that do not
+    necessarily have access to Internet. This can happen because of mountain regions, because
+    the internet is no longer trustable, because it became unavailable due to natural
+    conditions, or due to human destruction of the network infrastructure.
+    \n\n
+    Previously we have experimented with LoRa. But that equipment is expensive, exotic, and
+    difficult to maintain. Most people around us refused to buy the units, and they were
+    not often used.
+    \n\n
+    Our current approach is to use the smartphones we already carry in our pockets.
+    These devices are well maintained by their owners, ensuring they have battery and
+    function properly.
+    \n\n
+    However, those devices rely entirely on Internet connectivity for communication. If or when
+    the Internet is unavailable, people will still use their phones to take pictures, listen
+    to music, play games, and share things with their friends and family.
+    \n\n
+    Even without Internet, people will meet in person to exchange messages with each other or send
+    pendrives with text files or pictures to other communities far away.
+    \n\n
+    What we are doing with geogram is creating software for this scenario.
+    A scenario where, with or without Internet access, we have an app that allows people to
+    digitally carry and share messages between each other. The right time to develop such
+    software for off-grid usage is now while peace lasts, not later during emergencies or war
+    when we are more worried about basic things like survival.
+
+</string>
+    <string name="dev_options_button_warning">Please be careful, the buttons below are only meant for debug purposes.</string>
+    <string name="shutdown_app">Shutdown App</string>
+    <string name="copy_to_clipboard">Copy to Clipboard</string>
+    <string name="clear_log">Clear Log</string>
+    <string name="pause_log">Pause Log</string>
+    <string name="options">Options</string>
+    <string name="log">Log</string>
+    <string name="developer_options">Developer Options</string>
+    <string name="back">Back</string>
+    <string name="reset_settings">Reset Settings</string>
+    <string name="about_geogram">About Geogram</string>
+    <string name="filter">Filter</string>
+
+</resources>
