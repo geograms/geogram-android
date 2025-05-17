@@ -52,8 +52,8 @@
 
 The app will request:
 - **Location**: Required for BLE and Wi-Fi Direct scanning
-- **Bluetooth**: For BLE beacon detection
-- **Wi-Fi**: For peer-to-peer local messaging
+- **Eddystone beacons**: For BLE beacon detection
+- **BLE**: For peer-to-peer local messaging
 - **Internet**: Optional for sync and relay access
 
 ---
