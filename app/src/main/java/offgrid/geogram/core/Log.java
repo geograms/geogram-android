@@ -39,6 +39,10 @@ public class Log {
         // Format the message with the timestamp
         String formattedMessage = timestamp + " [" + tag + "] " + message;
 
+        if(tag.length() == 1){
+            formattedMessage = timestamp + " " + tag + " " + message;
+        }
+
         // Write to the system log
         if(Central.debugForLocalTests == false) {
             try {

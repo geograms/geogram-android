@@ -11,11 +11,11 @@ import offgrid.geogram.server.SimpleSparkServer;
 import offgrid.geogram.settings.SettingsLoader;
 import offgrid.geogram.settings.SettingsUser;
 import offgrid.geogram.util.JsonUtils;
-import offgrid.geogram.wifi.WiFiRequestor;
-import offgrid.geogram.wifi.comm.WiFiReceiver;
-import offgrid.geogram.wifi.comm.WiFiSender;
-import offgrid.geogram.wifi.messages.Message;
-import offgrid.geogram.wifi.messages.MessageHello_v1;
+import offgrid.geogram.old.wifi.WiFiRequestor;
+import offgrid.geogram.old.wifi.comm.WiFiReceiver;
+import offgrid.geogram.old.wifi.comm.WiFiSender;
+import offgrid.geogram.old.wifi.messages.Message;
+import offgrid.geogram.old.wifi.messages.MessageHello_v1;
 /*
     Focus on the communication between two devices
     using Wi-Fi communication

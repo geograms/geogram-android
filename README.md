@@ -1,105 +1,138 @@
-# Geogram for Android
+# Geogram
 
-**Geogram for Android** is a hybrid messaging and presence app designed to work both **offline** and **online**, enabling proximity-based communication via **BLE** and internet when available. It integrates seamlessly with the Geogram ecosystem, including ESP32 beacons, HTML app and UV-K5 firmware nodes.
+Geogram is an Android app designed to enable seamless communication in both **off-grid** and **internet-enabled** environments. The app leverages **Wi-Fi Direct** and **Bluetooth Low Energy (BLE)** for off-grid messaging and traditional internet connections for online messaging. Geogram ensures connectivity even in remote areas.
 
----
-
-## 📱 Features
-
-- 📶 **Offline Messaging & Discovery**
-  - Uses **Bluetooth (BLE)** for peer-to-peer device communication.
-  - Detects **geogram beacons** (e.g. T-Dongle S3) for passive proximity logging.
-
-- 🌍 **Online Synchronization (Optional)**
-  - Supports fallback to internet messaging when available.
-  - Uses NOSTR-compatible keys and relays for decentralized communication.
-
-- 🔔 **Location-Based Interactions**
-  - Detects Geogram beacons installed in physical locations (e.g. train stations, buildings).
-  - Receives context-specific messages (alerts, instructions, events).
-
-- 🔐 **Privacy by Design**
-  - All message signing happens on-device.
-  - No centralized server or tracking; full offline-first support.
+*ATTENTION*: App is not yet available for download (early development)
 
 ---
 
-## 🧱 Requirements
+## Features
 
-- Android 5.0+ (API 21)
-- BLE and Wi-Fi hardware
-- No internet required for core functionality
+- **Off-Grid Messaging**:
+  - Send and receive messages without an internet connection.
+  - Uses Wi-Fi Direct for peer-to-peer communication.
+  - Utilizes Bluetooth LE for low-energy proximity-based beacons.
+
+- **Internet Messaging**:
+  - Switches to internet communication when available.
+  - Provides fallback to internet-based protocols for reliability.
+
+- **Hybrid Network Detection**:
+  - Automatically detects available communication methods.
+  - Prioritizes off-grid communication when internet is unavailable.
+
+- **User-Friendly Interface** (in progress):
+  - Clean and intuitive UI for seamless communication.
+  - Message history for both off-grid and internet messages.
+
+- **Security**:
+  - Messages transmitted off-grid are encrypted for privacy.
 
 ---
 
-## 🛠️ Installation
+## How does it work
 
-1. Clone the repository:
+Geograms are telegrams based on _geography_. In other words, specific
+to a location. Users with the geogram app running on their devices are
+interacting automatically with the geogram beacons installed on a
+specific location.
+
+Beacon are simple devices, often based on ESP32-arduino machines that
+run from USB power and have both Wi-Fi and bluetooth available.
+They are installed on locations such as houses, train stations or 
+relevant places. Users passing through the beacons receive a
+notification (most of them only time messages).
+
+Beacons are both cheap and smart enough to interact with users,
+providing local messages that are relevant such as welcome messages,
+warning messages or even specific information about events and other
+things happening on that place.
+
+Last but not least, geogram beacons can store messages from users to
+other users. They are meeting points to exchange messages in cases when
+Internet is not available. These messages can either be written in
+plain text or made private just for a specific user to read.
+
+---
+
+## Installation
+
+1. Clone the repository or download the APK:
    ```bash
-   git clone https://github.com/geograms/geogram-android.git
+   git clone https://github.com/username/geogram.git
    ```
-2. Open in Android Studio.
-3. Build and deploy to your Android device:
+2. Open the project in Android Studio.
+3. Sync Gradle files and build the project.
+4. Install the APK on your Android device:
    ```bash
-   ./gradlew installDebug
+   adb install path/to/geogram.apk
    ```
 
-> A prebuilt APK will be provided in future releases.
+---
+
+## Usage
+
+### Off-Grid Messaging
+1. Enable **Wi-Fi Direct** or **Bluetooth** on your device.
+2. Open the app and select "Off-Grid Mode".
+3. Discover nearby devices and start sending messages.
+
+### Internet Messaging
+1. Connect your device to an active internet connection.
+2. Open the app and select "Online Mode".
+3. Start chatting with contacts using standard internet protocols.
 
 ---
 
-## 🔧 Permissions
+## Permissions
 
-The app will request:
-- **Location**: Required for BLE and Wi-Fi Direct scanning
-- **Eddystone beacons**: For BLE beacon detection
-- **BLE**: For peer-to-peer local messaging
-- **Internet**: Optional for sync and relay access
-
----
-
-## 📡 Use Case: Beacon Messaging
-
-Geogram beacons (based on ESP32 or T-Dongle) installed in real-world locations can:
-
-- Broadcast announcements to nearby users
-- Serve as drop-off/pick-up relays for messages (store-and-forward)
-- Provide time-sensitive alerts even when offline
-
-The app automatically interacts with beacons when in range and logs local context messages for the user.
+Geogram requires the following permissions for full functionality:
+- **Location**: Required for Wi-Fi Direct and Bluetooth functionality.
+- **Bluetooth**: To connect and exchange messages with nearby devices.
+- **Wi-Fi**: For peer-to-peer Wi-Fi Direct communication.
+- **Internet**: For internet-based messaging.
 
 ---
 
-## 🧪 Development Info
+## Development
 
-- Minimum SDK: 21
-- Target SDK: 34
-- Build system: Gradle
-- Language: Kotlin + Jetpack libraries
-- NOSTR integration via `nostr-tools`
-
----
-
-## 📄 License
-
-Licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+### Requirements
+- Android Studio (latest version)
+- Gradle 7.0+
+- Minimum SDK: 21 (Android 5.0)
+- Target SDK: 34 (Android 14)
 
 ---
 
-## 📣 Support
+## Contributing
 
-- Discussions: https://github.com/orgs/geograms/discussions  
-- Issues: https://github.com/geograms/geogram-html/issues
+We welcome contributions! Please follow these steps:
+1. Fork the repository.
+2. Create a feature branch:
+   ```bash
+   git checkout -b feature/your-feature
+   ```
+3. Commit your changes:
+   ```bash
+   git commit -m "Add your feature"
+   ```
+4. Push to the branch:
+   ```bash
+   git push origin feature/your-feature
+   ```
+5. Open a pull request.
 
 ---
 
-## 🤝 Contributors
+## Contact
 
-See [`CONTRIBUTORS.md`](https://github.com/geograms/geogram-html/blob/main/CONTRIBUTORS.md)
+You are welcome to contact directly.
 
-**Primary Contributor**  
-👤 Max Brito (Portugal/Germany) — 2025–present  
-- BLE integration  
-- BLE Direct peer messaging  
-- NOSTR relay support  
-- Beacon logic and UI/UX
+Telegram: @brito_X1
+
+---
+
+## License
+
+Geogram is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+

@@ -48,7 +48,7 @@ public class DebugFragment extends Fragment {
 
         new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> {
             if (position == 0) {
-                tab.setText(R.string.log);
+                tab.setText(R.string.activity);
             } else {
                 tab.setText(R.string.options);
             }

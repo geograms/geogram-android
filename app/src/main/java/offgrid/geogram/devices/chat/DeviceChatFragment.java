@@ -1,7 +1,6 @@
 package offgrid.geogram.devices.chat;
 
-import static offgrid.geogram.bluetooth.broadcast.BroadcastSender.sendPackageToDevice;
-import static offgrid.geogram.bluetooth.other.comms.BlueCommands.tagBio;
+import static offgrid.geogram.old.bluetooth_old.other.comms.BlueCommands.tagBio;
 
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -22,14 +21,9 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import offgrid.geogram.R;
-import offgrid.geogram.bluetooth.eddystone.DeviceFinder;
-import offgrid.geogram.bluetooth.other.comms.BluePackage;
-import offgrid.geogram.bluetooth.other.comms.DataType;
-import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.database.BioDatabase;
-import offgrid.geogram.database.BioProfile;
-import offgrid.geogram.devices.DeviceReachable;
+import offgrid.geogram.database.old.BioDatabase;
+import offgrid.geogram.database.old.BioProfile;
 import offgrid.geogram.events.EventAction;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
@@ -91,63 +85,12 @@ public class DeviceChatFragment extends Fragment {
         TextView chatTitleTextView = view.findViewById(R.id.chat_title);
         chatTitleTextView.setText(nickname);
 
+
+
         // Send button
         btnSend.setOnClickListener(v -> {
             String message = messageInput.getText().toString().trim();
-            if (message.isEmpty()) {
-                return;
-            }
-
-            // get the message box for this device
-            ChatMessages deviceMessages =
-                    ChatDatabaseWithDevice.getInstance(this.getContext()).getMessages(deviceId);
-
-            // message box can't be null
-            if(deviceMessages == null){
-                Log.e("DeviceChatFragment", "Device messages are null");
-                Toast.makeText(getContext(), "Unable to send messages", Toast.LENGTH_LONG).show();
-                return;
-            }
-
-            // create the direct message
-            ChatMessage messageToSend = new ChatMessage(
-                    Central.getInstance().getSettings().getIdDevice(),
-                    message
-                    );
-
-            // add this message on the database
-            deviceMessages.add(messageToSend);
-            // save the message to disk
-            ChatDatabaseWithDevice.getInstance(this.getContext()).saveToDisk(deviceId, deviceMessages);
-
-
-            new Thread(() -> {
-                // get the updated MAC address (they change often)
-                DeviceReachable deviceUpdated = DeviceFinder.getInstance(this.getContext()).getDeviceMap().get(deviceId);
-                // when it is null, there is nothing to be done here
-                if(deviceUpdated == null){
-                    Toast.makeText(getContext(), "Device is not reachable", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                // Create the data package
-                BluePackage packageToSend = BluePackage.createSender(
-                        // specific type C for chatting
-                        DataType.C, messageToSend.getMessage(), deviceId
-                );
-                // repeat the timestamp to permit finding this message again
-                packageToSend.setTimestamp(messageToSend.getTimestamp());
-
-                // send the package to the device
-                sendPackageToDevice(deviceUpdated.getMacAddress(), packageToSend, this.getContext());
-
-                requireActivity().runOnUiThread(() -> {
-                    messageInput.setText("");
-                    // inform the UI (start the connected events)
-                    EventControl.startEvent(EventType.MESSAGE_DIRECT_RECEIVED, messageToSend, false);
-                    //chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
-                });
-            }).start();
+            sendMessage(message);
         });
 
         // Scroll chat when user clicks the message input
@@ -165,6 +108,76 @@ public class DeviceChatFragment extends Fragment {
         displayMessages();
 
         return view;
+    }
+
+
+    private void sendMessage(String message){
+        if (message.isEmpty()) {
+            return;
+        }
+
+        // get the message box for this device
+//        ChatMessages deviceMessages =
+//                ChatDatabaseWithDevice.getInstance(this.getContext()).getMessages(deviceId);
+//
+//        // message box can't be null
+//        if(deviceMessages == null){
+//            Log.e("DeviceChatFragment", "Device messages are null");
+//            Toast.makeText(getContext(), "Unable to send messages", Toast.LENGTH_LONG).show();
+//            return;
+//        }
+
+        // create the direct message
+//            ChatMessage messageToSend = new ChatMessage(
+//                    Central.getInstance().getSettings().getIdDevice(),
+//                    message
+//                    );
+//
+//            // add this message on the database
+//            deviceMessages.add(messageToSend);
+//            // save the message to disk
+//            ChatDatabaseWithDevice.getInstance(this.getContext()).saveToDisk(deviceId, deviceMessages);
+
+        //BluetoothSender.getInstance(this.getContext()).setSelfMessage(text);
+        //BluetoothSender.getInstance(this.getContext()).sendMessage(text);
+        requireActivity().runOnUiThread(() -> {
+            //BluetoothSender.getInstance(null).start();
+            //BluetoothSender.getInstance(this.getContext()).setSelfMessage(message);
+            //BluetoothSender.getInstance(this.getContext()).sendMessage(message);
+        });
+
+//        new Thread(() -> {
+//            //requireActivity().runOnUiThread(() -> {
+//                BluetoothSender.getInstance(getContext()).sendMessage(message);
+//            //});
+//        }).start();
+
+//                // get the updated MAC address (they change often)
+//                DeviceReachable deviceUpdated = DeviceFinder.getInstance(this.getContext()).getDeviceMap().get(deviceId);
+//                // when it is null, there is nothing to be done here
+//                if(deviceUpdated == null){
+//                    Toast.makeText(getContext(), "Device is not reachable", Toast.LENGTH_SHORT).show();
+//                    return;
+//                }
+//
+//                // Create the data package
+//                BluePackage packageToSend = BluePackage.createSender(
+//                        // specific type C for chatting
+//                        DataType.C, messageToSend.getMessage(), deviceId
+//                );
+//                // repeat the timestamp to permit finding this message again
+//                packageToSend.setTimestamp(messageToSend.getTimestamp());
+//
+//                // send the package to the device
+//                sendPackageToDevice(deviceUpdated.getMacAddress(), packageToSend, this.getContext());
+//
+//                requireActivity().runOnUiThread(() -> {
+//                    messageInput.setText("");
+//                    // inform the UI (start the connected events)
+//                    EventControl.startEvent(EventType.MESSAGE_DIRECT_RECEIVED, messageToSend, false);
+//                    //chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
+//                });
+//        }).start();
     }
 
     private void addEventMessageReceivedOnOtherDevice() {
@@ -224,17 +237,17 @@ public class DeviceChatFragment extends Fragment {
         if(deviceId == null){
             return;
         }
-        // get all the messages related to this device id
-        ChatMessages messageBox = ChatDatabaseWithDevice.getInstance(this.getContext()).getMessages(deviceId);
-        String thisDeviceId = Central.getInstance().getSettings().getIdDevice();
-        // add all the messages
-        for(ChatMessage message : messageBox.messages){
-            if(message.getAuthorId().equalsIgnoreCase(thisDeviceId)){
-                displayUserMessage(message);
-            }else{
-                displayReceivedMessage(message);
-            }
-        }
+//        // get all the messages related to this device id
+//        ChatMessages messageBox = ChatDatabaseWithDevice.getInstance(this.getContext()).getMessages(deviceId);
+//        String thisDeviceId = Central.getInstance().getSettings().getIdDevice();
+//        // add all the messages
+//        for(ChatMessage message : messageBox.messages){
+//            if(message.getAuthorId().equalsIgnoreCase(thisDeviceId)){
+//                displayUserMessage(message);
+//            }else{
+//                displayReceivedMessage(message);
+//            }
+//        }
         // move to the bottom of the chat
         chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
     }

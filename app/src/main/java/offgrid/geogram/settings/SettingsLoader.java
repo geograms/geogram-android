@@ -12,7 +12,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Random;
 
-import offgrid.geogram.core.old.old.GenerateDeviceId;
+import offgrid.geogram.old.old.old.GenerateDeviceId;
 import offgrid.geogram.util.ASCII;
 import offgrid.geogram.util.nostr.Identity;
 import offgrid.geogram.util.NicknameGenerator;

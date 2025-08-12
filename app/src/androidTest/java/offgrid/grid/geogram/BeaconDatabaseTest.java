@@ -15,7 +15,7 @@ import org.junit.runner.RunWith;
 import java.io.File;
 
 import offgrid.geogram.core.Log;
-import offgrid.geogram.database.BeaconDatabase;
+import offgrid.geogram.database.old.BeaconDatabase;
 import offgrid.geogram.devices.DeviceReachable;
 
 /**

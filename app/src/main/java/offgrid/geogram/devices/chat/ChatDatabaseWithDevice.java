@@ -6,7 +6,7 @@ import java.io.File;
 import java.util.HashMap;
 
 import offgrid.geogram.core.Log;
-import offgrid.geogram.database.BioDatabase;
+import offgrid.geogram.database.old.BioDatabase;
 
 public class ChatDatabaseWithDevice {
 

@@ -18,6 +18,8 @@ bcpkixJdk15on = "1.70"
 viewpager2 = "1.1.0"
 mockitoInline = "5.2.0"
 slf4jSimple = "2.1.0-alpha1"
+junitJunit = "4.13.2"
+junitJupiterVersion = "5.8.1"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -38,6 +40,8 @@ bcpkix-jdk15on = { group = "org.bouncycastle", name = "bcpkix-jdk15on", version.
 viewpager2 = { group = "androidx.viewpager2", name = "viewpager2", version.ref = "viewpager2" }
 mockito-inline = { group = "org.mockito", name = "mockito-inline", version.ref = "mockitoInline" }
 slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4jSimple" }
+junit-junit = { group = "junit", name = "junit", version.ref = "junitJunit" }
+jupiter-junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junitJupiterVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

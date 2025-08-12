@@ -76,7 +76,8 @@
     <string name="pause_log">Pause Log</string>
     <string name="options">Options</string>
     <string name="log">Log</string>
-    <string name="developer_options">Developer Options</string>
+    <string name="activity">Activity</string>
+    <string name="developer_options">Log</string>
     <string name="back">Back</string>
     <string name="reset_settings">Reset Settings</string>
     <string name="about_geogram">About Geogram</string>

@@ -25,7 +25,7 @@
     <item
         android:id="@+id/nav_debug"
         android:icon="@drawable/ic_debug"
-        android:title="Developer options" />
+        android:title="Log" />
     <item
         android:id="@+id/nav_about"
         android:icon="@drawable/ic_info"

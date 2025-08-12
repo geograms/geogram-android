@@ -1,6 +1,6 @@
 package offgrid.geogram.settings;
 
-import static offgrid.geogram.bluetooth.broadcast.BroadcastSender.sendProfileToEveryone;
+import static offgrid.geogram.old.bluetooth_old.broadcast.BroadcastSender.sendProfileToEveryone;
 
 import android.content.ClipData;
 import android.content.ClipboardManager;

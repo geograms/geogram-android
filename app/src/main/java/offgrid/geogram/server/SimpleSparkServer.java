@@ -8,8 +8,8 @@ import com.google.gson.JsonObject;
 
 import offgrid.geogram.core.Log;
 import offgrid.geogram.util.JsonUtils;
-import offgrid.geogram.wifi.comm.WiFiReceiver;
-import offgrid.geogram.wifi.messages.Message;
+import offgrid.geogram.old.wifi.comm.WiFiReceiver;
+import offgrid.geogram.old.wifi.messages.Message;
 
 import java.net.ServerSocket;
 

@@ -51,10 +51,8 @@ dependencies {
     implementation(libs.bcpkix.jdk15on)
     implementation(libs.viewpager2)
     testImplementation(libs.junit)
-    testImplementation(libs.junit.jupiter)
     testImplementation(libs.mockito.inline)
     testImplementation(libs.slf4j.simple)
-    androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
 
     // Add the nostr-java-api library

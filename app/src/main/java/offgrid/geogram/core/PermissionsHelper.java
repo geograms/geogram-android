@@ -1,8 +1,11 @@
 package offgrid.geogram.core;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Context;
 import android.content.pm.PackageManager;
+import android.os.Build;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -13,41 +16,56 @@ import java.util.List;
 public class PermissionsHelper {
 
     private static final String TAG = "PermissionsHelper";
-
-    // List of required permissions
-    private static final String[] REQUIRED_PERMISSIONS = {
-
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_WIFI_STATE,
-            Manifest.permission.CHANGE_WIFI_STATE,
-            Manifest.permission.NEARBY_WIFI_DEVICES,
-            Manifest.permission.BLUETOOTH,
-            Manifest.permission.BLUETOOTH_ADMIN,
-            Manifest.permission.BLUETOOTH_ADVERTISE,
-            Manifest.permission.BLUETOOTH_CONNECT,
-            Manifest.permission.BLUETOOTH_SCAN,
-            Manifest.permission.INTERNET,
-            Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-    };
-
     private static final int PERMISSION_REQUEST_CODE = 100;
 
     /**
-     * Requests all necessary permissions if they are not already granted.
-     *
-     * @param activity The activity requesting the permissions.
-     * @return True if all permissions are already granted, false otherwise.
+     * Dynamically generates required permissions based on the device's Android version.
      */
+    @SuppressLint({"InlinedApi", "ObsoleteSdkInt"})
+    private static String[] getRequiredPermissions() {
+        List<String> permissions = new ArrayList<>();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            permissions.add(Manifest.permission.BLUETOOTH_SCAN);
+            permissions.add(Manifest.permission.BLUETOOTH_ADVERTISE);
+            permissions.add(Manifest.permission.BLUETOOTH_CONNECT);
+        } else {
+            permissions.add(Manifest.permission.BLUETOOTH);
+            permissions.add(Manifest.permission.BLUETOOTH_ADMIN);
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+            permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+        }
+
+//        permissions.add(Manifest.permission.ACCESS_WIFI_STATE);
+//        permissions.add(Manifest.permission.CHANGE_WIFI_STATE);
+//        permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES);
+        permissions.add(Manifest.permission.INTERNET);
+        permissions.add(Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+
+        return permissions.toArray(new String[0]);
+    }
+
+    /**
+     * Requests all necessary permissions if they are not already granted.
+     */
+    @SuppressLint("ObsoleteSdkInt")
     public static boolean requestPermissionsIfNecessary(Activity activity) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true;
+
+        String[] requiredPermissions = getRequiredPermissions();
         List<String> missingPermissions = new ArrayList<>();
-        for (String permission : REQUIRED_PERMISSIONS) {
+
+        for (String permission : requiredPermissions) {
             if (ActivityCompat.checkSelfPermission(activity, permission) != PackageManager.PERMISSION_GRANTED) {
                 missingPermissions.add(permission);
             }
         }
 
         if (!missingPermissions.isEmpty()) {
-            Log.i(TAG, "Requesting necessary permissions...");
+            Log.i(TAG, "Requesting permissions: " + missingPermissions);
             ActivityCompat.requestPermissions(
                     activity,
                     missingPermissions.toArray(new String[0]),
@@ -56,19 +74,25 @@ public class PermissionsHelper {
             return false;
         }
 
-        Log.i(TAG, "All necessary permissions already granted.");
+        Log.i(TAG, "All permissions already granted.");
         return true;
     }
 
     /**
-     * Checks if all necessary permissions are granted.
-     *
-     * @param activity The activity to check permissions for.
-     * @return True if all permissions are granted, false otherwise.
+     * Check if all permissions are granted in an activity context.
      */
     public static boolean hasAllPermissions(Activity activity) {
-        for (String permission : REQUIRED_PERMISSIONS) {
-            if (ActivityCompat.checkSelfPermission(activity, permission) != PackageManager.PERMISSION_GRANTED) {
+        return hasAllPermissions((Context) activity);
+    }
+
+    /**
+     * Check if all permissions are granted in a general context (e.g. Service).
+     */
+    public static boolean hasAllPermissions(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true;
+
+        for (String permission : getRequiredPermissions()) {
+            if (ActivityCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
                 Log.e(TAG, "Missing permission: " + permission);
                 return false;
             }
@@ -77,12 +101,7 @@ public class PermissionsHelper {
     }
 
     /**
-     * Handle the result of the permission request.
-     *
-     * @param requestCode  The request code for the permission request.
-     * @param permissions  The requested permissions.
-     * @param grantResults The grant results for the permissions.
-     * @return True if all permissions were granted, false otherwise.
+     * Handles permission request result.
      */
     public static boolean handlePermissionResult(
             int requestCode,
@@ -95,7 +114,7 @@ public class PermissionsHelper {
                     return false;
                 }
             }
-            Log.i(TAG, "All permissions were granted.");
+            Log.i(TAG, "All permissions granted.");
             return true;
         }
         return false;

@@ -1,18 +1,15 @@
 package offgrid.geogram.core;
 
-import static offgrid.geogram.MainActivity.activity;
 import static offgrid.geogram.core.Central.server;
 import static offgrid.geogram.core.Messages.log;
-import static offgrid.geogram.wifi.WiFiCommon.peers;
 
+import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.bluetooth.BluetoothAdapter;
 import android.content.Intent;
-import android.net.wifi.p2p.WifiP2pDevice;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -22,29 +19,18 @@ import androidx.core.app.NotificationCompat;
 
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
-import offgrid.geogram.bluetooth.eddystone.DeviceListing;
-import offgrid.geogram.bluetooth.BluetoothCentral;
+import offgrid.geogram.ble.BluetoothCentral;
 import offgrid.geogram.server.SimpleSparkServer;
-import offgrid.geogram.wifi.WiFiDirectAdvertiser;
-import offgrid.geogram.wifi.old.WiFiDirectDiscovery;
-import offgrid.geogram.wifi.WifiScanner;
 
 public class BackgroundService extends Service {
 
-    boolean startWifi = false;
-
     private static final String TAG = "offgrid-service";
     private static final String CHANNEL_ID = "ForegroundServiceChannel";
+
     private Handler handler;
     private Runnable logTask;
 
-    private WiFiDirectDiscovery wifiDiscover = null;
-
-    // how long between scans
     private final long intervalSeconds = 10;
-
-    private boolean wifiDiscoverEnabled = true;
-    private boolean hasNecessaryPermissions = false;
 
     @Override
     public void onCreate() {
@@ -56,48 +42,41 @@ public class BackgroundService extends Service {
         Central.getInstance().loadSettings(this.getApplicationContext());
 
         createNotificationChannel();
-        initializePermissions();
 
-
-        // Start the web server
-//        serverThread = new Thread(new SimpleSparkServer());
-//        serverThread.start();
-
-        server = new SimpleSparkServer();
-        Thread serverThread = new Thread(server);
-        // Start the server
-        serverThread.start();
-
-
-        // start the Wi-Fi hotspot
-        if(startWifi) {
-            startWiFiAdvertise();
-            // start Wi-Fi discovery
-            WifiScanner.getInstance(this.getApplicationContext());
-            WifiScanner.getInstance(this.getApplicationContext()).startScanning();
+        // Check permissions, do not request
+        boolean hasPermissions = PermissionsHelper.hasAllPermissions(getApplicationContext());
+        if (!hasPermissions) {
+            log(TAG, "Missing runtime permissions — Bluetooth and Wi-Fi will not start.");
         }
 
-        // Initialize Bluetooth services
-        startBluetooth();
+        // Start background web server
+        server = new SimpleSparkServer();
+        new Thread(server).start();
 
-        // Initialize periodic task
+        // Start Bluetooth stack if allowed
+        if (hasPermissions) {
+            startBluetooth();
+        }
+
+        // Start recurring background task
         handler = new Handler();
         logTask = new Runnable() {
             @Override
             public void run() {
-                if (hasNecessaryPermissions) {
+                if (PermissionsHelper.hasAllPermissions(getApplicationContext())) {
                     runBackgroundTask();
                 } else {
-                    log(TAG, "Missing permissions, cannot proceed");
+                    log(TAG, "Permissions still missing — skipping task.");
                 }
-                handler.postDelayed(this, intervalSeconds * 1000); // Repeat every interval
+                handler.postDelayed(this, intervalSeconds * 1000);
             }
         };
         handler.post(logTask);
 
-        log(TAG, "Geogram was launched");
+        log(TAG, "Geogram background service started.");
     }
 
+    @SuppressLint("ObsoleteSdkInt")
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel serviceChannel = new NotificationChannel(
@@ -106,60 +85,35 @@ public class BackgroundService extends Service {
                     NotificationManager.IMPORTANCE_LOW
             );
             serviceChannel.setDescription("Offgrid phone, looking for data and connections");
+
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) {
                 manager.createNotificationChannel(serviceChannel);
-                log(TAG, "Notification channel created");
+                log(TAG, "Notification channel created.");
             } else {
-                log(TAG, "NotificationManager is null");
+                log(TAG, "Failed to create notification channel.");
             }
         }
     }
 
-    private void initializePermissions() {
-        if (activity == null) {
-            log(TAG, "Activity is null, skipping permission initialization");
-            return;
-        }
-        hasNecessaryPermissions = PermissionsHelper.requestPermissionsIfNecessary(activity);
-
-        if (!hasNecessaryPermissions) {
-            log(TAG, "Permissions are not granted yet. Waiting for user response.");
-            PermissionsHelper.requestPermissionsIfNecessary(activity);
-        }
-    }
-
-    /**
-     * Starts the Bluetooth beacon
-     */
     private void startBluetooth() {
-        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (bluetoothAdapter == null) {
-            log(TAG, "Bluetooth is not supported on this device.");
-            return;
-        } else if (!bluetoothAdapter.isEnabled()) {
-            log(TAG, "Bluetooth is disabled. Please turn it on");
-            return;
-        }
-        BluetoothCentral.getInstance(this).start();
+        BluetoothCentral.getInstance(this);
     }
 
-    private void startWiFiDiscover() {
-        if (wifiDiscoverEnabled) {
-            log(TAG, "WiFi discovery initialized");
-            wifiDiscover = new WiFiDirectDiscovery(this);
-        } else {
-            log(TAG, "WiFi discovery disabled");
-        }
-    }
-
-    private void startWiFiAdvertise() {
-        WiFiDirectAdvertiser.getInstance(this.getApplicationContext()).startAdvertising();
-        log(TAG, "WiFi advertise initialized");
+    private void runBackgroundTask() {
+        // Add background recurring logic here if needed
+        // e.g., updating BLE state, handling queues, telemetry, etc.
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+
+        if (!PermissionsHelper.hasAllPermissions(getApplicationContext())) {
+            log(TAG, "Missing required location permissions — cannot start foreground service.");
+            stopSelf(); // Prevent crash
+            return START_NOT_STICKY;
+        }
+
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
@@ -172,16 +126,17 @@ public class BackgroundService extends Service {
                 .setOngoing(true)
                 .build();
 
-        startForeground(1, notification);
+        try {
+            startForeground(1, notification);
+        } catch (SecurityException e) {
+            log(TAG, "SecurityException when starting foreground service: " + e.getMessage());
+            stopSelf(); // Prevent crash loop
+            return START_NOT_STICKY;
+        }
 
         return START_STICKY;
     }
 
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
 
     @Override
     public void onDestroy() {
@@ -192,27 +147,13 @@ public class BackgroundService extends Service {
             handler.removeCallbacks(logTask);
         }
 
-        BluetoothCentral.getInstance(this).stop();
-        WiFiDirectAdvertiser.getInstance(this.getApplicationContext()).stopAdvertising();
-
+        // Optional: cleanup BLE or Wi-Fi
+        // BluetoothCentral.getInstance(this).stop();
     }
 
-    private void runBackgroundTask() {
-        if (wifiDiscover != null && wifiDiscoverEnabled) {
-            wifiDiscover.startDiscovery(1);
-            wifiDiscover.stopDiscovery();
-            listPeers();
-        }
-
-        DeviceListing.getInstance().updateList(this.getApplicationContext());
-    }
-
-    private void listPeers() {
-        if (peers == null) {
-            return;
-        }
-        for (WifiP2pDevice device : peers.getDeviceList()) {
-            log(TAG, "Found P2P available: " + device.deviceName);
-        }
+    @Nullable
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
     }
 }
