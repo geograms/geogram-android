@@ -1,4 +1,4 @@
-package offgrid.geogram.devices;
+package offgrid.geogram.devices.old;
 
 import android.content.Context;
 
@@ -16,7 +16,7 @@ import com.google.gson.JsonSyntaxException;
  * Defines information about a beacon that was
  * found by this device.
  */
-public class DeviceReachable {
+public class DeviceReachableOld {
     private String macAddress;
     private String namespaceId = null;
     private String instanceId = null;
@@ -30,7 +30,7 @@ public class DeviceReachable {
     /**
      * Constructor initializes the time the beacon was first found.
      */
-    public DeviceReachable() {
+    public DeviceReachableOld() {
         this.timeFirstFound = System.currentTimeMillis();
         this.timeLastFound = this.timeFirstFound;
     }
@@ -180,10 +180,10 @@ public class DeviceReachable {
      * @return A BeaconReachable object populated with data from
      *         the JSON file, or null if an error occurs.
      */
-    public static DeviceReachable fromJson(File file) {
+    public static DeviceReachableOld fromJson(File file) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         try (FileReader reader = new FileReader(file)) {
-            return gson.fromJson(reader, DeviceReachable.class);
+            return gson.fromJson(reader, DeviceReachableOld.class);
         } catch (JsonSyntaxException e) {
             Log.e("BeaconReachable", "Error parsing JSON: " +
                     e.getMessage());
@@ -216,7 +216,7 @@ public class DeviceReachable {
      *
      * @param beaconFromFile The existing BeaconReachable object to merge.
      */
-    public void merge(DeviceReachable beaconFromFile) {
+    public void merge(DeviceReachableOld beaconFromFile) {
         if (beaconFromFile == null) {
             return;
         }

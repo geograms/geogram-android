@@ -10,7 +10,7 @@ import java.net.Socket;
 import offgrid.geogram.old.bluetooth_old.eddystone.EddystoneNamespaceGenerator;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.old.HelloDatabase;
-import offgrid.geogram.devices.DeviceReachable;
+import offgrid.geogram.devices.old.DeviceReachableOld;
 import offgrid.geogram.util.JsonUtils;
 import offgrid.geogram.old.wifi.details.WiFiNetwork;
 import offgrid.geogram.old.wifi.messages.MessageHello_v1;
@@ -25,7 +25,7 @@ public class WiFiUpdates {
      * Always try first to show cached information and then
      * show information updated from the other device over Wi-Fi
      */
-    public static MessageHello_v1 sayHello(DeviceReachable deviceDiscovered, Context context) {
+    public static MessageHello_v1 sayHello(DeviceReachableOld deviceDiscovered, Context context) {
         // get the namespace info
         String[] data = EddystoneNamespaceGenerator.extractNamespaceDetails(
                 deviceDiscovered.getNamespaceId()

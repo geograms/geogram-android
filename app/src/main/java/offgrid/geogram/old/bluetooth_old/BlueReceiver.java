@@ -18,9 +18,9 @@ import offgrid.geogram.core.Log;
 import offgrid.geogram.old.bluetooth_old.broadcast.LostAndFound;
 import offgrid.geogram.database.old.BioDatabase;
 import offgrid.geogram.database.old.BioProfile;
-import offgrid.geogram.devices.chat.ChatDatabaseWithDevice;
-import offgrid.geogram.devices.chat.ChatMessage;
-import offgrid.geogram.devices.chat.ChatMessages;
+import offgrid.geogram.apps.chat.ChatDatabaseWithDevice;
+import offgrid.geogram.apps.chat.ChatMessage;
+import offgrid.geogram.apps.chat.ChatMessages;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
 

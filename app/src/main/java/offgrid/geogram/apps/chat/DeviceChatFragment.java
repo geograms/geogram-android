@@ -1,4 +1,4 @@
-package offgrid.geogram.devices.chat;
+package offgrid.geogram.apps.chat;
 
 import static offgrid.geogram.old.bluetooth_old.other.comms.BlueCommands.tagBio;
 

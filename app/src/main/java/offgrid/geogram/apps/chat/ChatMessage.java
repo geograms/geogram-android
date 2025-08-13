@@ -1,4 +1,4 @@
-package offgrid.geogram.devices.chat;
+package offgrid.geogram.apps.chat;
 
 import java.util.ArrayList;
 

@@ -18,9 +18,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import offgrid.geogram.apps.main.DeviceListing;
 import offgrid.geogram.old.bluetooth_old.other.comms.Mutex;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.devices.DeviceReachable;
+import offgrid.geogram.devices.old.DeviceReachableOld;
 
 public class DeviceFinder {
 
@@ -33,7 +34,7 @@ public class DeviceFinder {
 
     private final Context context;
     private final BluetoothAdapter bluetoothAdapter;
-    private final HashMap<String, DeviceReachable> deviceMap = new HashMap<>();
+    private final HashMap<String, DeviceReachableOld> deviceMap = new HashMap<>();
     private boolean isScanning = false;
     private final Handler scanHandler = new Handler();
     private final ScheduledExecutorService scanScheduler = Executors.newSingleThreadScheduledExecutor();
@@ -160,7 +161,7 @@ public class DeviceFinder {
     /**
      * Gets the up-to-date HashMap of discovered devices.
      */
-    public HashMap<String, DeviceReachable> getDeviceMap() {
+    public HashMap<String, DeviceReachableOld> getDeviceMap() {
         return deviceMap;
     }
 
@@ -235,9 +236,9 @@ public class DeviceFinder {
 
          */
 
-        DeviceReachable deviceFound = deviceMap.get(deviceId);
+        DeviceReachableOld deviceFound = deviceMap.get(deviceId);
         if (deviceFound == null) {
-            deviceFound = new DeviceReachable();
+            deviceFound = new DeviceReachableOld();
             deviceFound.setDeviceId(deviceId);
             deviceFound.setNamespaceId(namespaceId);
             deviceFound.setMacAddress(result.getDevice().getAddress());
@@ -260,7 +261,7 @@ public class DeviceFinder {
         // remove old items
         long time = SCAN_INTERVAL_MS + SCAN_DURATION_MS + 1500;
         for(String deviceIdListed : deviceMap.keySet()){
-            DeviceReachable deviceListed = deviceMap.get(deviceIdListed);
+            DeviceReachableOld deviceListed = deviceMap.get(deviceIdListed);
             long timeMax = deviceListed.getTimeLastFound() + time;
             if(timeMax < System.currentTimeMillis()){
                 deviceMap.remove(deviceIdListed);
@@ -319,11 +320,11 @@ public class DeviceFinder {
     /**
      * Updates a device in the map.
      */
-    public void update(DeviceReachable device) {
+    public void update(DeviceReachableOld device) {
         deviceMap.put(device.getDeviceId(), device);
     }
 
-    public DeviceReachable getDevice(String deviceId) {
+    public DeviceReachableOld getDevice(String deviceId) {
         if(this.getDeviceMap().containsKey(deviceId)  == false){
             return null;
         }

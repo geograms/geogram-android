@@ -1,4 +1,4 @@
-package offgrid.geogram.devices;
+package offgrid.geogram.devices.old;
 
 /**
  * Defines an NPUB identity that is associated to a user.

@@ -2,7 +2,7 @@ package offgrid.geogram.database.old;
 
 import java.util.ArrayList;
 
-import offgrid.geogram.devices.NPUB;
+import offgrid.geogram.devices.old.NPUB;
 
 /**
  * Defines a user which is normally a single person.

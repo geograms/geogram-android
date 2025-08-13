@@ -12,7 +12,7 @@ import offgrid.geogram.old.bluetooth_old.BlueQueueReceiving;
 import offgrid.geogram.old.bluetooth_old.eddystone.DeviceFinder;
 import offgrid.geogram.old.bluetooth_old.other.comms.BluePackage;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.devices.DeviceReachable;
+import offgrid.geogram.devices.old.DeviceReachableOld;
 
 public class WatchDogMissingParcels {
 
@@ -127,7 +127,7 @@ public class WatchDogMissingParcels {
             String packageId = item.getId();
             String deviceId = item.getDeviceId();
             // get the most up-to-date MAC address for the device
-            DeviceReachable device = DeviceFinder.getInstance(context).getDeviceMap().get(deviceId);
+            DeviceReachableOld device = DeviceFinder.getInstance(context).getDeviceMap().get(deviceId);
             if(device == null){
                 Log.e(TAG, "Device not found for id: " + deviceId);
                 continue;

@@ -8,7 +8,7 @@ import java.util.HashMap;
 import offgrid.geogram.old.bluetooth_old.eddystone.DeviceFinder;
 import offgrid.geogram.old.bluetooth_old.broadcast.BroadcastSender;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.devices.DeviceReachable;
+import offgrid.geogram.devices.old.DeviceReachableOld;
 
 /**
  * Handles all data related to bio profiles that were sent
@@ -204,7 +204,7 @@ public class BioDatabase {
             Log.e(TAG, "Pinged profile not found for " + data);
             return;
         }
-        DeviceReachable beacon = DeviceFinder.getInstance(context)
+        DeviceReachableOld beacon = DeviceFinder.getInstance(context)
                 .getDeviceMap().get(profile.getDeviceId());
         if(beacon == null){
             Log.e(TAG, "Pinged beacon not found for " + data);

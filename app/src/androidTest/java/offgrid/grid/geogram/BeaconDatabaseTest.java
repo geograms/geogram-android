@@ -16,7 +16,7 @@ import java.io.File;
 
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.old.BeaconDatabase;
-import offgrid.geogram.devices.DeviceReachable;
+import offgrid.geogram.devices.old.DeviceReachableOld;
 
 /**
  * Test beacons inside an Android device.
@@ -34,7 +34,7 @@ public class BeaconDatabaseTest {
         Log.i("BeaconDatabaseTest", "Folder exists: " + folder.getAbsolutePath());
 
         // create a discovered beacon
-        DeviceReachable beacon = new DeviceReachable();
+        DeviceReachableOld beacon = new DeviceReachableOld();
         beacon.setMacAddress("00:11:22:33:44:55");
         // always 10 digits, user-defined
         beacon.setNamespaceId("0123456789");

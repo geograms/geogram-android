@@ -1,4 +1,4 @@
-package offgrid.geogram.devices;
+package offgrid.geogram.devices.old;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -18,7 +18,7 @@ import offgrid.geogram.old.bluetooth_old.eddystone.DeviceFinder;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.old.BioDatabase;
 import offgrid.geogram.database.old.BioProfile;
-import offgrid.geogram.devices.chat.DeviceChatFragment;
+import offgrid.geogram.apps.chat.DeviceChatFragment;
 
 public class DeviceDetailsFragment extends Fragment {
 
@@ -70,7 +70,7 @@ public class DeviceDetailsFragment extends Fragment {
         }
 
         // get the device from the list
-        DeviceReachable deviceDiscovered =
+        DeviceReachableOld deviceDiscovered =
                 DeviceFinder.getInstance(this.getContext()).getDeviceMap().get(deviceId);
         if(deviceDiscovered == null){
             Log.e(TAG, "Device not found: " + deviceId);
@@ -135,7 +135,7 @@ public class DeviceDetailsFragment extends Fragment {
         icons.setClickable(false); // Disable click events
     }
 
-    private void launchMessageWindow(DeviceReachable beaconDiscovered) {
+    private void launchMessageWindow(DeviceReachableOld beaconDiscovered) {
         DeviceChatFragment fragment = DeviceChatFragment.newInstance(beaconDiscovered.getDeviceId());
 
         MainActivity.activity.getSupportFragmentManager()

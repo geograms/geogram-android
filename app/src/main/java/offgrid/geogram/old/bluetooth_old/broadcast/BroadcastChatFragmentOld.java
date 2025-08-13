@@ -29,7 +29,7 @@ import offgrid.geogram.old.bluetooth_old.BlueQueueReceiving;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.old.BioDatabase;
 import offgrid.geogram.database.old.BioProfile;
-import offgrid.geogram.devices.DeviceDetailsFragment;
+import offgrid.geogram.devices.old.DeviceDetailsFragment;
 import offgrid.geogram.util.ASCII;
 import offgrid.geogram.util.DateUtils;
 

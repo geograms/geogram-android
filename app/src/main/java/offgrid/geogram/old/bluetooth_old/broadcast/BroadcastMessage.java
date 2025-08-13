@@ -3,7 +3,7 @@ package offgrid.geogram.old.bluetooth_old.broadcast;
 import java.util.ArrayList;
 
 import offgrid.geogram.old.bluetooth_old.other.comms.BluePackage;
-import offgrid.geogram.devices.DeviceReachable;
+import offgrid.geogram.devices.old.DeviceReachableOld;
 
 /**
  * Stores a message that was broadcast to all devices within reach
@@ -14,7 +14,7 @@ public class BroadcastMessage {
     private final boolean writtenByMe;
     private String deviceId = null;
     private BluePackage packageSent;
-    private final ArrayList<DeviceReachable> devicesThatReadMessage = new ArrayList<>();
+    private final ArrayList<DeviceReachableOld> devicesThatReadMessage = new ArrayList<>();
 
 
 
@@ -25,11 +25,11 @@ public class BroadcastMessage {
         this.writtenByMe = writtenByMe;
     }
 
-    private void addDeviceThatReadMessage(DeviceReachable device) {
+    private void addDeviceThatReadMessage(DeviceReachableOld device) {
         devicesThatReadMessage.add(device);
     }
 
-    public ArrayList<DeviceReachable> getDevicesThatReadMessage() {
+    public ArrayList<DeviceReachableOld> getDevicesThatReadMessage() {
         return devicesThatReadMessage;
     }
 

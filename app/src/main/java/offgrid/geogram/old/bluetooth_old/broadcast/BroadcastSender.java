@@ -21,7 +21,7 @@ import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.old.BioProfile;
 import offgrid.geogram.settings.SettingsUser;
-import offgrid.geogram.devices.DeviceReachable;
+import offgrid.geogram.devices.old.DeviceReachableOld;
 
 public class BroadcastSender {
     private static final String TAG_ID = "BroadcastSender";
@@ -48,8 +48,8 @@ public class BroadcastSender {
     public static void broadcastMessageToAllEddystoneDevicesShort(String text, Context context) {
         new Thread(() -> {
             try {
-                Collection<DeviceReachable> devices = DeviceFinder.getInstance(context).getDeviceMap().values();
-                for (DeviceReachable device : devices) {
+                Collection<DeviceReachableOld> devices = DeviceFinder.getInstance(context).getDeviceMap().values();
+                for (DeviceReachableOld device : devices) {
                     String macAddress = device.getMacAddress();
                     Log.i(TAG_ID, "Sending short message to " + macAddress + " with: " + text);
                     Bluecomm.getInstance(context).writeData(macAddress, text);
@@ -63,7 +63,7 @@ public class BroadcastSender {
     public static void broadcastMessageToAllEddystoneDevices(BroadcastMessage messageToBroadcast, Context context) {
         new Thread(() -> {
             try {
-                Collection<DeviceReachable> devices = DeviceFinder.getInstance(context).getDeviceMap().values();
+                Collection<DeviceReachableOld> devices = DeviceFinder.getInstance(context).getDeviceMap().values();
                 if (devices.isEmpty()) {
                     Log.i(TAG_ID, "No Eddystone devices to broadcast the message.");
                     return;
@@ -75,7 +75,7 @@ public class BroadcastSender {
                 );
                 messageToBroadcast.setPackage(packageToSend);
 
-                for (DeviceReachable device : devices) {
+                for (DeviceReachableOld device : devices) {
                     sendPackageToDevice(device.getMacAddress(), packageToSend, context);
                 }
             } catch (Exception e) {
@@ -105,7 +105,7 @@ public class BroadcastSender {
 
                 // get the specified MAC address as default or try to get a new one
                 String macAddress = macAddressProvided;
-                DeviceReachable device = DeviceFinder.getInstance(context).getDevice(deviceId);
+                DeviceReachableOld device = DeviceFinder.getInstance(context).getDevice(deviceId);
                 // is this device not reachable?
                 if(device == null){
                     // don't send this message

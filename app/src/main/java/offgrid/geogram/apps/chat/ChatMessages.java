@@ -1,4 +1,4 @@
-package offgrid.geogram.devices.chat;
+package offgrid.geogram.apps.chat;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

@@ -26,7 +26,6 @@ import androidx.fragment.app.FragmentTransaction;
 
 import com.google.android.material.navigation.NavigationView;
 
-import offgrid.geogram.ble.events.BroadcastChatFragment;
 import offgrid.geogram.core.Art;
 import offgrid.geogram.core.BackgroundService;
 import offgrid.geogram.core.Central;
@@ -41,6 +40,7 @@ import offgrid.geogram.util.BatteryOptimizationHelper;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
+
     public static MainActivity activity = null;
     public static ListView beacons = null;
     private static boolean wasCreatedBefore = false;

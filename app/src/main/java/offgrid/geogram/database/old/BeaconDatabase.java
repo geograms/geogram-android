@@ -6,7 +6,7 @@ import java.io.File;
 import java.util.HashMap;
 
 import offgrid.geogram.core.Log;
-import offgrid.geogram.devices.DeviceReachable;
+import offgrid.geogram.devices.old.DeviceReachableOld;
 
 /**
  * Handles all data related to beacons that have been found
@@ -18,7 +18,7 @@ public class BeaconDatabase {
     public static final String FILE_NAME = "beacon.json";
 
     // the most up to date list of beacons saved on our disk
-    public static HashMap<String, DeviceReachable> beacons = new HashMap<>();
+    public static HashMap<String, DeviceReachableOld> beacons = new HashMap<>();
 //    private static long timeLastUpdated = -1;
 
     /**

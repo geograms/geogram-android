@@ -8,7 +8,7 @@ import offgrid.geogram.old.bluetooth_old.other.comms.BlueCommands;
 import offgrid.geogram.old.bluetooth_old.other.comms.BluePackage;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.devices.DeviceReachable;
+import offgrid.geogram.devices.old.DeviceReachableOld;
 import offgrid.geogram.events.EventAction;
 
 public class EventBluetoothPackageReceived extends EventAction {
@@ -35,7 +35,7 @@ public class EventBluetoothPackageReceived extends EventAction {
 
     // MAC address might have changes since this is dynamic
     String senderId = packageReceived.getDeviceId();
-    DeviceReachable device = DeviceFinder.getInstance(context).getDeviceMap().get(senderId);
+    DeviceReachableOld device = DeviceFinder.getInstance(context).getDeviceMap().get(senderId);
     // is the device still within our reach?
     if(device == null){
         Log.e(TAG, "Device not found: " + senderId);

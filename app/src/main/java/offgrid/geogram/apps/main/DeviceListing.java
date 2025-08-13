@@ -1,4 +1,4 @@
-package offgrid.geogram.old.bluetooth_old.eddystone;
+package offgrid.geogram.apps.main;
 
 import static offgrid.geogram.util.BluetoothUtils.calculateDistance;
 import static offgrid.geogram.util.DateUtils.getHumanReadableTime;
@@ -17,9 +17,10 @@ import offgrid.geogram.old.bluetooth_old.broadcast.LostAndFound;
 import offgrid.geogram.database.old.BeaconDatabase;
 import offgrid.geogram.database.old.BioDatabase;
 import offgrid.geogram.database.old.BioProfile;
-import offgrid.geogram.devices.DeviceReachable;
+import offgrid.geogram.devices.old.DeviceReachableOld;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.devices.DeviceDetailsFragment;
+import offgrid.geogram.devices.old.DeviceDetailsFragment;
+import offgrid.geogram.old.bluetooth_old.eddystone.DeviceFinder;
 
 /**
  * Manages the list of beacons that were found
@@ -32,7 +33,7 @@ public class DeviceListing {
     private static DeviceListing instance; // Singleton instance
 
     // list of beacons both reachable and past ones
-    public final HashMap<String, DeviceReachable> beacons = new HashMap<>();
+    public final HashMap<String, DeviceReachableOld> beacons = new HashMap<>();
 
     // Private constructor for Singleton pattern
     private DeviceListing() {
@@ -61,21 +62,21 @@ public class DeviceListing {
 
         // create a new list
         // add all beacons from the database
-        HashMap<String, DeviceReachable> beaconsToList = new HashMap<>(BeaconDatabase.beacons);
+        HashMap<String, DeviceReachableOld> beaconsToList = new HashMap<>(BeaconDatabase.beacons);
 
         // now update with all the beacons within radio reach
-        for(DeviceReachable beacon : DeviceFinder.getInstance(context).getDeviceMap().values()){
+        for(DeviceReachableOld beacon : DeviceFinder.getInstance(context).getDeviceMap().values()){
             // overwrite any existing items
             beaconsToList.put(beacon.getDeviceId(), beacon);
         }
 
         // transform into a simple arrayList
-        ArrayList<DeviceReachable> deviceList = new ArrayList<>(beaconsToList.values());
+        ArrayList<DeviceReachableOld> deviceList = new ArrayList<>(beaconsToList.values());
         // Sort beacons by last seen time, most recent first
-        deviceList.sort(Comparator.comparingLong(DeviceReachable::getTimeLastFound).reversed());
+        deviceList.sort(Comparator.comparingLong(DeviceReachableOld::getTimeLastFound).reversed());
 
         ArrayList<BioProfile> displayList = new ArrayList<>();
-        for (DeviceReachable deviceFound : deviceList) {
+        for (DeviceReachableOld deviceFound : deviceList) {
             // data displayed on main screen
             String distance = calculateDistance(deviceFound.getRssi());
             long lastSeen = System.currentTimeMillis() - deviceFound.getTimeLastFound();
