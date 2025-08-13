@@ -52,15 +52,22 @@ public class Device implements Comparable<Device> {
         return Objects.hash(ID, deviceType);
     }
 
+//    @NonNull
+//    @Override
+//    public String toString() {
+//        return "Device{" +
+//                "ID='" + ID + '\'' +
+//                ", deviceType=" + deviceType +
+//                ", latest=" + latestTimestamp() +
+//                ", locations=" + connectedEvents.size() +
+//                '}';
+//    }
+
+
     @NonNull
     @Override
-    public String toString() {
-        return "Device{" +
-                "ID='" + ID + '\'' +
-                ", deviceType=" + deviceType +
-                ", latest=" + latestTimestamp() +
-                ", locations=" + connectedEvents.size() +
-                '}';
+    public String toString(){
+        return ID + " (" + deviceType.name() + ")";
     }
 
     public void addEvent(ConnectedEvent event) {
@@ -90,4 +97,5 @@ public class Device implements Comparable<Device> {
         // there was no match, so add one
         connectedEvents.add(event);
     }
+
 }

@@ -1,4 +1,4 @@
-package offgrid.geogram.devices.old;
+package offgrid.geogram.devices;
 
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -14,6 +14,7 @@ import androidx.fragment.app.Fragment;
 
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
+import offgrid.geogram.devices.old.DeviceReachableOld;
 import offgrid.geogram.old.bluetooth_old.eddystone.DeviceFinder;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.old.BioDatabase;
@@ -27,10 +28,10 @@ public class DeviceDetailsFragment extends Fragment {
     private static final String
             ARG_BEACON_DETAILS = "beacon_details";
 
-    public static DeviceDetailsFragment newInstance(BioProfile profile)  {
+    public static DeviceDetailsFragment newInstance(Device device)  {
         DeviceDetailsFragment fragment = new DeviceDetailsFragment();
         Bundle args = new Bundle();
-        args.putString(ARG_BEACON_DETAILS, profile.getDeviceId());
+        args.putString(ARG_BEACON_DETAILS, device.ID);
         fragment.setArguments(args);
         return fragment;
     }

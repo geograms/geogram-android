@@ -25,11 +25,12 @@ import java.util.ArrayList;
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.ble.BluetoothSender;
+import offgrid.geogram.devices.Device;
 import offgrid.geogram.old.bluetooth_old.BlueQueueReceiving;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.old.BioDatabase;
 import offgrid.geogram.database.old.BioProfile;
-import offgrid.geogram.devices.old.DeviceDetailsFragment;
+import offgrid.geogram.devices.DeviceDetailsFragment;
 import offgrid.geogram.util.ASCII;
 import offgrid.geogram.util.DateUtils;
 
@@ -266,7 +267,8 @@ public class BroadcastChatFragmentOld extends Fragment implements BroadcastSende
         // Add click listener to navigate to the user profile
         receivedMessageView.setOnClickListener(v -> {
             if (profile != null) {
-                navigateToDeviceDetails(profile);
+                navigateToDeviceDetails(null);
+                //navigateToDeviceDetails(profile);
             } else {
                 Toast.makeText(getContext(), "Profile not found", Toast.LENGTH_SHORT).show();
             }
@@ -305,7 +307,7 @@ public class BroadcastChatFragmentOld extends Fragment implements BroadcastSende
     }
 
 
-    private void navigateToDeviceDetails(BioProfile profile) {
+    private void navigateToDeviceDetails(Device profile) {
         DeviceDetailsFragment fragment = DeviceDetailsFragment.newInstance(profile);
 
         // make the screen appear

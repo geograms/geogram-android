@@ -9,7 +9,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
-import offgrid.geogram.ble.events.BroadcastChatFragment;
+import offgrid.geogram.apps.chat.BroadcastChatFragment;
 import offgrid.geogram.database.DatabaseCallSign;
 import offgrid.geogram.old.old.WiFi_control;
 import offgrid.geogram.server.SimpleSparkServer;

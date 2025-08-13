@@ -22,6 +22,7 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.UUID;
 
+import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
@@ -115,7 +116,8 @@ public class BluetoothSender {
 
     public void sendMessage(String message) {
         if (message == null || message.isEmpty()) return;
-        BluetoothMessage msg = new BluetoothMessage("CR7BBQ-5", "ANY", message);
+        String callsign = Central.getInstance().getSettings().getIdDevice();
+        BluetoothMessage msg = new BluetoothMessage(callsign, "ANY", message);
         sendMessage(msg);
     }
     public void sendMessage(BluetoothMessage msg) {

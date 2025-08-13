@@ -6,11 +6,7 @@ import offgrid.geogram.ble.BluetoothMessage;
 import offgrid.geogram.ble.chat.ChatMessage;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.database.CallSign;
 import offgrid.geogram.events.EventAction;
-import offgrid.geogram.events.EventControl;
-import offgrid.geogram.events.EventType;
-import offgrid.geogram.old.bluetooth_old.broadcast.BroadcastMessage;
 
 public class EventBleMessageReceived extends EventAction {
 

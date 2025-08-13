@@ -4,7 +4,6 @@ import offgrid.geogram.ble.BluetoothMessage;
 import offgrid.geogram.ble.chat.ChatMessage;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.events.EventAction;
-import offgrid.geogram.old.bluetooth_old.broadcast.BroadcastMessage;
 
 public class EventBleBroadcastMessageReceived extends EventAction {
     private static final String TAG = "EventBleMessageReceived";

@@ -13,13 +13,14 @@ import java.util.HashMap;
 
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
+import offgrid.geogram.devices.Device;
 import offgrid.geogram.old.bluetooth_old.broadcast.LostAndFound;
 import offgrid.geogram.database.old.BeaconDatabase;
 import offgrid.geogram.database.old.BioDatabase;
 import offgrid.geogram.database.old.BioProfile;
 import offgrid.geogram.devices.old.DeviceReachableOld;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.devices.old.DeviceDetailsFragment;
+import offgrid.geogram.devices.DeviceDetailsFragment;
 import offgrid.geogram.old.bluetooth_old.eddystone.DeviceFinder;
 
 /**
@@ -80,7 +81,7 @@ public class DeviceListing {
         // Sort beacons by last seen time, most recent first
         deviceList.sort(Comparator.comparingLong(DeviceReachableOld::getTimeLastFound).reversed());
 
-        ArrayList<BioProfile> displayList = new ArrayList<>();
+        ArrayList<Device> displayList = new ArrayList<>();
         for (DeviceReachableOld deviceFound : deviceList) {
             // data displayed on main screen
             String distance = calculateDistance(deviceFound.getRssi());
@@ -103,11 +104,12 @@ public class DeviceListing {
                 continue;
             }
             bioData.setDistance(distance);
-            displayList.add(bioData);
+            displayList.add(null);
+        //    displayList.add(bioData);
         }
 
         // instead of strings, we place a whole object there
-        ArrayAdapter<BioProfile> adapter = new ArrayAdapter<>(
+        ArrayAdapter<Device> adapter = new ArrayAdapter<>(
                 beaconWindow.getContext(),
                 android.R.layout.simple_list_item_1,
                 displayList
@@ -117,7 +119,7 @@ public class DeviceListing {
         // Add click listener to items
         beaconWindow.setOnItemClickListener((parent, view, position, id) -> {
             // get the object
-            BioProfile profile = displayList.get(position);
+            Device profile = displayList.get(position);
 
             // make the screen appear
             if(MainActivity.getInstance() == null){

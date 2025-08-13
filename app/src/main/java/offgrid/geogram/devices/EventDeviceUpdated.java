@@ -6,11 +6,14 @@ import android.widget.ListView;
 import java.util.ArrayList;
 
 import offgrid.geogram.MainActivity;
+import offgrid.geogram.R;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.database.old.BioProfile;
 import offgrid.geogram.events.EventAction;
 
 public class EventDeviceUpdated extends EventAction {
+
+    private static final String TAG = "EventDeviceUpdated";
+
     public EventDeviceUpdated(String id) {
         super(id);
     }
@@ -31,25 +34,33 @@ public class EventDeviceUpdated extends EventAction {
         }
 
         // create a new list of things to show
-        ArrayList<BioProfile> displayList = new ArrayList<>();
-
-        // convert the profiles
-        for(Device deviceSpotted: DeviceManager.getInstance().getDevicesSpotted()){
-            BioProfile bio = new BioProfile();
-            bio.setDeviceId(deviceSpotted.ID);
-            bio.setNick(deviceSpotted.ID);
-            // add it up
-            displayList.add(bio);
-        }
+        ArrayList<Device> displayList = new ArrayList<>(DeviceManager.getInstance().getDevicesSpotted());
 
 
         // display on UI
-        ArrayAdapter<BioProfile> adapter = new ArrayAdapter<>(
+        ArrayAdapter<Device> adapter = new ArrayAdapter<>(
                 beaconWindow.getContext(),
                 android.R.layout.simple_list_item_1,
                 displayList
         );
         beaconWindow.setAdapter(adapter);
+
+        // define what happens when clicking on the item
+        beaconWindow.setOnItemClickListener((parent, view, position, id) -> {
+            // get the object
+            Device deviceClicked = displayList.get(position);
+            // make the screen appear
+            if(MainActivity.getInstance() == null){
+                Log.e(TAG, "MainActivity is null");
+                return;
+            }
+
+            MainActivity.getInstance().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.main, DeviceDetailsFragment.newInstance(deviceClicked))
+                    .addToBackStack(null)
+                    .commit();
+        });
 
     }
 }

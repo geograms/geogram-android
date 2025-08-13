@@ -29,9 +29,8 @@ import com.google.android.material.navigation.NavigationView;
 
 import java.lang.ref.WeakReference;
 
-import javax.sql.ConnectionEvent;
-
-import offgrid.geogram.ble.events.EventBleBroadcastMessageSent;
+import offgrid.geogram.apps.loops.PingDevice;
+import offgrid.geogram.apps.loops.UpdatedCoordinates;
 import offgrid.geogram.core.Art;
 import offgrid.geogram.core.BackgroundService;
 import offgrid.geogram.core.Central;
@@ -42,7 +41,6 @@ import offgrid.geogram.devices.ConnectionType;
 import offgrid.geogram.devices.DeviceManager;
 import offgrid.geogram.devices.DeviceType;
 import offgrid.geogram.devices.EventDeviceUpdated;
-import offgrid.geogram.events.EventAction;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
 import offgrid.geogram.fragments.AboutFragment;
@@ -160,6 +158,7 @@ public class MainActivity extends AppCompatActivity {
         setupNavigationDrawer();
         setupBackPressedHandler();
         setupEvents();
+        setupLoops();
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayShowTitleEnabled(false);
@@ -175,6 +174,11 @@ public class MainActivity extends AppCompatActivity {
 
         // add a dummy connection for test purposes
         addDummyConnection();
+    }
+
+    private void setupLoops() {
+        PingDevice.getInstance().start();
+        UpdatedCoordinates.getInstance().start(this);
     }
 
     private void setupEvents() {

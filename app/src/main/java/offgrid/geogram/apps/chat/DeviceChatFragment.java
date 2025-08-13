@@ -73,7 +73,7 @@ public class DeviceChatFragment extends Fragment {
 
         // Initialize UI
         EditText messageInput = view.findViewById(R.id.message_input);
-        ImageButton btnSend = view.findViewById(R.id.btn_send);
+        //ImageButton btnSend = view.findViewById(R.id.btn_send);
         chatMessageContainer = view.findViewById(R.id.chat_message_container);
         chatScrollView = view.findViewById(R.id.chat_scroll_view);
 
@@ -88,10 +88,10 @@ public class DeviceChatFragment extends Fragment {
 
 
         // Send button
-        btnSend.setOnClickListener(v -> {
-            String message = messageInput.getText().toString().trim();
-            sendMessage(message);
-        });
+//        btnSend.setOnClickListener(v -> {
+//            String message = messageInput.getText().toString().trim();
+//            //sendMessage(message);
+//        });
 
         // Scroll chat when user clicks the message input
         messageInput.setOnFocusChangeListener((v, hasFocus) -> {
@@ -111,74 +111,7 @@ public class DeviceChatFragment extends Fragment {
     }
 
 
-    private void sendMessage(String message){
-        if (message.isEmpty()) {
-            return;
-        }
 
-        // get the message box for this device
-//        ChatMessages deviceMessages =
-//                ChatDatabaseWithDevice.getInstance(this.getContext()).getMessages(deviceId);
-//
-//        // message box can't be null
-//        if(deviceMessages == null){
-//            Log.e("DeviceChatFragment", "Device messages are null");
-//            Toast.makeText(getContext(), "Unable to send messages", Toast.LENGTH_LONG).show();
-//            return;
-//        }
-
-        // create the direct message
-//            ChatMessage messageToSend = new ChatMessage(
-//                    Central.getInstance().getSettings().getIdDevice(),
-//                    message
-//                    );
-//
-//            // add this message on the database
-//            deviceMessages.add(messageToSend);
-//            // save the message to disk
-//            ChatDatabaseWithDevice.getInstance(this.getContext()).saveToDisk(deviceId, deviceMessages);
-
-        //BluetoothSender.getInstance(this.getContext()).setSelfMessage(text);
-        //BluetoothSender.getInstance(this.getContext()).sendMessage(text);
-        requireActivity().runOnUiThread(() -> {
-            //BluetoothSender.getInstance(null).start();
-            //BluetoothSender.getInstance(this.getContext()).setSelfMessage(message);
-            //BluetoothSender.getInstance(this.getContext()).sendMessage(message);
-        });
-
-//        new Thread(() -> {
-//            //requireActivity().runOnUiThread(() -> {
-//                BluetoothSender.getInstance(getContext()).sendMessage(message);
-//            //});
-//        }).start();
-
-//                // get the updated MAC address (they change often)
-//                DeviceReachable deviceUpdated = DeviceFinder.getInstance(this.getContext()).getDeviceMap().get(deviceId);
-//                // when it is null, there is nothing to be done here
-//                if(deviceUpdated == null){
-//                    Toast.makeText(getContext(), "Device is not reachable", Toast.LENGTH_SHORT).show();
-//                    return;
-//                }
-//
-//                // Create the data package
-//                BluePackage packageToSend = BluePackage.createSender(
-//                        // specific type C for chatting
-//                        DataType.C, messageToSend.getMessage(), deviceId
-//                );
-//                // repeat the timestamp to permit finding this message again
-//                packageToSend.setTimestamp(messageToSend.getTimestamp());
-//
-//                // send the package to the device
-//                sendPackageToDevice(deviceUpdated.getMacAddress(), packageToSend, this.getContext());
-//
-//                requireActivity().runOnUiThread(() -> {
-//                    messageInput.setText("");
-//                    // inform the UI (start the connected events)
-//                    EventControl.startEvent(EventType.MESSAGE_DIRECT_RECEIVED, messageToSend, false);
-//                    //chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
-//                });
-//        }).start();
-    }
 
     private void addEventMessageReceivedOnOtherDevice() {
         // add our hook to the event actions

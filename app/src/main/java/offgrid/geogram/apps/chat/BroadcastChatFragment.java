@@ -1,4 +1,4 @@
-package offgrid.geogram.ble.events;
+package offgrid.geogram.apps.chat;
 
 import static offgrid.geogram.old.bluetooth_old.other.comms.BlueCommands.tagBio;
 
@@ -144,23 +144,7 @@ public class BroadcastChatFragment extends Fragment {
         BroadcastSender.removeMessageUpdateListener();
     }
 
-    /**
-     * Starts polling the BroadcastChat.messages list every 10 seconds.
-     */
-//    private void startMessagePolling() {
-//        // only allow one instance to run
-//        if(runningPoll != null){
-//            return;
-//        }
-//        runningPoll = new Runnable() {
-//            @Override
-//            public void run() {
-//                updateMessages();
-//                handler.postDelayed(this, REFRESH_INTERVAL_MS);
-//            }
-//        };
-//        handler.postDelayed(runningPoll, REFRESH_INTERVAL_MS);
-//    }
+
 
     /**
      * Updates the chat message container with new messages.

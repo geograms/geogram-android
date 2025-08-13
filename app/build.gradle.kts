@@ -51,6 +51,7 @@ dependencies {
     implementation(libs.bcpkix.jdk15on)
     implementation(libs.viewpager2)
     implementation(libs.runner)
+    implementation(libs.play.services.location)
     testImplementation(libs.junit)
     testImplementation(libs.mockito.inline)
     testImplementation(libs.slf4j.simple)
