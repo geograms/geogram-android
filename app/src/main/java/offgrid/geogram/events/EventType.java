@@ -8,5 +8,6 @@ public enum EventType {
     BLE_BROADCAST_SENT,     // broadcast message was received
 
     BLUETOOTH_ACKNOWLEDGE_RECEIVED, // a message sent by bluetooth was acknowledged
-    BLUETOOTH_MESSAGE_RECEIVED  // a package was received from another bluetooth device
+    BLUETOOTH_MESSAGE_RECEIVED,  // a package was received from another bluetooth device
+    DEVICE_UPDATED, // a device was updated
 }

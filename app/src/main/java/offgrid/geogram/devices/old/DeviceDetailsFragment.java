@@ -138,7 +138,12 @@ public class DeviceDetailsFragment extends Fragment {
     private void launchMessageWindow(DeviceReachableOld beaconDiscovered) {
         DeviceChatFragment fragment = DeviceChatFragment.newInstance(beaconDiscovered.getDeviceId());
 
-        MainActivity.activity.getSupportFragmentManager()
+        if(MainActivity.getInstance() == null){
+            Log.e(TAG, "MainActivity is null");
+            return;
+        }
+
+        MainActivity.getInstance().getSupportFragmentManager()
                 .beginTransaction()
                 .replace(R.id.main, fragment)
                 .addToBackStack(null)

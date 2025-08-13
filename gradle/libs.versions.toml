@@ -20,6 +20,7 @@ mockitoInline = "5.2.0"
 slf4jSimple = "2.1.0-alpha1"
 junitJunit = "4.13.2"
 junitJupiterVersion = "5.8.1"
+runner = "1.6.1"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -42,6 +43,7 @@ mockito-inline = { group = "org.mockito", name = "mockito-inline", version.ref =
 slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4jSimple" }
 junit-junit = { group = "junit", name = "junit", version.ref = "junitJunit" }
 jupiter-junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junitJupiterVersion" }
+runner = { group = "androidx.test", name = "runner", version.ref = "runner" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

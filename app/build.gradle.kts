@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.bcprov.jdk15on)
     implementation(libs.bcpkix.jdk15on)
     implementation(libs.viewpager2)
+    implementation(libs.runner)
     testImplementation(libs.junit)
     testImplementation(libs.mockito.inline)
     testImplementation(libs.slf4j.simple)

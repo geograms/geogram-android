@@ -14,6 +14,7 @@ import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.graphics.Insets;
@@ -26,11 +27,24 @@ import androidx.fragment.app.FragmentTransaction;
 
 import com.google.android.material.navigation.NavigationView;
 
+import java.lang.ref.WeakReference;
+
+import javax.sql.ConnectionEvent;
+
+import offgrid.geogram.ble.events.EventBleBroadcastMessageSent;
 import offgrid.geogram.core.Art;
 import offgrid.geogram.core.BackgroundService;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.core.PermissionsHelper;
+import offgrid.geogram.devices.ConnectedEvent;
+import offgrid.geogram.devices.ConnectionType;
+import offgrid.geogram.devices.DeviceManager;
+import offgrid.geogram.devices.DeviceType;
+import offgrid.geogram.devices.EventDeviceUpdated;
+import offgrid.geogram.events.EventAction;
+import offgrid.geogram.events.EventControl;
+import offgrid.geogram.events.EventType;
 import offgrid.geogram.fragments.AboutFragment;
 import offgrid.geogram.fragments.DebugFragment;
 import offgrid.geogram.fragments.NetworksFragment;
@@ -41,15 +55,31 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
 
-    public static MainActivity activity = null;
-    public static ListView beacons = null;
+    // --- Leak-safe singleton accessor (WeakReference) ---
+    private static volatile WeakReference<MainActivity> sInstance = new WeakReference<>(null);
+
+    /** Returns the current activity instance if alive; else null. */
+    public static @Nullable MainActivity getInstance() {
+        return sInstance.get();
+    }
+
+    /** Convenience: get the ListView if the Activity is alive; else null. */
+    public static @Nullable ListView getBeaconsViewIfAlive() {
+        MainActivity a = getInstance();
+        return (a == null) ? null : a.beacons;
+    }
+    // ----------------------------------------------------
+
+    // Keep this non-static to avoid holding UI across process lifetime
+    public ListView beacons;
+    // This flag can stay static; it doesn’t hold context or views.
     private static boolean wasCreatedBefore = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        activity = this;
+        sInstance = new WeakReference<>(this); // publish current instance
 
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
 
@@ -58,6 +88,17 @@ public class MainActivity extends AppCompatActivity {
         } else {
             PermissionsHelper.requestPermissionsIfNecessary(this);
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        // Clear the weak ref if it points to this instance
+        MainActivity cur = sInstance.get();
+        if (cur == this) {
+            sInstance.clear();
+            sInstance = new WeakReference<>(null);
+        }
+        super.onDestroy();
     }
 
     @Override
@@ -71,7 +112,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -79,7 +119,6 @@ public class MainActivity extends AppCompatActivity {
         if (PermissionsHelper.handlePermissionResult(requestCode, permissions, grantResults)) {
             initializeApp();
         } else {
-            // Check if user denied with "Don't ask again"
             boolean permanentlyDenied = false;
             for (int i = 0; i < permissions.length; i++) {
                 if (grantResults[i] == PackageManager.PERMISSION_DENIED &&
@@ -94,7 +133,6 @@ public class MainActivity extends AppCompatActivity {
                         "Some permissions are permanently denied. Please enable them in App Settings.",
                         Toast.LENGTH_LONG).show();
 
-                // Open settings
                 Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
                 intent.setData(android.net.Uri.fromParts("package", getPackageName(), null));
                 startActivity(intent);
@@ -105,8 +143,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
-
-
 
     private void initializeApp() {
         Log.i(TAG, "Initializing the app...");
@@ -123,6 +159,7 @@ public class MainActivity extends AppCompatActivity {
 
         setupNavigationDrawer();
         setupBackPressedHandler();
+        setupEvents();
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayShowTitleEnabled(false);
@@ -135,6 +172,22 @@ public class MainActivity extends AppCompatActivity {
         log("Geogram", Art.logo1());
         startBackgroundService();
         wasCreatedBefore = true;
+
+        // add a dummy connection for test purposes
+        addDummyConnection();
+    }
+
+    private void setupEvents() {
+        // add the action to the event
+        EventControl.addEvent(EventType.DEVICE_UPDATED,
+                new EventDeviceUpdated(TAG + "-device_updated")
+        );
+    }
+
+    private void addDummyConnection() {
+        ConnectedEvent event = new ConnectedEvent(ConnectionType.DIRECT, "123", "456", "789");
+        String callsign = "CR7BBQ";
+        DeviceManager.getInstance().addNewEvent(callsign, DeviceType.HT_PORTABLE, event);
     }
 
     private void setupNavigationDrawer() {

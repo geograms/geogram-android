@@ -2,6 +2,9 @@ package offgrid.geogram.devices;
 
 import java.util.TreeSet;
 
+import offgrid.geogram.events.EventControl;
+import offgrid.geogram.events.EventType;
+
 /**
  * Singleton managing devices found nearby (physically or remotely).
  */
@@ -39,4 +42,28 @@ public class DeviceManager {
     public synchronized void clear() {
         devicesSpotted.clear();
     }
+
+    public synchronized void addNewEvent(String callsign, DeviceType deviceType, ConnectedEvent event){
+        Device deviceFound = null;
+        for(Device device : devicesSpotted){
+            if(device.ID.equalsIgnoreCase(callsign)){
+                deviceFound = device;
+                break;
+            }
+        }
+        if(deviceFound != null){
+            deviceFound.addEvent(event);
+        }else{
+            deviceFound = new Device(callsign, deviceType);
+            deviceFound.addEvent(event);
+            devicesSpotted.add(deviceFound);
+        }
+        // add the device
+
+
+        // a new event happened
+        EventControl.startEvent(EventType.DEVICE_UPDATED, deviceFound);
+
+    }
+
 }

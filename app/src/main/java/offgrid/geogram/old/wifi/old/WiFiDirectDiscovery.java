@@ -1,6 +1,5 @@
 package offgrid.geogram.old.wifi.old;
 
-import static offgrid.geogram.MainActivity.activity;
 import static offgrid.geogram.old.wifi.WiFiCommon.channel;
 import static offgrid.geogram.old.wifi.WiFiCommon.wifiP2pManager;
 
@@ -37,53 +36,53 @@ public class WiFiDirectDiscovery {
             return;
         }
 
-        if (!PermissionsHelper.hasAllPermissions(activity)) {
-            Log.e(TAG, "Missing necessary permissions. Repeating permission request");
-            PermissionsHelper.requestPermissionsIfNecessary(activity);
-            startDiscovery(counter + 1);
-            return;
-        }
-
-        // Ensure Wi-Fi is enabled
-        WifiManager wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
-        if (!wifiManager.isWifiEnabled()) {
-            Log.e(TAG, "Wi-Fi is disabled. Prompting user to enable it.");
-            // Prompt user to enable Wi-Fi
-            Intent intent = new Intent(WifiManager.ACTION_PICK_WIFI_NETWORK);
-            context.startActivity(intent);
-            return;
-        }
-
-        // Start peer discovery
-        try {
-            isDiscovering = true;
-            wifiP2pManager.discoverPeers(channel, new WifiP2pManager.ActionListener() {
-                @Override
-                public void onSuccess() {
-                    Log.i(TAG, "Peer discovery started successfully");
-                }
-
-                @Override
-                public void onFailure(int reason) {
-                    isDiscovering = false;
-                    switch (reason) {
-                        case WifiP2pManager.P2P_UNSUPPORTED:
-                            Log.e(TAG, "Peer discovery failed: P2P unsupported");
-                            break;
-                        case WifiP2pManager.BUSY:
-                            Log.e(TAG, "Peer discovery failed: Framework busy");
-                            break;
-                        case WifiP2pManager.ERROR:
-                        default:
-                            Log.e(TAG, "Peer discovery failed: Internal error");
-                            break;
-                    }
-                }
-            });
-        } catch (SecurityException e) {
-            isDiscovering = false;
-            Log.e(TAG, "Permission denied while starting peer discovery: " + e.getMessage());
-        }
+//        if (!PermissionsHelper.hasAllPermissions(activity)) {
+//            Log.e(TAG, "Missing necessary permissions. Repeating permission request");
+//            PermissionsHelper.requestPermissionsIfNecessary(activity);
+//            startDiscovery(counter + 1);
+//            return;
+//        }
+//
+//        // Ensure Wi-Fi is enabled
+//        WifiManager wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
+//        if (!wifiManager.isWifiEnabled()) {
+//            Log.e(TAG, "Wi-Fi is disabled. Prompting user to enable it.");
+//            // Prompt user to enable Wi-Fi
+//            Intent intent = new Intent(WifiManager.ACTION_PICK_WIFI_NETWORK);
+//            context.startActivity(intent);
+//            return;
+//        }
+//
+//        // Start peer discovery
+//        try {
+//            isDiscovering = true;
+//            wifiP2pManager.discoverPeers(channel, new WifiP2pManager.ActionListener() {
+//                @Override
+//                public void onSuccess() {
+//                    Log.i(TAG, "Peer discovery started successfully");
+//                }
+//
+//                @Override
+//                public void onFailure(int reason) {
+//                    isDiscovering = false;
+//                    switch (reason) {
+//                        case WifiP2pManager.P2P_UNSUPPORTED:
+//                            Log.e(TAG, "Peer discovery failed: P2P unsupported");
+//                            break;
+//                        case WifiP2pManager.BUSY:
+//                            Log.e(TAG, "Peer discovery failed: Framework busy");
+//                            break;
+//                        case WifiP2pManager.ERROR:
+//                        default:
+//                            Log.e(TAG, "Peer discovery failed: Internal error");
+//                            break;
+//                    }
+//                }
+//            });
+//        } catch (SecurityException e) {
+//            isDiscovering = false;
+//            Log.e(TAG, "Permission denied while starting peer discovery: " + e.getMessage());
+//        }
     }
 
     public void stopDiscovery() {

@@ -54,7 +54,12 @@ public class DeviceListing {
      * Updates the list of beacons on the UI.
      */
     public void updateList(Context context) {
-        ListView beaconWindow = MainActivity.beacons;
+        if(MainActivity.getInstance() == null){
+            Log.e(TAG, "MainActivity is null");
+            return;
+        }
+
+        ListView beaconWindow = MainActivity.getInstance().beacons;
 
         if (beaconWindow == null) {
             return;
@@ -115,7 +120,12 @@ public class DeviceListing {
             BioProfile profile = displayList.get(position);
 
             // make the screen appear
-            MainActivity.activity.getSupportFragmentManager()
+            if(MainActivity.getInstance() == null){
+                Log.e(TAG, "MainActivity is null");
+                return;
+            }
+
+            MainActivity.getInstance().getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.main, DeviceDetailsFragment.newInstance(profile))
                     .addToBackStack(null)

@@ -82,4 +82,8 @@ public class ConnectedEvent implements Comparable<ConnectedEvent> {
                 ", count=" + timestamps.size() +
                 '}';
     }
+
+    public boolean containsTimeStamp(long l) {
+        return timestamps.contains(l);
+    }
 }

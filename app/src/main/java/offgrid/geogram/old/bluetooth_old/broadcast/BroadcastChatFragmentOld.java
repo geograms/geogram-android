@@ -309,7 +309,12 @@ public class BroadcastChatFragmentOld extends Fragment implements BroadcastSende
         DeviceDetailsFragment fragment = DeviceDetailsFragment.newInstance(profile);
 
         // make the screen appear
-        MainActivity.activity.getSupportFragmentManager()
+        if(MainActivity.getInstance() == null){
+            Log.e(TAG, "MainActivity is null");
+            return;
+        }
+
+        MainActivity.getInstance().getSupportFragmentManager()
                 .beginTransaction()
                 .replace(R.id.main, DeviceDetailsFragment.newInstance(profile))
                 .addToBackStack(null)
