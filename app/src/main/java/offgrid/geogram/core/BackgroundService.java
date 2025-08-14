@@ -20,6 +20,7 @@ import androidx.core.app.NotificationCompat;
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.ble.BluetoothCentral;
+import offgrid.geogram.database.DatabaseMessages;
 import offgrid.geogram.server.SimpleSparkServer;
 
 public class BackgroundService extends Service {
@@ -58,6 +59,9 @@ public class BackgroundService extends Service {
             startBluetooth();
         }
 
+        // start the databases
+        startDatabases();
+
         // Start recurring background task
         handler = new Handler();
         logTask = new Runnable() {
@@ -74,6 +78,10 @@ public class BackgroundService extends Service {
         handler.post(logTask);
 
         log(TAG, "Geogram background service started.");
+    }
+
+    private void startDatabases() {
+        DatabaseMessages.getInstance().init(this.getApplicationContext());
     }
 
     @SuppressLint("ObsoleteSdkInt")

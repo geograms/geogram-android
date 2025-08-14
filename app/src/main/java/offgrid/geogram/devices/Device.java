@@ -11,7 +11,7 @@ public class Device implements Comparable<Device> {
     public final DeviceType deviceType;
 
     // when was this device located before?
-    public final TreeSet<ConnectedEvent> connectedEvents = new TreeSet<>();
+    public final TreeSet<EventConnected> connectedEvents = new TreeSet<>();
 
     public Device(String ID, DeviceType deviceType) {
         this.ID = Objects.requireNonNull(ID, "ID");
@@ -70,9 +70,9 @@ public class Device implements Comparable<Device> {
         return ID + " (" + deviceType.name() + ")";
     }
 
-    public void addEvent(ConnectedEvent event) {
+    public void addEvent(EventConnected event) {
         // iterate all previous events to update
-        for(ConnectedEvent connectedEvent : connectedEvents){
+        for(EventConnected connectedEvent : connectedEvents){
             // needs to match the same type
             if(connectedEvent.connectionType != event.connectionType){
                 continue;

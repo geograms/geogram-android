@@ -17,9 +17,9 @@ import offgrid.geogram.R;
 import offgrid.geogram.devices.old.DeviceReachableOld;
 import offgrid.geogram.old.bluetooth_old.eddystone.DeviceFinder;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.database.old.BioDatabase;
-import offgrid.geogram.database.old.BioProfile;
-import offgrid.geogram.apps.chat.DeviceChatFragment;
+import offgrid.geogram.old.databaseold.BioDatabase;
+import offgrid.geogram.old.databaseold.BioProfile;
+import offgrid.geogram.apps.chat.ChatFragmentDevice;
 
 public class DeviceDetailsFragment extends Fragment {
 
@@ -137,7 +137,7 @@ public class DeviceDetailsFragment extends Fragment {
     }
 
     private void launchMessageWindow(DeviceReachableOld beaconDiscovered) {
-        DeviceChatFragment fragment = DeviceChatFragment.newInstance(beaconDiscovered.getDeviceId());
+        ChatFragmentDevice fragment = ChatFragmentDevice.newInstance(beaconDiscovered.getDeviceId());
 
         if(MainActivity.getInstance() == null){
             Log.e(TAG, "MainActivity is null");

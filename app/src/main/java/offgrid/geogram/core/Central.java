@@ -9,8 +9,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
-import offgrid.geogram.apps.chat.BroadcastChatFragment;
-import offgrid.geogram.database.DatabaseCallSign;
+import offgrid.geogram.apps.chat.ChatFragmentBroadcast;
 import offgrid.geogram.old.old.WiFi_control;
 import offgrid.geogram.server.SimpleSparkServer;
 import offgrid.geogram.settings.SettingsLoader;
@@ -26,9 +25,8 @@ public class Central {
     public static boolean debugForLocalTests = false;
 
 
-    public BroadcastChatFragment broadcastChatFragment = new BroadcastChatFragment();
+    public ChatFragmentBroadcast broadcastChatFragment = new ChatFragmentBroadcast();
 
-    public DatabaseCallSign databaseCallSign = null;
     /*
      * Old settings, need to be incrementally removed
      */
@@ -101,7 +99,6 @@ public class Central {
         try {
             settings = SettingsLoader.loadSettings(context);
             // setup other variables
-            databaseCallSign = DatabaseCallSign.loadFromDisk(context);
         } catch (Exception e) {
             settings = new SettingsUser(); // Default settings if loading fails
             log("SettingsLoader", "Failed to load settings. Using defaults.");

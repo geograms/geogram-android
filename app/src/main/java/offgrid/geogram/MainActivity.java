@@ -36,7 +36,7 @@ import offgrid.geogram.core.BackgroundService;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.core.PermissionsHelper;
-import offgrid.geogram.devices.ConnectedEvent;
+import offgrid.geogram.devices.EventConnected;
 import offgrid.geogram.devices.ConnectionType;
 import offgrid.geogram.devices.DeviceManager;
 import offgrid.geogram.devices.DeviceType;
@@ -177,8 +177,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupLoops() {
-        PingDevice.getInstance().start();
         UpdatedCoordinates.getInstance().start(this);
+        PingDevice.getInstance().start();
     }
 
     private void setupEvents() {
@@ -189,7 +189,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void addDummyConnection() {
-        ConnectedEvent event = new ConnectedEvent(ConnectionType.DIRECT, "123", "456", "789");
+        EventConnected event = new EventConnected(ConnectionType.DIRECT, "123", "456", "789");
         String callsign = "CR7BBQ";
         DeviceManager.getInstance().addNewEvent(callsign, DeviceType.HT_PORTABLE, event);
     }

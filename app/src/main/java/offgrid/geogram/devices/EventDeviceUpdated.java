@@ -33,7 +33,7 @@ public class EventDeviceUpdated extends EventAction {
             return;
         }
 
-        // create a new list of things to show
+        // create a new list of things to show on the main screen
         ArrayList<Device> displayList = new ArrayList<>(DeviceManager.getInstance().getDevicesSpotted());
 
 

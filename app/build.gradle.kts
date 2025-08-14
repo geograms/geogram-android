@@ -4,8 +4,7 @@ plugins {
 
 android {
     signingConfigs {
-        create("release") {
-        }
+        create("release") { }
     }
     namespace = "offgrid.geogram"
     compileSdk = 34
@@ -35,7 +34,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
 
+/** Kill duplicate classes by excluding the old IntelliJ annotations everywhere. */
+configurations.configureEach {
+    exclude(group = "com.intellij", module = "annotations")
 }
 
 dependencies {
@@ -52,11 +55,16 @@ dependencies {
     implementation(libs.viewpager2)
     implementation(libs.runner)
     implementation(libs.play.services.location)
+
+    // Room
+    implementation(libs.room.runtime)
+    annotationProcessor(libs.room.compiler) // <-- was implementation(...)
+
+    debugImplementation(libs.stetho)
     testImplementation(libs.junit)
     testImplementation(libs.mockito.inline)
     testImplementation(libs.slf4j.simple)
     androidTestImplementation(libs.espresso.core)
 
-    // Add the nostr-java-api library
-    //implementation("com.github.tcheeric:nostr-java:main-SNAPSHOT")
+    // implementation("com.github.tcheeric:nostr-java:main-SNAPSHOT")
 }

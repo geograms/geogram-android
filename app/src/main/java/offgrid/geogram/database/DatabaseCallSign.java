@@ -5,7 +5,7 @@ import android.content.Context;
 import java.io.File;
 import java.util.HashMap;
 
-import offgrid.geogram.ble.chat.ChatMessage;
+import offgrid.geogram.apps.chat.ChatMessage;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.util.JsonUtils;
 
@@ -14,7 +14,7 @@ import offgrid.geogram.util.JsonUtils;
  */
 public class DatabaseCallSign {
 
-    public final static String TAG = "DatabaseMesageStream";
+    public final static String TAG = "DatabaseMessageStream";
     public final static String FOLDER_NAME = "callsigns";
     public final static String FILE_NAME = "data-callsign.json";
 
@@ -107,7 +107,7 @@ public class DatabaseCallSign {
      * @param chatMessage
      */
     public void update(ChatMessage chatMessage) {
-        String callSignName = chatMessage.getFrom();
+        String callSignName = chatMessage.getAuthorId();
         if (callSignName == null) {
             Log.e(TAG, "callSignName is null");
             return;

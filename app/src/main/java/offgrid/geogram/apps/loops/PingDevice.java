@@ -8,7 +8,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import offgrid.geogram.ble.BluetoothCentral;
 import offgrid.geogram.ble.BluetoothSender;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.util.GeoCode4;
@@ -41,16 +40,25 @@ public final class PingDevice {
     private final Object lock = new Object();
     private ScheduledFuture<?> repeatingTask; // null if not running
 
-    /** Start repeating every 60s; no-op if already running. */
+    /** Start: send one ping now, then repeat every 60s after that. */
     public void start() {
         synchronized (lock) {
             if (repeatingTask != null && !repeatingTask.isCancelled() && !repeatingTask.isDone()) return;
-            // With fixed DELAY: next run starts 60s AFTER previous run finished (avoids overlap).
-            repeatingTask = scheduler.scheduleWithFixedDelay(this::safeBroadcastPing,
-                    0, REFRESH_INTERVAL_SECONDS, TimeUnit.SECONDS);
-            Log.d(TAG, "Ping started (every " + REFRESH_INTERVAL_SECONDS + "s)");
+
+            // Immediate, async (doesn't block caller thread)
+            scheduler.execute(this::safeBroadcastPing);
+
+            // Next runs start 60s AFTER the previous one finishes
+            repeatingTask = scheduler.scheduleWithFixedDelay(
+                    this::safeBroadcastPing,
+                    REFRESH_INTERVAL_SECONDS,            // initial delay (start after 60s)
+                    REFRESH_INTERVAL_SECONDS,            // period
+                    TimeUnit.SECONDS
+            );
+            Log.d(TAG, "Ping started (immediate + every " + REFRESH_INTERVAL_SECONDS + "s)");
         }
     }
+
 
     /** Stop repeating; safe to call multiple times. */
     public void stop() {
@@ -101,6 +109,8 @@ public final class PingDevice {
             String latCode = GeoCode4.encodeLat(f.lat);   // e.g., "0A9F"
             String lonCode = GeoCode4.encodeLon(f.lon);   // e.g., "Z12K"
             coordinates = latCode + "-" + lonCode;
+            // don't use APRS coordinates because they use non-human friendly chars
+            // coordinates = AprsCompressed.encodePairWithDash(f.lat, f.lon);
         }
 
 

@@ -22,15 +22,15 @@ import androidx.fragment.app.Fragment;
 
 import offgrid.geogram.R;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.database.old.BioDatabase;
-import offgrid.geogram.database.old.BioProfile;
+import offgrid.geogram.old.databaseold.BioDatabase;
+import offgrid.geogram.old.databaseold.BioProfile;
 import offgrid.geogram.events.EventAction;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
 import offgrid.geogram.util.ASCII;
 import offgrid.geogram.util.DateUtils;
 
-public class DeviceChatFragment extends Fragment {
+public class ChatFragmentDevice extends Fragment {
 
     private static final String ARG_DEVICE_ID = "device_id";
     private static final String TAG = "DeviceChatFragment";
@@ -40,8 +40,8 @@ public class DeviceChatFragment extends Fragment {
     private final Handler handler = new Handler(Looper.getMainLooper());
     BioProfile profile = null;
 
-    public static DeviceChatFragment newInstance(String deviceId) {
-        DeviceChatFragment fragment = new DeviceChatFragment();
+    public static ChatFragmentDevice newInstance(String deviceId) {
+        ChatFragmentDevice fragment = new ChatFragmentDevice();
         Bundle args = new Bundle();
         args.putString(ARG_DEVICE_ID, deviceId);
         fragment.setArguments(args);
@@ -170,6 +170,10 @@ public class DeviceChatFragment extends Fragment {
         if(deviceId == null){
             return;
         }
+
+        // get the previous messages
+
+
 //        // get all the messages related to this device id
 //        ChatMessages messageBox = ChatDatabaseWithDevice.getInstance(this.getContext()).getMessages(deviceId);
 //        String thisDeviceId = Central.getInstance().getSettings().getIdDevice();

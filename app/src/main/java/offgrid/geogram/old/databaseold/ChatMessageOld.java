@@ -1,4 +1,4 @@
-package offgrid.geogram.ble.chat;
+package offgrid.geogram.old.databaseold;
 
 import offgrid.geogram.ble.BluetoothMessage;
 import offgrid.geogram.old.bluetooth_old.broadcast.BroadcastMessage;
@@ -6,11 +6,11 @@ import offgrid.geogram.old.bluetooth_old.broadcast.BroadcastMessage;
 /*
     Defines a message displayed inside a chat window
  */
-public class ChatMessage {
+public class ChatMessageOld {
 
     // has the message been read by this user?
     private boolean wasRead;
-    // was the message sent by the device?
+    // was the message read by the target device?
     private boolean wasSent;
     // when was it received or sent?
     // was this message displayed to the end user?
@@ -87,8 +87,8 @@ public class ChatMessage {
         isWrittenByMe = writtenByMe;
     }
 
-    public static ChatMessage convert(BluetoothMessage message){
-        ChatMessage output = new ChatMessage();
+    public static ChatMessageOld convert(BluetoothMessage message){
+        ChatMessageOld output = new ChatMessageOld();
         output.setFrom(message.getIdFromSender());
         output.setTo(message.getIdDestination());
         output.setMessage(message.getMessage());
@@ -96,8 +96,8 @@ public class ChatMessage {
         return output;
     }
 
-    public static ChatMessage convert(BroadcastMessage message) {
-        ChatMessage output = new ChatMessage();
+    public static ChatMessageOld convert(BroadcastMessage message) {
+        ChatMessageOld output = new ChatMessageOld();
         output.setFrom(message.getDeviceId());
         output.setMessage(message.getMessage());
         output.setTimestamp(message.getTimestamp());

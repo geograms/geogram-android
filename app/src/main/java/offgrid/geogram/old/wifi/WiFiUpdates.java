@@ -9,7 +9,7 @@ import java.net.Socket;
 
 import offgrid.geogram.old.bluetooth_old.eddystone.EddystoneNamespaceGenerator;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.database.old.HelloDatabase;
+import offgrid.geogram.old.databaseold.HelloDatabase;
 import offgrid.geogram.devices.old.DeviceReachableOld;
 import offgrid.geogram.util.JsonUtils;
 import offgrid.geogram.old.wifi.details.WiFiNetwork;

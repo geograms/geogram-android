@@ -19,7 +19,7 @@ import offgrid.geogram.old.bluetooth_old.Bluecomm;
 import offgrid.geogram.old.bluetooth_old.other.comms.DataType;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.database.old.BioProfile;
+import offgrid.geogram.old.databaseold.BioProfile;
 import offgrid.geogram.settings.SettingsUser;
 import offgrid.geogram.devices.old.DeviceReachableOld;
 

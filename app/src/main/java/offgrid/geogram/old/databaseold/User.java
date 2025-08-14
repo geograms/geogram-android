@@ -1,4 +1,4 @@
-package offgrid.geogram.database.old;
+package offgrid.geogram.old.databaseold;
 
 import java.util.ArrayList;
 

@@ -43,7 +43,7 @@ public class DeviceManager {
         devicesSpotted.clear();
     }
 
-    public synchronized void addNewEvent(String callsign, DeviceType deviceType, ConnectedEvent event){
+    public synchronized void addNewEvent(String callsign, DeviceType deviceType, EventConnected event){
         Device deviceFound = null;
         for(Device device : devicesSpotted){
             if(device.ID.equalsIgnoreCase(callsign)){

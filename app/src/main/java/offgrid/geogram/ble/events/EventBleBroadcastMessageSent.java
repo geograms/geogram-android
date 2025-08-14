@@ -1,7 +1,7 @@
 package offgrid.geogram.ble.events;
 
+import offgrid.geogram.apps.chat.ChatMessage;
 import offgrid.geogram.ble.BluetoothMessage;
-import offgrid.geogram.ble.chat.ChatMessage;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.events.EventAction;
 

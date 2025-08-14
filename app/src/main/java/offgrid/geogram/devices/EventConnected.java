@@ -8,13 +8,13 @@ import java.util.Objects;
  * There was a connection between two devices.
  * Natural order: by most recent timestamp (older first, newer last).
  */
-public class ConnectedEvent implements Comparable<ConnectedEvent> {
+public class EventConnected implements Comparable<EventConnected> {
     public final ArrayList<Long> timestamps = new ArrayList<>();
     public final ConnectionType connectionType;
 
     public final String lat, lon, alt;
 
-    public ConnectedEvent(ConnectionType connectionType, String lat, String lon, String alt) {
+    public EventConnected(ConnectionType connectionType, String lat, String lon, String alt) {
         this.connectionType = Objects.requireNonNull(connectionType, "connectionType");
         this.lat = lat;
         this.lon = lon;
@@ -41,7 +41,7 @@ public class ConnectedEvent implements Comparable<ConnectedEvent> {
 
     /** Natural ordering: ascending by latest timestamp (older first). */
     @Override
-    public int compareTo(ConnectedEvent other) {
+    public int compareTo(EventConnected other) {
         int byTime = Long.compare(this.latestTimestamp(), other.latestTimestamp());
         if (byTime != 0) return byTime;
         // stable tie-breakers to keep sort deterministic
@@ -58,8 +58,8 @@ public class ConnectedEvent implements Comparable<ConnectedEvent> {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ConnectedEvent)) return false;
-        ConnectedEvent that = (ConnectedEvent) o;
+        if (!(o instanceof EventConnected)) return false;
+        EventConnected that = (EventConnected) o;
         return connectionType == that.connectionType
                 && Objects.equals(lat, that.lat)
                 && Objects.equals(lon, that.lon)

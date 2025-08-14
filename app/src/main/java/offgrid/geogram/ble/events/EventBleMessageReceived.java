@@ -2,8 +2,8 @@ package offgrid.geogram.ble.events;
 
 import java.util.HashMap;
 
+import offgrid.geogram.apps.chat.ChatMessage;
 import offgrid.geogram.ble.BluetoothMessage;
-import offgrid.geogram.ble.chat.ChatMessage;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.events.EventAction;
@@ -32,11 +32,6 @@ public class EventBleMessageReceived extends EventAction {
         if(message.contains(":") == false){
             return;
         }
-
-
-//        if(messages.size() == 1){
-//            System.gc();
-//        }
 
         // get the id of the message
         String id = message.substring(0, 2);
@@ -82,9 +77,9 @@ public class EventBleMessageReceived extends EventAction {
     }
 
     private void addMessageToDatabase(ChatMessage chatMessage) {
-        if(chatMessage.getFrom() == null){
+        if(chatMessage.getAuthorId() == null){
             return;
         }
-        Central.getInstance().databaseCallSign.update(chatMessage);
+        //Central.getInstance().databaseCallSign.update(chatMessage);
     }
 }
