@@ -119,6 +119,7 @@ public final class DatabaseMessages {
 
     /** Add a single message; returns true if added (i.e., not a duplicate). */
     public boolean add(@NonNull ChatMessage msg) {
+        Log.d(TAG, "add: " + msg);
         Objects.requireNonNull(msg, "msg");
         synchronized (lock) {
             ensureInitialized();

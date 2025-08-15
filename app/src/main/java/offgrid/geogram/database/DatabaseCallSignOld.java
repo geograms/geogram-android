@@ -12,7 +12,7 @@ import offgrid.geogram.util.JsonUtils;
 /**
  * Provides a folder of messages being received or sent
  */
-public class DatabaseCallSign {
+public class DatabaseCallSignOld {
 
     public final static String TAG = "DatabaseMessageStream";
     public final static String FOLDER_NAME = "callsigns";
@@ -23,7 +23,7 @@ public class DatabaseCallSign {
 
     private final Context context;
 
-    public DatabaseCallSign(Context context) {
+    public DatabaseCallSignOld(Context context) {
         this.context = context;
     }
 
@@ -52,12 +52,12 @@ public class DatabaseCallSign {
         list.put(callSign.getCallsign(), callSign);
     }
 
-    public static DatabaseCallSign loadFromDisk(Context appContext) {
+    public static DatabaseCallSignOld loadFromDisk(Context appContext) {
         File folder = new File(appContext.getFilesDir(), FOLDER_NAME);
         File file = new File(folder, FILE_NAME);
 
         if (file.exists()) {
-            DatabaseCallSign instance = JsonUtils.parseJson(file, DatabaseCallSign.class);
+            DatabaseCallSignOld instance = JsonUtils.parseJson(file, DatabaseCallSignOld.class);
             if (instance != null) {
                 Log.i(TAG, "Loaded DatabaseCallSign from: " + file.getAbsolutePath());
                 return instance;
@@ -68,7 +68,7 @@ public class DatabaseCallSign {
             Log.i(TAG, "No existing file. Creating new in-memory DatabaseCallSign.");
         }
 
-        return new DatabaseCallSign(appContext);
+        return new DatabaseCallSignOld(appContext);
     }
 
 

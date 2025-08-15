@@ -20,6 +20,7 @@ import androidx.core.app.NotificationCompat;
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.ble.BluetoothCentral;
+import offgrid.geogram.database.DatabaseLocations;
 import offgrid.geogram.database.DatabaseMessages;
 import offgrid.geogram.server.SimpleSparkServer;
 
@@ -82,6 +83,7 @@ public class BackgroundService extends Service {
 
     private void startDatabases() {
         DatabaseMessages.getInstance().init(this.getApplicationContext());
+        DatabaseLocations.get().init(getApplicationContext());
     }
 
     @SuppressLint("ObsoleteSdkInt")

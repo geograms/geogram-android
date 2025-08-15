@@ -6,6 +6,7 @@ import offgrid.geogram.apps.chat.ChatMessage;
 import offgrid.geogram.ble.BluetoothMessage;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
+import offgrid.geogram.database.DatabaseMessages;
 import offgrid.geogram.events.EventAction;
 
 public class EventBleMessageReceived extends EventAction {
@@ -59,27 +60,44 @@ public class EventBleMessageReceived extends EventAction {
             return;
         }
 
+        // needs to have a destination
         String destination = msg.getIdDestination();
         if(destination == null){
             return;
         }
 
         // the message is complete, do the rest
+
+        // is this a broadcast message?
         if(msg.getIdDestination().equalsIgnoreCase("ANY")){
-            // this is a broadcast message to be placed on the chat
-            ChatMessage chatMessage = ChatMessage.convert(msg);
-            Central.getInstance().broadcastChatFragment.addMessage(chatMessage);
-            addMessageToDatabase(chatMessage);
+            handleBroadcastMessage(msg);
         }
 
         Log.i(TAG, "-->> Message completed: " + msg.getOutput());
-
     }
 
-    private void addMessageToDatabase(ChatMessage chatMessage) {
-        if(chatMessage.getAuthorId() == null){
+    private void handleBroadcastMessage(BluetoothMessage msg) {
+        // start by getting the text of the message
+        String text = msg.getMessage();
+
+        // + is for location messages
+        if(text.startsWith("+")){
+            handleLocationMessage(msg);
             return;
         }
-        //Central.getInstance().databaseCallSign.update(chatMessage);
+
+        // this is a generic message, convert to a standard format
+        String idThisDevice = Central.getInstance().getSettings().getIdDevice();
+        ChatMessage chatMessage = ChatMessage.convert(msg);
+
+        // add to our database of broadcast messages
+        DatabaseMessages.getInstance().add(chatMessage);
+
+        // place it on the chat (when possible)
+        Central.getInstance().broadcastChatFragment.addMessage(chatMessage);
     }
+
+    private void handleLocationMessage(BluetoothMessage msg) {
+    }
+
 }

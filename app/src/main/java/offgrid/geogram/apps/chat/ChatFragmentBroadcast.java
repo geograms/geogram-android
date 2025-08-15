@@ -51,10 +51,10 @@ public class ChatFragmentBroadcast extends Fragment {
     }
 
     public void addMessage(ChatMessage message){
-        //messageLog.add(message);
+        // get the id for this device
         String idThisDevice = Central.getInstance().getSettings().getIdDevice();
-        DatabaseMessages.getInstance().add(message);
         if(canAddMessages()){
+            // when possible, include the message on the chat window
             updateMessage(idThisDevice, message);
         }
     }
