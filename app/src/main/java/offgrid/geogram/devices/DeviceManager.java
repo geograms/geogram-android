@@ -2,6 +2,7 @@ package offgrid.geogram.devices;
 
 import java.util.TreeSet;
 
+import offgrid.geogram.database.DatabaseLocations;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
 
@@ -43,7 +44,7 @@ public class DeviceManager {
         devicesSpotted.clear();
     }
 
-    public synchronized void addNewEvent(String callsign, DeviceType deviceType, EventConnected event){
+    public synchronized void addNewLocationEvent(String callsign, DeviceType deviceType, EventConnected event){
         Device deviceFound = null;
         for(Device device : devicesSpotted){
             if(device.ID.equalsIgnoreCase(callsign)){
@@ -51,17 +52,23 @@ public class DeviceManager {
                 break;
             }
         }
-        if(deviceFound != null){
-            deviceFound.addEvent(event);
-        }else{
+        // when there was no device, add one
+        if(deviceFound == null){
             deviceFound = new Device(callsign, deviceType);
-            deviceFound.addEvent(event);
             devicesSpotted.add(deviceFound);
         }
-        // add the device
+        // add the event
+        deviceFound.addEvent(event);
 
+        // add this location event to the database
+        DatabaseLocations.get().enqueue(
+                callsign,
+                event.geocode,
+                System.currentTimeMillis(),
+                null
+        );
 
-        // a new event happened
+        // a new event happened with the device
         EventControl.startEvent(EventType.DEVICE_UPDATED, deviceFound);
 
     }

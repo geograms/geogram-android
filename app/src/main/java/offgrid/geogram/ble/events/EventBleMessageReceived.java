@@ -6,13 +6,18 @@ import offgrid.geogram.apps.chat.ChatMessage;
 import offgrid.geogram.ble.BluetoothMessage;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
+import offgrid.geogram.database.DatabaseLocations;
 import offgrid.geogram.database.DatabaseMessages;
+import offgrid.geogram.devices.ConnectionType;
+import offgrid.geogram.devices.DeviceManager;
+import offgrid.geogram.devices.DeviceType;
+import offgrid.geogram.devices.EventConnected;
 import offgrid.geogram.events.EventAction;
+import offgrid.geogram.util.GeoCode4;
 
 public class EventBleMessageReceived extends EventAction {
 
     HashMap<String, BluetoothMessage> messages = new HashMap<>();
-
     private static final String TAG = "EventBleMessageReceived";
 
     public EventBleMessageReceived(String id) {
@@ -98,6 +103,23 @@ public class EventBleMessageReceived extends EventAction {
     }
 
     private void handleLocationMessage(BluetoothMessage msg) {
+        Log.i(TAG, "Location message received");
+        // example of messages: +053156@RY19-IUZS
+        String text = msg.getMessage();
+        // needs to contain the coordinate portion
+        if(text.contains("@") == false){
+            return;
+        }
+        String geocodeExtracted = text.substring(text.indexOf("@") + 1);
+        String[] coordinate = geocodeExtracted.split("-");
+        if(coordinate.length != 2){
+            return;
+        }
+
+        // notify other parts of the code that a new location was received
+        EventConnected event = new EventConnected(ConnectionType.BLE, geocodeExtracted);
+        DeviceManager.getInstance().addNewLocationEvent(msg.getAuthor(), DeviceType.HT_PORTABLE, event);
+
     }
 
 }

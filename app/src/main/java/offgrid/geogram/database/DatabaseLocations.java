@@ -68,6 +68,10 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import offgrid.geogram.devices.ConnectionType;
+import offgrid.geogram.devices.DeviceManager;
+import offgrid.geogram.devices.DeviceType;
+import offgrid.geogram.devices.EventConnected;
 import offgrid.geogram.util.GeoCode4; // your 4+4 Base36 codec (encode/decode)
 
 /** Singleton database facade for storing locations by callsign (with 4+4 cell code). */
@@ -224,6 +228,29 @@ public final class DatabaseLocations {
         out.sort(Comparator.comparingDouble(n -> n.distanceKm));
         return out;
     }
+
+    /** Total number of stored location rows. */
+    public long getTotalLocationCount() {
+        ensureInit();
+        activeReads.incrementAndGet();
+        try {
+            return dao.countAll();
+        } finally {
+            activeReads.decrementAndGet();
+        }
+    }
+
+    /** Number of stored location rows for a specific callsign. */
+    public long getLocationCountForCallsign(@NonNull String callsign) {
+        ensureInit();
+        activeReads.incrementAndGet();
+        try {
+            return dao.countByCallsign(callsign);
+        } finally {
+            activeReads.decrementAndGet();
+        }
+    }
+
 
     /** Delete all rows of a callsign. */
     public int deleteByCallsign(@NonNull String callsign) {
@@ -427,6 +454,13 @@ public final class DatabaseLocations {
 
         @Query("DELETE FROM locations")
         int deleteAll();
+
+        @Query("SELECT COUNT(*) FROM locations")
+        long countAll();
+
+        @Query("SELECT COUNT(*) FROM locations WHERE callsign = :cs")
+        long countByCallsign(String cs);
+
     }
 
     @Database(entities = { LocationRow.class }, version = 1, exportSchema = false)

@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Objects;
 
+import offgrid.geogram.util.GeoCode4;
+
 /**
  * There was a connection between two devices.
  * Natural order: by most recent timestamp (older first, newer last).
@@ -11,6 +13,7 @@ import java.util.Objects;
 public class EventConnected implements Comparable<EventConnected> {
     public final ArrayList<Long> timestamps = new ArrayList<>();
     public final ConnectionType connectionType;
+    public String geocode = null;
 
     public final String lat, lon, alt;
 
@@ -19,9 +22,22 @@ public class EventConnected implements Comparable<EventConnected> {
         this.lat = lat;
         this.lon = lon;
         this.alt = alt;
+        this.geocode = GeoCode4.encode(Long.parseLong(lat), Long.parseLong(lon));
         // record creation time as first observation
         timestamps.add(System.currentTimeMillis());
     }
+
+    public EventConnected(ConnectionType connectionType, String geoCode) {
+        this.connectionType = Objects.requireNonNull(connectionType, "connectionType");
+        double[] latlon = GeoCode4.decodePair(geoCode);
+        this.lat = GeoCode4.encodeLat(latlon[0]);
+        this.lon = GeoCode4.encodeLon(latlon[1]);
+        this.alt = null;
+        this.geocode = geoCode;
+        // record creation time as first observation
+        timestamps.add(System.currentTimeMillis());
+    }
+
 
     /** Add an observation timestamp (ms since epoch). */
     public void addTimestamp(long epochMillis) {

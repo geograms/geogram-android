@@ -173,7 +173,7 @@ public class MainActivity extends AppCompatActivity {
         wasCreatedBefore = true;
 
         // add a dummy connection for test purposes
-        addDummyConnection();
+        //addDummyConnection();
     }
 
     private void setupLoops() {
@@ -189,9 +189,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void addDummyConnection() {
-        EventConnected event = new EventConnected(ConnectionType.DIRECT, "123", "456", "789");
+        EventConnected event = new EventConnected(ConnectionType.BLE, "123", "456", "789");
         String callsign = "CR7BBQ";
-        DeviceManager.getInstance().addNewEvent(callsign, DeviceType.HT_PORTABLE, event);
+        DeviceManager.getInstance().addNewLocationEvent(callsign, DeviceType.HT_PORTABLE, event);
     }
 
     private void setupNavigationDrawer() {

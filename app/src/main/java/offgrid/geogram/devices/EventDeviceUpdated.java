@@ -10,6 +10,13 @@ import offgrid.geogram.R;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.events.EventAction;
 
+/*
+
+    This class is mainly responsible for updating the main screen
+    and show which devices/Callsigns have been recently updated.
+
+ */
+
 public class EventDeviceUpdated extends EventAction {
 
     private static final String TAG = "EventDeviceUpdated";
