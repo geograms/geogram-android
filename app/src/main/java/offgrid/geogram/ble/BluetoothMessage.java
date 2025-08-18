@@ -13,6 +13,7 @@ package offgrid.geogram.ble;
 
 import static offgrid.geogram.ble.BluetoothCentral.maxSizeOfMessages;
 
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.TreeMap;
 
@@ -75,6 +76,13 @@ public class BluetoothMessage {
      * Each parcel will contain at most {@code TEXT_LENGTH_PER_PARCEL} characters.
      */
     private void splitDataIntoParcels() {
+        // single message?
+        if(message.length() <= TEXT_LENGTH_PER_PARCEL){
+            messageBox.put("000", message);
+            return;
+        }
+
+        // this is a long message, break into multiple parcels
         int dataLength = message.length();
         int messageParcelsTotal = (int) Math.ceil((double) message.length() / TEXT_LENGTH_PER_PARCEL);
 
@@ -149,6 +157,10 @@ public class BluetoothMessage {
         return messageBox;
     }
 
+    /**
+     * A human readable format of the message, including parcel codes
+     * @return
+     */
     public String getOutput() {
         String output = "";
         if(messageBox.isEmpty()){
@@ -165,6 +177,21 @@ public class BluetoothMessage {
     }
 
     public void addMessageParcel(String messageParcel) {
+
+        // don't add new parcels after completing a message
+        if(this.messageCompleted){
+            return;
+        }
+
+        // is this a single message?
+        if(ValidCommands.isValidCommand(messageParcel)){
+            // just mark as completed
+            this.message = messageParcel;
+            messageBox.put("000", messageParcel);
+            this.messageCompleted = true;
+            return;
+        }
+
         // needs to be a parcel
         if(messageParcel.contains(":") == false){
             return;
@@ -302,5 +329,42 @@ public class BluetoothMessage {
         // not the case, so we ask for a future value
         return id + messageBox.size();
     }
+
+    /** List all missing parcel IDs up to the highest index we've seen (past gaps only). */
+    public ArrayList<String> getMissingParcels() {
+        ArrayList<String> missing = new ArrayList<>();
+        if (messageBox.isEmpty()) return missing;
+
+        // Determine the 2-char message ID prefix
+        String baseId = this.id;
+        if (baseId == null) {
+            String firstKey = messageBox.firstKey();
+            if (firstKey == null || firstKey.length() < 3) return missing;
+            baseId = firstKey.substring(0, 2);
+        }
+
+        // Find the highest index we've seen (e.g., ...-5 means 0..4 are "past" indices)
+        int maxSeen = -1;
+        for (String key : messageBox.keySet()) {
+            if (key.length() < 3) continue;
+            try {
+                int idx = Integer.parseInt(key.substring(2));
+                if (idx > maxSeen) maxSeen = idx;
+            } catch (NumberFormatException ignore) { /* skip malformed */ }
+        }
+
+        // Only header (idx==0) or nothing parsable → no past gaps
+        if (maxSeen <= 0) return missing;
+
+        // Collect all gaps from 0..(maxSeen-1)
+        for (int i = 0; i < maxSeen; i++) {
+            String k = baseId + i;
+            if (!messageBox.containsKey(k)) {
+                missing.add(k);
+            }
+        }
+        return missing;
+    }
+
 
 }

@@ -72,30 +72,46 @@ public class Device implements Comparable<Device> {
 
     public void addEvent(EventConnected event) {
         // iterate all previous events to update
-        for(EventConnected connectedEvent : connectedEvents){
+        for(EventConnected connectedEvent : connectedEvents) {
             // needs to match the same type
-            if(connectedEvent.connectionType != event.connectionType){
+            if (connectedEvent.connectionType != event.connectionType) {
                 continue;
             }
             // the coordinates need to match
-            if(!connectedEvent.alt.equalsIgnoreCase(event.alt)
-                || !connectedEvent.lat.equalsIgnoreCase(event.lat)
-                    || !connectedEvent.lon.equalsIgnoreCase(event.lon)
-            ){
-                continue;
+            if (event.geocode != null && connectedEvent.geocode != null
+                    && !event.geocode.equalsIgnoreCase(connectedEvent.geocode)) {
+                if (connectedEvent.containsTimeStamp(event.latestTimestamp())) {
+                    return;
+                } else {
+                    // it wasn't, so add it up here
+                    connectedEvent.addTimestamp(event.latestTimestamp());
+                    return;
+                }
             }
-            // coordinates are the same
-            // was the same time stamp added before?
-            if(connectedEvent.containsTimeStamp(event.latestTimestamp())){
-                return;
-            }else{
-                // it wasn't, so add it up here
-                connectedEvent.addTimestamp(event.latestTimestamp());
-                return;
-            }
+
+            connectedEvents.add(event);
+            break;
         }
+
+//            if(!connectedEvent.alt.equalsIgnoreCase(event.alt)
+//                || !connectedEvent.lat.equalsIgnoreCase(event.lat)
+//                    || !connectedEvent.lon.equalsIgnoreCase(event.lon)
+//            ){
+//                continue;
+//            }
+//            // coordinates are the same
+//            // was the same time stamp added before?
+//            if(connectedEvent.containsTimeStamp(event.latestTimestamp())){
+//                return;
+//            }else{
+//                // it wasn't, so add it up here
+//                connectedEvent.addTimestamp(event.latestTimestamp());
+//                return;
+//            }
+//        }
+
         // there was no match, so add one
-        connectedEvents.add(event);
+
     }
 
 }

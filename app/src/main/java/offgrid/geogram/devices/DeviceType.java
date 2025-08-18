@@ -1,5 +1,7 @@
 package offgrid.geogram.devices;
 
+import java.util.Locale;
+
 public enum DeviceType {
     PRIMARY_STATION,        // SSID 0 — your primary fixed station, usually message capable
     ADDITIONAL_STATION_1,   // SSID 1 — generic additional: digi, mobile, weather, etc.
@@ -16,8 +18,8 @@ public enum DeviceType {
     ONE_WAY_TRACKERS,       // SSID 12 — APRStt, DTMF, RFID devices, one-way trackers
     WEATHER_STATION,        // SSID 13 — weather stations
     TRUCKERS,               // SSID 14 — truckers or full-time drivers
-    ADDITIONAL_STATION_15   // SSID 15 — generic additional
-    ;
+    ADDITIONAL_STATION_15,  // SSID 15 — generic additional
+    UNSPECIFIED;            // no SSID, invalid SSID, or unknown type
 
     /** Convert SSID number (0-15) to DeviceType enum. */
     public static DeviceType fromSsid(int ssid) {
@@ -38,13 +40,42 @@ public enum DeviceType {
             case 13: return WEATHER_STATION;
             case 14: return TRUCKERS;
             case 15: return ADDITIONAL_STATION_15;
-            default: throw new IllegalArgumentException("Invalid SSID: " + ssid);
+            default: return UNSPECIFIED;
         }
     }
 
-    /** Returns the recommended SSID value (0-15) for this DeviceType. */
+    /** Returns the recommended SSID value (0-15) for this DeviceType; -1 for UNSPECIFIED. */
     public int toSsid() {
-        return this.ordinal();
+        return this == UNSPECIFIED ? -1 : this.ordinal();
+    }
+
+    /**
+     * Determine device type from a callsign string like "DL1ABC-9".
+     * Rules:
+     *  - If callsign is null/blank → UNSPECIFIED.
+     *  - If it has "-SSID" with 0..15 → mapped type.
+     *  - If no "-SSID" or invalid/out-of-range → UNSPECIFIED.
+     */
+    public static DeviceType fromCallsign(String callsign) {
+        if (callsign == null || callsign.trim().isEmpty()) return UNSPECIFIED;
+        String cs = callsign.trim().toUpperCase(Locale.ROOT);
+
+        int ssid = parseSsid(cs);
+        if (ssid < 0) return UNSPECIFIED;
+        return fromSsid(ssid);
+    }
+
+    /** Extract SSID (0..15) from a callsign like "K1ABC-7"; returns -1 if absent/invalid. */
+    public static int parseSsid(String callsign) {
+        if (callsign == null) return -1;
+        int dash = callsign.lastIndexOf('-');
+        if (dash < 0 || dash == callsign.length() - 1) return -1;
+        try {
+            int val = Integer.parseInt(callsign.substring(dash + 1));
+            return (val >= 0 && val <= 15) ? val : -1;
+        } catch (NumberFormatException ex) {
+            return -1;
+        }
     }
 
     @Override
@@ -66,6 +97,7 @@ public enum DeviceType {
             case WEATHER_STATION: return "Weather Station (-13)";
             case TRUCKERS: return "Truckers (-14)";
             case ADDITIONAL_STATION_15: return "Additional Station 15 (-15)";
+            case UNSPECIFIED: return "Unspecified";
             default: return super.toString();
         }
     }

@@ -99,6 +99,10 @@ public final class PingDevice {
 
     private void broadcastPing() {
 
+        if(Central.getInstance() == null || Central.getInstance().getSettings() == null
+            || Central.getInstance().getSettings().getIdDevice() == null){
+            return;
+        }
 
         // get the basic info
         String callsign = Central.getInstance().getSettings().getIdDevice();

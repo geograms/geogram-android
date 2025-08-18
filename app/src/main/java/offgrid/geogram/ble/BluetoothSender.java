@@ -32,7 +32,7 @@ import offgrid.geogram.events.EventType;
 public class BluetoothSender {
 
     // Self-advertising
-    private String selfMessage = null; //">CR7BBQ " + System.currentTimeMillis();
+    private String selfMessage = null;
     private static final String TAG = "BluetoothSender";
     private static final UUID SERVICE_UUID = UUID.fromString("0000FEAA-0000-1000-8000-00805F9B34FB");
     private static BluetoothSender instance;
@@ -170,7 +170,9 @@ public class BluetoothSender {
                 handler.postDelayed(() -> {
                     stopAdvertising(); // Stop current ad
                     String removed = messageQueue.poll(); // Remove message from queue
-                    Log.i(TAG, "Message sent and removed from queue: " + removed);
+                    if(removed != null) {
+                        Log.i(TAG, "Message sent and removed from queue: " + removed);
+                    }
                     isSending = false;
                     BluetoothListener.getInstance(context).resumeListening();
                     tryToSendNext(); // Try next message

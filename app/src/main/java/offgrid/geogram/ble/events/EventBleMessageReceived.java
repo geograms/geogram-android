@@ -1,9 +1,11 @@
 package offgrid.geogram.ble.events;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import offgrid.geogram.apps.chat.ChatMessage;
 import offgrid.geogram.ble.BluetoothMessage;
+import offgrid.geogram.ble.ValidCommands;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.DatabaseLocations;
@@ -34,7 +36,18 @@ public class EventBleMessageReceived extends EventAction {
         Log.i(TAG, "-->> Received message: " + message);
         // Handle the received message here
 
-        // need to have the separator
+        // is this a single message?
+        if(ValidCommands.isValidCommand(message)){
+            // this is a one-time message
+            BluetoothMessage msg = new BluetoothMessage();
+            msg.addMessageParcel(message);
+            // process the message right away
+            handleSingleMessage(msg);
+            return;
+        }
+
+
+        // need to have the separator for multiple parcels
         if(message.contains(":") == false){
             return;
         }
@@ -61,7 +74,7 @@ public class EventBleMessageReceived extends EventAction {
         if(msg.isMessageCompleted() == false){
             // if more than 3 seconds pass without update, ask for missing parcels
             //TODO: add the code here to ask for a new parcel
-            Log.i(TAG, "Message not yet completed: " + msg.getId());
+            shouldWeAskForMissingPackages(msg);
             return;
         }
 
@@ -81,8 +94,23 @@ public class EventBleMessageReceived extends EventAction {
         Log.i(TAG, "-->> Message completed: " + msg.getOutput());
     }
 
-    private void handleBroadcastMessage(BluetoothMessage msg) {
-        // start by getting the text of the message
+    /**
+     * Long messages will lose packages. This is the place to ask for missing packages.
+     */
+    private void shouldWeAskForMissingPackages(BluetoothMessage msg) {
+        ArrayList<String> missingParcels = msg.getMissingParcels();
+        if(missingParcels.isEmpty()){
+            return;
+        }
+        // ask for the missing parcels
+
+
+        // messages are sent in sequence. If there is a missing sequence, ask for it
+        Log.i(TAG, msg.getId() + " is missing packages: " + missingParcels.size());
+    }
+
+
+    private void handleSingleMessage(BluetoothMessage msg) {
         String text = msg.getMessage();
 
         // + is for location messages
@@ -90,6 +118,22 @@ public class EventBleMessageReceived extends EventAction {
             handleLocationMessage(msg);
             return;
         }
+
+        // handle commands that start with /
+        if(text.startsWith("/")){
+            // handle commands
+            return;
+        }
+    }
+    private void handleBroadcastMessage(BluetoothMessage msg) {
+        // start by getting the text of the message
+        String text = msg.getMessage();
+
+//        // + is for location messages
+//        if(text.startsWith("+")){
+//            handleLocationMessage(msg);
+//            return;
+//        }
 
         // this is a generic message, convert to a standard format
         String idThisDevice = Central.getInstance().getSettings().getIdDevice();
@@ -111,6 +155,7 @@ public class EventBleMessageReceived extends EventAction {
             return;
         }
         String geocodeExtracted = text.substring(text.indexOf("@") + 1);
+        String authorId = text.substring(1, text.indexOf("@"));
         String[] coordinate = geocodeExtracted.split("-");
         if(coordinate.length != 2){
             return;
@@ -118,7 +163,7 @@ public class EventBleMessageReceived extends EventAction {
 
         // notify other parts of the code that a new location was received
         EventConnected event = new EventConnected(ConnectionType.BLE, geocodeExtracted);
-        DeviceManager.getInstance().addNewLocationEvent(msg.getAuthor(), DeviceType.HT_PORTABLE, event);
+        DeviceManager.getInstance().addNewLocationEvent(authorId, DeviceType.HT_PORTABLE, event);
 
     }
 
