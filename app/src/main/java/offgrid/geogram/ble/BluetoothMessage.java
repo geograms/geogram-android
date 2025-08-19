@@ -34,13 +34,18 @@ public class BluetoothMessage {
 
     private final long timeStamp = System.currentTimeMillis();
 
-    public BluetoothMessage(String idFromSender, String idDestination, String messageToSend) {
+    public BluetoothMessage(String idFromSender, String idDestination,
+                            String messageToSend, boolean singleMessage) {
         this.id = generateRandomId();
         this.idFromSender = idFromSender;
         this.idDestination = idDestination;
         this.message = messageToSend;
         this.checksum = calculateChecksum(message);
-        splitDataIntoParcels();
+        if(singleMessage){
+            messageBox.put("000", message);
+        }else{
+            splitDataIntoParcels();
+        }
     }
 
     public BluetoothMessage() {
@@ -76,12 +81,6 @@ public class BluetoothMessage {
      * Each parcel will contain at most {@code TEXT_LENGTH_PER_PARCEL} characters.
      */
     private void splitDataIntoParcels() {
-        // single message?
-        if(message.length() <= TEXT_LENGTH_PER_PARCEL){
-            messageBox.put("000", message);
-            return;
-        }
-
         // this is a long message, break into multiple parcels
         int dataLength = message.length();
         int messageParcelsTotal = (int) Math.ceil((double) message.length() / TEXT_LENGTH_PER_PARCEL);

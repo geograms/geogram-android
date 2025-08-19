@@ -117,7 +117,8 @@ public class BluetoothSender {
     public void sendMessage(String message) {
         if (message == null || message.isEmpty()) return;
         String callsign = Central.getInstance().getSettings().getIdDevice();
-        BluetoothMessage msg = new BluetoothMessage(callsign, "ANY", message);
+        boolean singleMessage = ValidCommands.isValidCommand(message);
+        BluetoothMessage msg = new BluetoothMessage(callsign, "ANY", message, singleMessage);
         sendMessage(msg);
     }
     public void sendMessage(BluetoothMessage msg) {

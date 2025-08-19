@@ -6,6 +6,7 @@ import java.util.HashMap;
 import offgrid.geogram.apps.chat.ChatMessage;
 import offgrid.geogram.ble.BluetoothMessage;
 import offgrid.geogram.ble.ValidCommands;
+import offgrid.geogram.ble.missing.MissingMessagesBLE;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.DatabaseLocations;
@@ -122,21 +123,37 @@ public class EventBleMessageReceived extends EventAction {
         // handle commands that start with /
         if(text.startsWith("/")){
             // handle commands
+            handleCommand(msg);
             return;
         }
     }
-    private void handleBroadcastMessage(BluetoothMessage msg) {
-        // start by getting the text of the message
+
+    private void handleCommand(BluetoothMessage msg) {
         String text = msg.getMessage();
+        if(ValidCommands.isValidRequest(text) == false){
+            return;
+        }
+        if(text.startsWith(ValidCommands.PARCEL_REPEAT)){
+            handleParcelRepeat(text);
+            return;
+        }
+        Log.i(TAG, "Command received but not understood: " + text);
+    }
 
-//        // + is for location messages
-//        if(text.startsWith("+")){
-//            handleLocationMessage(msg);
-//            return;
-//        }
+    /**
+     * Place a request to send again a parcel from a message being dispatched
+     * @param text /REPEAT AF8
+     */
+    private void handleParcelRepeat(String text) {
+        // account for the command size plus the space
+        String data = text.substring(ValidCommands.PARCEL_REPEAT.length()+1);
+        String messageId = data.substring(0,2);
+        String parcelNumber = data.substring(2);
+        MissingMessagesBLE.addToQueue(ConnectionType.BLE, messageId, parcelNumber);
+    }
 
+    private void handleBroadcastMessage(BluetoothMessage msg) {
         // this is a generic message, convert to a standard format
-        String idThisDevice = Central.getInstance().getSettings().getIdDevice();
         ChatMessage chatMessage = ChatMessage.convert(msg);
 
         // add to our database of broadcast messages
