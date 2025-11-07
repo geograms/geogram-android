@@ -49,6 +49,7 @@ import offgrid.geogram.fragments.AboutFragment;
 import offgrid.geogram.fragments.DebugFragment;
 import offgrid.geogram.fragments.DevicesFragment;
 import offgrid.geogram.fragments.DevicesWithinReachFragment;
+import offgrid.geogram.fragments.MessagesFragment;
 import offgrid.geogram.fragments.NetworksFragment;
 import offgrid.geogram.settings.SettingsFragment;
 import offgrid.geogram.util.BatteryOptimizationHelper;
@@ -271,6 +272,15 @@ public class MainActivity extends AppCompatActivity {
             FragmentManager fragmentManager = getSupportFragmentManager();
             FragmentTransaction transaction = fragmentManager.beginTransaction();
             transaction.replace(R.id.fragment_container, new DevicesWithinReachFragment()).addToBackStack(null);
+            transaction.commit();
+        });
+
+        // Messages button
+        ImageButton btnMessages = findViewById(R.id.btn_messages);
+        btnMessages.setOnClickListener(v -> {
+            FragmentManager fragmentManager = getSupportFragmentManager();
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.replace(R.id.fragment_container, new MessagesFragment()).addToBackStack(null);
             transaction.commit();
         });
 

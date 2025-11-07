@@ -47,6 +47,17 @@
                 android:src="@drawable/ic_chat"
                 app:tint="@color/white" />
 
+            <!-- Messages Button -->
+            <ImageButton
+                android:id="@+id/btn_messages"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="Messages"
+                android:src="@drawable/ic_messages"
+                app:tint="@color/white" />
+
             <!-- Spacer for Title -->
             <View
                 android:layout_width="0dp"
