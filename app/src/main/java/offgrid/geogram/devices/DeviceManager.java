@@ -60,13 +60,15 @@ public class DeviceManager {
         // add the event
         deviceFound.addEvent(event);
 
-        // add this location event to the database
-        DatabaseLocations.get().enqueue(
-                callsign,
-                event.geocode,
-                System.currentTimeMillis(),
-                null
-        );
+        // add this location event to the database only if geocode is present
+        if(event.geocode != null) {
+            DatabaseLocations.get().enqueue(
+                    callsign,
+                    event.geocode,
+                    System.currentTimeMillis(),
+                    null
+            );
+        }
 
         // a new event happened with the device
         EventControl.startEvent(EventType.DEVICE_UPDATED, deviceFound);
