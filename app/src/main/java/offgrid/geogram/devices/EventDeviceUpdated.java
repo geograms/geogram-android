@@ -34,6 +34,11 @@ public class EventDeviceUpdated extends EventAction {
             Log.e("DEVICE_UPDATED", "MainActivity is null");
             return;
         }
+
+        // Update device count badge
+        MainActivity.getInstance().runOnUiThread(() -> {
+            MainActivity.getInstance().updateDeviceCount();
+        });
         // get the beacon list
         ListView beaconWindow = MainActivity.getInstance().beacons;
         if (beaconWindow == null) {

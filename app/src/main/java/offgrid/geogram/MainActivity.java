@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.widget.ImageButton;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
@@ -36,6 +37,7 @@ import offgrid.geogram.core.BackgroundService;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.core.PermissionsHelper;
+import offgrid.geogram.database.DatabaseMessages;
 import offgrid.geogram.devices.EventConnected;
 import offgrid.geogram.devices.ConnectionType;
 import offgrid.geogram.devices.DeviceManager;
@@ -45,6 +47,8 @@ import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
 import offgrid.geogram.fragments.AboutFragment;
 import offgrid.geogram.fragments.DebugFragment;
+import offgrid.geogram.fragments.DevicesFragment;
+import offgrid.geogram.fragments.DevicesWithinReachFragment;
 import offgrid.geogram.fragments.NetworksFragment;
 import offgrid.geogram.settings.SettingsFragment;
 import offgrid.geogram.util.BatteryOptimizationHelper;
@@ -201,15 +205,27 @@ public class MainActivity extends AppCompatActivity {
 
         checkBluetoothStatus();
 
-        // Load the Nearby chat fragment by default on the main screen
-        loadNearbyFragment();
+        // Initialize device count badge
+        updateDeviceCount();
 
-        if (wasCreatedBefore) return;
+        if (wasCreatedBefore) {
+            // On subsequent calls, just reload the fragment (database already initialized)
+            loadNearbyFragment();
+            return;
+        }
 
         log("Geogram", Art.logo1());
+
+        // Initialize settings and database before starting service and loading fragment
+        Central.getInstance().loadSettings(getApplicationContext());
+        DatabaseMessages.getInstance().init(getApplicationContext());
+
         startBackgroundService();
         BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(this);
         wasCreatedBefore = true;
+
+        // Load the Nearby chat fragment after settings and database are initialized
+        loadNearbyFragment();
 
         // add a dummy connection for test purposes
         //addDummyConnection();
@@ -239,6 +255,24 @@ public class MainActivity extends AppCompatActivity {
 
         ImageButton btnSettings = findViewById(R.id.btn_settings);
         btnSettings.setOnClickListener(v -> drawerLayout.openDrawer(GravityCompat.START));
+
+        // Chat button
+        ImageButton btnChat = findViewById(R.id.btn_chat);
+        btnChat.setOnClickListener(v -> {
+            // Clear back stack and return to nearby chat
+            FragmentManager fragmentManager = getSupportFragmentManager();
+            fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+            loadNearbyFragment();
+        });
+
+        // Device counter button
+        ImageButton btnDevices = findViewById(R.id.btn_devices);
+        btnDevices.setOnClickListener(v -> {
+            FragmentManager fragmentManager = getSupportFragmentManager();
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.replace(R.id.fragment_container, new DevicesWithinReachFragment()).addToBackStack(null);
+            transaction.commit();
+        });
 
         navigationView.setNavigationItemSelectedListener(item -> {
             FragmentManager fragmentManager = getSupportFragmentManager();
@@ -302,5 +336,27 @@ public class MainActivity extends AppCompatActivity {
         FragmentTransaction transaction = fragmentManager.beginTransaction();
         transaction.replace(R.id.fragment_container, Central.getInstance().broadcastChatFragment);
         transaction.commit();
+    }
+
+    /**
+     * Update the device count badge.
+     * Call this method whenever devices are added/removed.
+     */
+    public void updateDeviceCount() {
+        TextView deviceCountBadge = findViewById(R.id.tv_device_count);
+        if (deviceCountBadge == null) return;
+
+        int deviceCount = DeviceManager.getInstance().getDevicesSpotted().size();
+
+        deviceCountBadge.setText(String.valueOf(deviceCount));
+
+        // Update badge background color
+        if (deviceCount == 0) {
+            // Grey when no devices
+            deviceCountBadge.setBackgroundResource(R.drawable.badge_background_grey);
+        } else {
+            // Green when devices are nearby
+            deviceCountBadge.setBackgroundResource(R.drawable.badge_background_green);
+        }
     }
 }
