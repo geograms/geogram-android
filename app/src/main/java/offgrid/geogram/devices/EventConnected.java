@@ -29,11 +29,19 @@ public class EventConnected implements Comparable<EventConnected> {
 
     public EventConnected(ConnectionType connectionType, String geoCode) {
         this.connectionType = Objects.requireNonNull(connectionType, "connectionType");
-        double[] latlon = GeoCode4.decodePair(geoCode);
-        this.lat = GeoCode4.encodeLat(latlon[0]);
-        this.lon = GeoCode4.encodeLon(latlon[1]);
-        this.alt = null;
-        this.geocode = geoCode;
+        // Handle null geocode for ping-only events (no location data)
+        if (geoCode == null) {
+            this.lat = null;
+            this.lon = null;
+            this.alt = null;
+            this.geocode = null;
+        } else {
+            double[] latlon = GeoCode4.decodePair(geoCode);
+            this.lat = GeoCode4.encodeLat(latlon[0]);
+            this.lon = GeoCode4.encodeLon(latlon[1]);
+            this.alt = null;
+            this.geocode = geoCode;
+        }
         // record creation time as first observation
         timestamps.add(System.currentTimeMillis());
     }

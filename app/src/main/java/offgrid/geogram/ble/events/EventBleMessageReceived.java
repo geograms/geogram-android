@@ -165,12 +165,27 @@ public class EventBleMessageReceived extends EventAction {
 
     private void handleLocationMessage(BluetoothMessage msg) {
         Log.i(TAG, "Location message received");
-        // example of messages: +053156@RY19-IUZS
+        // example of messages: +053156@RY19-IUZS or +X1A2B3 (ping from T-Dongle)
         String text = msg.getMessage();
-        // needs to contain the coordinate portion
+
+        // Check if this is a simple ping message (no coordinates)
         if(text.contains("@") == false){
+            // This is a simple ping from T-Dongle: +CALLSIGN
+            String callsign = text.substring(1); // Remove the '+' prefix
+
+            if(callsign.isEmpty()){
+                return;
+            }
+
+            Log.i(TAG, "Ping received from: " + callsign);
+
+            // Add device without geocode (null geocode indicates BLE ping only)
+            EventConnected event = new EventConnected(ConnectionType.BLE, null);
+            DeviceManager.getInstance().addNewLocationEvent(callsign, DeviceType.HT_PORTABLE, event);
             return;
         }
+
+        // Handle location messages with coordinates
         String geocodeExtracted = text.substring(text.indexOf("@") + 1);
         String authorId = text.substring(1, text.indexOf("@"));
         String[] coordinate = geocodeExtracted.split("-");

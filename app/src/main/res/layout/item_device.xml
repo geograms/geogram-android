@@ -27,4 +27,13 @@
         android:textSize="14sp"
         android:layout_marginTop="4dp" />
 
+    <TextView
+        android:id="@+id/device_last_seen"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Last seen: Just now"
+        android:textColor="#888888"
+        android:textSize="12sp"
+        android:layout_marginTop="4dp" />
+
 </LinearLayout>
