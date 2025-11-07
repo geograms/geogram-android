@@ -44,19 +44,29 @@
 
         </LinearLayout>
 
-        <!-- ListView for Beacons -->
+        <!-- Fragment Container for content -->
+        <FrameLayout
+            android:id="@+id/fragment_container"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="#2B2B2B"
+            app:layout_constraintTop_toBottomOf="@+id/top_action_bar"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
+
+        <!-- ListView for Beacons (kept for backward compatibility, hidden by default) -->
         <ListView
             android:id="@+id/lv_beacons"
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:background="#352F2F"
             android:cacheColorHint="#352F2F"
+            android:visibility="gone"
             app:layout_constraintTop_toBottomOf="@+id/top_action_bar"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" />
-
-        <!-- Empty View for Beacons -->
 
         <!-- Floating Action Button
         <com.google.android.material.floatingactionbutton.FloatingActionButton

@@ -73,10 +73,6 @@ public class ChatFragmentBroadcast extends Fragment {
         chatMessageContainer = view.findViewById(R.id.chat_message_container);
         chatScrollView = view.findViewById(R.id.chat_scroll_view);
 
-        // Back button functionality
-        ImageButton btnBack = view.findViewById(R.id.btn_back);
-        btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
-
         // Send button functionality
         btnSend.setOnClickListener(v -> {
             String message = messageInput.getText().toString().trim();

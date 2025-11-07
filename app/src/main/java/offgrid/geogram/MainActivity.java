@@ -201,6 +201,11 @@ public class MainActivity extends AppCompatActivity {
 
         checkBluetoothStatus();
 
+        // Load the Nearby chat fragment by default on the main screen
+        if (!wasCreatedBefore) {
+            loadNearbyFragment();
+        }
+
         if (wasCreatedBefore) return;
 
         log("Geogram", Art.logo1());
@@ -242,15 +247,15 @@ public class MainActivity extends AppCompatActivity {
             FragmentTransaction transaction = fragmentManager.beginTransaction();
 
             if (item.getItemId() == R.id.nav_settings) {
-                transaction.replace(R.id.main, SettingsFragment.getInstance()).addToBackStack(null);
+                transaction.replace(R.id.fragment_container, SettingsFragment.getInstance()).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_broadcast) {
-                transaction.replace(R.id.main, Central.getInstance().broadcastChatFragment).addToBackStack(null);
+                transaction.replace(R.id.fragment_container, Central.getInstance().broadcastChatFragment).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_debug) {
-                transaction.replace(R.id.main, new DebugFragment()).addToBackStack(null);
+                transaction.replace(R.id.fragment_container, new DebugFragment()).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_about) {
-                transaction.replace(R.id.main, new AboutFragment()).addToBackStack(null);
+                transaction.replace(R.id.fragment_container, new AboutFragment()).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_networks) {
-                transaction.replace(R.id.main, new NetworksFragment()).addToBackStack(null);
+                transaction.replace(R.id.fragment_container, new NetworksFragment()).addToBackStack(null);
             }
 
             transaction.commit();
@@ -292,5 +297,12 @@ public class MainActivity extends AppCompatActivity {
         } else if (!bluetoothAdapter.isEnabled()) {
             Toast.makeText(this, "Bluetooth is disabled. Please enable it", Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void loadNearbyFragment() {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction transaction = fragmentManager.beginTransaction();
+        transaction.replace(R.id.fragment_container, Central.getInstance().broadcastChatFragment);
+        transaction.commit();
     }
 }
