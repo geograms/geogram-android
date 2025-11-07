@@ -27,6 +27,8 @@ import offgrid.geogram.events.EventType;
 
 public class DevicesWithinReachFragment extends Fragment {
 
+    private static final String EVENT_LISTENER_ID = "DevicesWithinReachFragment_Listener";
+
     private RecyclerView recyclerView;
     private DeviceAdapter adapter;
     private TextView emptyMessage;
@@ -43,29 +45,37 @@ public class DevicesWithinReachFragment extends Fragment {
 
         emptyMessage = view.findViewById(R.id.empty_message);
 
-        // Create event listener for device updates
-        deviceUpdateListener = new EventAction("DevicesWithinReachFragment_" + hashCode()) {
-            @Override
-            public void action(Object... data) {
-                // Update UI on main thread
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> loadDevices());
+        // Create event listener for device updates (only if not already created)
+        if (deviceUpdateListener == null) {
+            deviceUpdateListener = new EventAction(EVENT_LISTENER_ID) {
+                @Override
+                public void action(Object... data) {
+                    // Update UI on main thread
+                    if (getActivity() != null && isAdded()) {
+                        getActivity().runOnUiThread(() -> {
+                            if (isAdded() && getView() != null) {
+                                loadDevices();
+                            }
+                        });
+                    }
                 }
-            }
-        };
-
-        // Load devices
-        loadDevices();
+            };
+        }
 
         return view;
     }
 
     private void loadDevices() {
+        if (recyclerView == null || emptyMessage == null) {
+            return; // Views not ready yet
+        }
+
         TreeSet<Device> devices = DeviceManager.getInstance().getDevicesSpotted();
 
         if (devices.isEmpty()) {
             recyclerView.setVisibility(View.GONE);
             emptyMessage.setVisibility(View.VISIBLE);
+            adapter = null; // Clear adapter when no devices
         } else {
             recyclerView.setVisibility(View.VISIBLE);
             emptyMessage.setVisibility(View.GONE);
@@ -82,17 +92,29 @@ public class DevicesWithinReachFragment extends Fragment {
     }
 
     @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        // Load devices after view is created
+        loadDevices();
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         // Register event listener for real-time updates
-        EventControl.addEvent(EventType.DEVICE_UPDATED, deviceUpdateListener);
-        loadDevices();
+        if (deviceUpdateListener != null) {
+            EventControl.addEvent(EventType.DEVICE_UPDATED, deviceUpdateListener);
+        }
+        // Refresh the device list when fragment becomes visible
+        if (getView() != null) {
+            loadDevices();
+        }
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        // Note: EventControl doesn't have removeEvent, listener will be inactive when fragment is paused
+        // Note: EventControl doesn't have removeEvent, listener stays registered
     }
 
     // RecyclerView Adapter
