@@ -104,7 +104,12 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
 
         if (!PermissionsHelper.hasAllPermissions(this)) {
-            PermissionsHelper.requestPermissionsIfNecessary(this);
+            // If returning from settings and permissions still not granted, show dialog again
+            if (wasCreatedBefore) {
+                showPermissionDeniedDialog();
+            } else {
+                PermissionsHelper.requestPermissionsIfNecessary(this);
+            }
         } else if (!wasCreatedBefore) {
             initializeApp();
         }
@@ -117,32 +122,64 @@ public class MainActivity extends AppCompatActivity {
         if (PermissionsHelper.handlePermissionResult(requestCode, permissions, grantResults)) {
             initializeApp();
         } else {
-            boolean permanentlyDenied = false;
-            for (int i = 0; i < permissions.length; i++) {
-                if (grantResults[i] == PackageManager.PERMISSION_DENIED &&
-                        !shouldShowRequestPermissionRationale(permissions[i])) {
-                    permanentlyDenied = true;
-                    break;
-                }
-            }
-
-            if (permanentlyDenied) {
-                Toast.makeText(this,
-                        "Some permissions are permanently denied. Please enable them in App Settings.",
-                        Toast.LENGTH_LONG).show();
-
-                Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                intent.setData(android.net.Uri.fromParts("package", getPackageName(), null));
-                startActivity(intent);
-            } else {
-                Toast.makeText(this,
-                        "Permissions are required for the app to function correctly.",
-                        Toast.LENGTH_LONG).show();
-            }
+            handlePermissionDenied(permissions, grantResults);
         }
     }
 
+    private void handlePermissionDenied(@NonNull String[] permissions, @NonNull int[] grantResults) {
+        boolean permanentlyDenied = false;
+        for (int i = 0; i < permissions.length; i++) {
+            if (grantResults[i] == PackageManager.PERMISSION_DENIED &&
+                    !shouldShowRequestPermissionRationale(permissions[i])) {
+                permanentlyDenied = true;
+                break;
+            }
+        }
+
+        if (permanentlyDenied) {
+            showPermissionDeniedDialog();
+        } else {
+            showPermissionRequiredDialog();
+        }
+    }
+
+    private void showPermissionRequiredDialog() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Permissions Required")
+                .setMessage("Geogram requires Bluetooth and Location permissions to function. The app cannot proceed without these permissions.")
+                .setCancelable(false)
+                .setPositiveButton("Grant Permissions", (dialog, which) -> {
+                    PermissionsHelper.requestPermissionsIfNecessary(this);
+                })
+                .setNegativeButton("Exit", (dialog, which) -> {
+                    finish();
+                })
+                .show();
+    }
+
+    private void showPermissionDeniedDialog() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Permissions Denied")
+                .setMessage("Some permissions are permanently denied. Please enable Bluetooth and Location permissions in App Settings for Geogram to work.")
+                .setCancelable(false)
+                .setPositiveButton("Open Settings", (dialog, which) -> {
+                    Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    intent.setData(android.net.Uri.fromParts("package", getPackageName(), null));
+                    startActivity(intent);
+                })
+                .setNegativeButton("Exit", (dialog, which) -> {
+                    finish();
+                })
+                .show();
+    }
+
     private void initializeApp() {
+        // Double-check permissions before initializing
+        if (!PermissionsHelper.hasAllPermissions(this)) {
+            Log.e(TAG, "Cannot initialize app without permissions");
+            return;
+        }
+
         Log.i(TAG, "Initializing the app...");
 
         beacons = findViewById(R.id.lv_beacons);
@@ -152,8 +189,6 @@ public class MainActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
-
-        BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(this);
 
         setupNavigationDrawer();
         setupBackPressedHandler();
@@ -170,6 +205,7 @@ public class MainActivity extends AppCompatActivity {
 
         log("Geogram", Art.logo1());
         startBackgroundService();
+        BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(this);
         wasCreatedBefore = true;
 
         // add a dummy connection for test purposes

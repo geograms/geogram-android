@@ -117,20 +117,19 @@ public class BackgroundService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-
-        if (!PermissionsHelper.hasAllPermissions(getApplicationContext())) {
-            log(TAG, "Missing required location permissions — cannot start foreground service.");
-            stopSelf(); // Prevent crash
-            return START_NOT_STICKY;
-        }
-
+        // MUST call startForeground() immediately to avoid crash
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
 
+        boolean hasPermissions = PermissionsHelper.hasAllPermissions(getApplicationContext());
+        String contentText = hasPermissions
+                ? "Service is running in the background"
+                : "Waiting for permissions...";
+
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Geogram Service")
-                .setContentText("Service is running in the background")
+                .setContentText(contentText)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
@@ -140,8 +139,15 @@ public class BackgroundService extends Service {
             startForeground(1, notification);
         } catch (SecurityException e) {
             log(TAG, "SecurityException when starting foreground service: " + e.getMessage());
-            stopSelf(); // Prevent crash loop
+            stopSelf();
             return START_NOT_STICKY;
+        }
+
+        // Now check permissions after we've called startForeground()
+        if (!hasPermissions) {
+            log(TAG, "Service started but missing permissions. Waiting for user to grant them.");
+            // Don't stop the service - let it wait for permissions
+            // The recurring task in onCreate will check permissions periodically
         }
 
         return START_STICKY;

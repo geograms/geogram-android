@@ -27,7 +27,12 @@ public class BatteryOptimizationHelper {
 
         // Check if the intent can be resolved
         if (intent.resolveActivity(context.getPackageManager()) != null) {
-            context.startActivity(intent);
+            try {
+                context.startActivity(intent);
+                Log.i(TAG, "Requesting battery optimization exemption.");
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to start battery optimization request: " + e.getMessage());
+            }
         } else {
             Log.e(TAG, "Unable to resolve battery optimization settings intent.");
         }
