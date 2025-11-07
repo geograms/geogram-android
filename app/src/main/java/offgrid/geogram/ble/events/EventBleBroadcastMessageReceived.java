@@ -19,6 +19,8 @@ public class EventBleBroadcastMessageReceived extends EventAction {
         ChatMessage message = ChatMessage.convert(messageBluetooth);
         // add the message on the database
         DatabaseMessages.getInstance().add(message);
+        // flush immediately to disk
+        DatabaseMessages.getInstance().flushNow();
 
         // add the message on the broadcast window
         Central.getInstance().broadcastChatFragment.addMessage(message);

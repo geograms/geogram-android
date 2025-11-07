@@ -202,9 +202,7 @@ public class MainActivity extends AppCompatActivity {
         checkBluetoothStatus();
 
         // Load the Nearby chat fragment by default on the main screen
-        if (!wasCreatedBefore) {
-            loadNearbyFragment();
-        }
+        loadNearbyFragment();
 
         if (wasCreatedBefore) return;
 
