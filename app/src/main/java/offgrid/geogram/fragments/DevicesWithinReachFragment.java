@@ -1,10 +1,10 @@
 package offgrid.geogram.fragments;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -32,14 +32,6 @@ public class DevicesWithinReachFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_devices_within_reach, container, false);
-
-        // Back button functionality
-        ImageButton btnBack = view.findViewById(R.id.btn_back);
-        btnBack.setOnClickListener(v -> {
-            if (getActivity() != null) {
-                getActivity().getSupportFragmentManager().popBackStack();
-            }
-        });
 
         // Initialize RecyclerView
         recyclerView = view.findViewById(R.id.devices_recycler_view);
@@ -120,11 +112,19 @@ public class DevicesWithinReachFragment extends Fragment {
                 // Format the last seen time
                 long timestamp = device.latestTimestamp();
                 String lastSeenText;
+                boolean isInactive = false;
+
                 if (timestamp == Long.MIN_VALUE) {
                     lastSeenText = "Last seen: Unknown";
+                    isInactive = true;
                 } else {
                     long now = System.currentTimeMillis();
                     long diff = now - timestamp;
+
+                    // Mark as inactive if more than 5 minutes (300000 ms)
+                    if (diff > 300000) {
+                        isInactive = true;
+                    }
 
                     if (diff < 60000) {
                         lastSeenText = "Last seen: Just now";
@@ -141,6 +141,17 @@ public class DevicesWithinReachFragment extends Fragment {
                 }
 
                 deviceLastSeen.setText(lastSeenText);
+
+                // Apply grey color for inactive devices (not seen in 5+ minutes)
+                if (isInactive) {
+                    deviceName.setTextColor(Color.parseColor("#888888"));
+                    deviceType.setTextColor(Color.parseColor("#666666"));
+                    deviceLastSeen.setTextColor(Color.parseColor("#555555"));
+                } else {
+                    deviceName.setTextColor(Color.parseColor("#FFFFFF"));
+                    deviceType.setTextColor(Color.parseColor("#AAAAAA"));
+                    deviceLastSeen.setTextColor(Color.parseColor("#888888"));
+                }
             }
         }
     }
