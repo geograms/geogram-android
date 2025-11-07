@@ -67,26 +67,38 @@ public class DevicesWithinReachFragment extends Fragment {
 
     private void loadDevices() {
         if (recyclerView == null || emptyMessage == null) {
+            android.util.Log.d("DevicesFragment", "loadDevices: Views not ready yet");
             return; // Views not ready yet
         }
 
         TreeSet<Device> devices = DeviceManager.getInstance().getDevicesSpotted();
+        android.util.Log.d("DevicesFragment", "loadDevices: Found " + devices.size() + " devices");
 
         if (devices.isEmpty()) {
+            android.util.Log.d("DevicesFragment", "loadDevices: Showing empty message");
             recyclerView.setVisibility(View.GONE);
             emptyMessage.setVisibility(View.VISIBLE);
             adapter = null; // Clear adapter when no devices
         } else {
+            android.util.Log.d("DevicesFragment", "loadDevices: Showing " + devices.size() + " devices in list");
             recyclerView.setVisibility(View.VISIBLE);
             emptyMessage.setVisibility(View.GONE);
 
             if (adapter == null) {
                 // Create new adapter
+                android.util.Log.d("DevicesFragment", "loadDevices: Creating new adapter");
                 adapter = new DeviceAdapter(devices);
-                recyclerView.setAdapter(adapter);
             } else {
                 // Update existing adapter
+                android.util.Log.d("DevicesFragment", "loadDevices: Updating existing adapter");
                 adapter.updateDevices(devices);
+            }
+
+            // CRITICAL FIX: Always attach adapter to recyclerView
+            // (views are recreated when navigating back, but adapter persists)
+            if (recyclerView.getAdapter() != adapter) {
+                android.util.Log.d("DevicesFragment", "loadDevices: Re-attaching adapter to new RecyclerView");
+                recyclerView.setAdapter(adapter);
             }
         }
     }
@@ -94,6 +106,7 @@ public class DevicesWithinReachFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        android.util.Log.d("DevicesFragment", "onViewCreated called");
         // Load devices after view is created
         loadDevices();
     }
@@ -101,6 +114,7 @@ public class DevicesWithinReachFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        android.util.Log.d("DevicesFragment", "onResume called");
         // Register event listener for real-time updates
         if (deviceUpdateListener != null) {
             EventControl.addEvent(EventType.DEVICE_UPDATED, deviceUpdateListener);
