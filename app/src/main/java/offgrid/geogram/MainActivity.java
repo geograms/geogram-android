@@ -350,22 +350,33 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Update the device count badge.
+     * Only counts devices heard in the last 5 minutes.
      * Call this method whenever devices are added/removed.
      */
     public void updateDeviceCount() {
         TextView deviceCountBadge = findViewById(R.id.tv_device_count);
         if (deviceCountBadge == null) return;
 
-        int deviceCount = DeviceManager.getInstance().getDevicesSpotted().size();
+        // Count only devices heard in the last 5 minutes (300000 ms)
+        long now = System.currentTimeMillis();
+        long fiveMinutesAgo = now - 300000;
 
-        deviceCountBadge.setText(String.valueOf(deviceCount));
+        int activeDeviceCount = 0;
+        for (offgrid.geogram.devices.Device device : DeviceManager.getInstance().getDevicesSpotted()) {
+            long lastSeen = device.latestTimestamp();
+            if (lastSeen > fiveMinutesAgo) {
+                activeDeviceCount++;
+            }
+        }
+
+        deviceCountBadge.setText(String.valueOf(activeDeviceCount));
 
         // Update badge background color
-        if (deviceCount == 0) {
-            // Grey when no devices
+        if (activeDeviceCount == 0) {
+            // Grey when no active devices
             deviceCountBadge.setBackgroundResource(R.drawable.badge_background_grey);
         } else {
-            // Green when devices are nearby
+            // Green when active devices are nearby
             deviceCountBadge.setBackgroundResource(R.drawable.badge_background_green);
         }
     }

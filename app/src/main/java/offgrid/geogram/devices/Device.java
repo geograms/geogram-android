@@ -77,41 +77,27 @@ public class Device implements Comparable<Device> {
             if (connectedEvent.connectionType != event.connectionType) {
                 continue;
             }
-            // the coordinates need to match
-            if (event.geocode != null && connectedEvent.geocode != null
-                    && !event.geocode.equalsIgnoreCase(connectedEvent.geocode)) {
-                if (connectedEvent.containsTimeStamp(event.latestTimestamp())) {
-                    return;
-                } else {
-                    // it wasn't, so add it up here
+
+            // For ping-only events (null geocode), just update timestamp on matching connection type
+            if (event.geocode == null && connectedEvent.geocode == null) {
+                if (!connectedEvent.containsTimeStamp(event.latestTimestamp())) {
                     connectedEvent.addTimestamp(event.latestTimestamp());
-                    return;
                 }
+                return;
             }
 
-            connectedEvents.add(event);
-            break;
+            // the coordinates need to match for location events
+            if (event.geocode != null && connectedEvent.geocode != null
+                    && event.geocode.equalsIgnoreCase(connectedEvent.geocode)) {
+                if (!connectedEvent.containsTimeStamp(event.latestTimestamp())) {
+                    connectedEvent.addTimestamp(event.latestTimestamp());
+                }
+                return;
+            }
         }
 
-//            if(!connectedEvent.alt.equalsIgnoreCase(event.alt)
-//                || !connectedEvent.lat.equalsIgnoreCase(event.lat)
-//                    || !connectedEvent.lon.equalsIgnoreCase(event.lon)
-//            ){
-//                continue;
-//            }
-//            // coordinates are the same
-//            // was the same time stamp added before?
-//            if(connectedEvent.containsTimeStamp(event.latestTimestamp())){
-//                return;
-//            }else{
-//                // it wasn't, so add it up here
-//                connectedEvent.addTimestamp(event.latestTimestamp());
-//                return;
-//            }
-//        }
-
         // there was no match, so add one
-
+        connectedEvents.add(event);
     }
 
 }
