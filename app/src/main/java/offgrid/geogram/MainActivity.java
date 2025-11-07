@@ -217,9 +217,14 @@ public class MainActivity extends AppCompatActivity {
 
         log("Geogram", Art.logo1());
 
-        // Initialize settings and database before starting service and loading fragment
+        // Initialize settings and databases before starting service and loading fragment
         Central.getInstance().loadSettings(getApplicationContext());
         DatabaseMessages.getInstance().init(getApplicationContext());
+        offgrid.geogram.database.DatabaseLocations.get().init(getApplicationContext());
+        offgrid.geogram.database.DatabaseDevices.get().init(getApplicationContext());
+
+        // Load device history from database
+        offgrid.geogram.devices.DeviceManager.getInstance().loadFromDatabase();
 
         startBackgroundService();
         BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(this);
