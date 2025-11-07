@@ -21,12 +21,16 @@ import java.util.TreeSet;
 import offgrid.geogram.R;
 import offgrid.geogram.devices.Device;
 import offgrid.geogram.devices.DeviceManager;
+import offgrid.geogram.events.EventAction;
+import offgrid.geogram.events.EventControl;
+import offgrid.geogram.events.EventType;
 
 public class DevicesWithinReachFragment extends Fragment {
 
     private RecyclerView recyclerView;
     private DeviceAdapter adapter;
     private TextView emptyMessage;
+    private EventAction deviceUpdateListener;
 
     @Nullable
     @Override
@@ -38,6 +42,17 @@ public class DevicesWithinReachFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
         emptyMessage = view.findViewById(R.id.empty_message);
+
+        // Create event listener for device updates
+        deviceUpdateListener = new EventAction("DevicesWithinReachFragment_" + hashCode()) {
+            @Override
+            public void action(Object... data) {
+                // Update UI on main thread
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> loadDevices());
+                }
+            }
+        };
 
         // Load devices
         loadDevices();
@@ -54,24 +69,44 @@ public class DevicesWithinReachFragment extends Fragment {
         } else {
             recyclerView.setVisibility(View.VISIBLE);
             emptyMessage.setVisibility(View.GONE);
-            adapter = new DeviceAdapter(devices);
-            recyclerView.setAdapter(adapter);
+
+            if (adapter == null) {
+                // Create new adapter
+                adapter = new DeviceAdapter(devices);
+                recyclerView.setAdapter(adapter);
+            } else {
+                // Update existing adapter
+                adapter.updateDevices(devices);
+            }
         }
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        // Register event listener for real-time updates
+        EventControl.addEvent(EventType.DEVICE_UPDATED, deviceUpdateListener);
         loadDevices();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Note: EventControl doesn't have removeEvent, listener will be inactive when fragment is paused
     }
 
     // RecyclerView Adapter
     private class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder> {
 
-        private final TreeSet<Device> devices;
+        private TreeSet<Device> devices;
 
         public DeviceAdapter(TreeSet<Device> devices) {
-            this.devices = devices;
+            this.devices = new TreeSet<>(devices);
+        }
+
+        public void updateDevices(TreeSet<Device> newDevices) {
+            this.devices = new TreeSet<>(newDevices);
+            notifyDataSetChanged();
         }
 
         @NonNull
