@@ -66,7 +66,7 @@ public class DevicesWithinReachFragment extends Fragment {
     }
 
     // RecyclerView Adapter
-    private static class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder> {
+    private class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder> {
 
         private final TreeSet<Device> devices;
 
@@ -86,6 +86,18 @@ public class DevicesWithinReachFragment extends Fragment {
         public void onBindViewHolder(@NonNull DeviceViewHolder holder, int position) {
             Device device = (Device) devices.toArray()[position];
             holder.bind(device);
+
+            // Set click listener to navigate to device profile
+            holder.itemView.setOnClickListener(v -> {
+                if (getActivity() != null) {
+                    DeviceProfileFragment fragment = DeviceProfileFragment.newInstance(device.ID);
+                    getActivity().getSupportFragmentManager()
+                            .beginTransaction()
+                            .replace(R.id.fragment_container, fragment)
+                            .addToBackStack(null)
+                            .commit();
+                }
+            });
         }
 
         @Override

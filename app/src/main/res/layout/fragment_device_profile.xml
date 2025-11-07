@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/dark_gray_background"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Top Bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <!-- Back Arrow -->
+            <ImageButton
+                android:id="@+id/btn_back"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/back"
+                android:src="@drawable/ic_back"
+                app:tint="@color/white" />
+
+            <!-- Title (Device Name) -->
+            <TextView
+                android:id="@+id/tv_device_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:text="Device Name"
+                android:textColor="@color/white"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:paddingStart="8dp"/>
+        </LinearLayout>
+
+        <!-- Device Information Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#353535"
+            android:padding="16dp"
+            android:layout_marginTop="16dp">
+
+            <TextView
+                android:id="@+id/tv_device_type"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Type: HT_PORTABLE"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:paddingBottom="12dp" />
+
+            <TextView
+                android:id="@+id/tv_first_seen"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="First seen: Jan 01, 2025 12:00:00"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:paddingBottom="12dp" />
+
+            <TextView
+                android:id="@+id/tv_last_seen"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Last seen: Jan 01, 2025 12:05:00"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:paddingBottom="12dp" />
+
+            <TextView
+                android:id="@+id/tv_connection_count"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Times detected: 5"
+                android:textColor="@color/white"
+                android:textSize="16sp" />
+
+        </LinearLayout>
+
+        <!-- Placeholder for future features -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="More details coming soon..."
+            android:textColor="#888888"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:paddingTop="24dp" />
+
+    </LinearLayout>
+</ScrollView>
