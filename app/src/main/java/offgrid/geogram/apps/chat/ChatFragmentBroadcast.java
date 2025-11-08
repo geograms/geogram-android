@@ -187,6 +187,33 @@ public class ChatFragmentBroadcast extends Fragment {
                 return;
             }
 
+            // Clear input and show message immediately (optimistic UI)
+            messageInput.setText("");
+
+            // Add message to database immediately for instant display
+            String callsign = Central.getInstance().getSettings().getCallsign();
+            ChatMessage optimisticMessage = new ChatMessage(callsign, message);
+            optimisticMessage.setWrittenByMe(true);
+            optimisticMessage.setTimestamp(System.currentTimeMillis());
+
+            // Determine message type based on mode
+            if ("Internet only".equals(selectedCommunicationMode)) {
+                optimisticMessage.setMessageType(ChatMessageType.INTERNET);
+            } else if ("Local only".equals(selectedCommunicationMode)) {
+                optimisticMessage.setMessageType(ChatMessageType.LOCAL);
+            } else {
+                // For "Everything" mode, default to LOCAL (will get internet copy too)
+                optimisticMessage.setMessageType(ChatMessageType.LOCAL);
+            }
+
+            DatabaseMessages.getInstance().add(optimisticMessage);
+
+            // Refresh UI immediately
+            eraseMessagesFromWindow();
+            updateMessages();
+            chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
+
+            // Send in background
             new Thread(() -> {
                 boolean sentLocal = false;
                 boolean sentInternet = false;
@@ -209,21 +236,19 @@ public class ChatFragmentBroadcast extends Fragment {
                         Location location = getLastKnownLocation();
                         if (location != null) {
                             SettingsUser userSettings = Central.getInstance().getSettings();
-                            String callsign = userSettings.getCallsign();
+                            String userCallsign = userSettings.getCallsign();
                             String nsec = userSettings.getNsec();
                             String npub = userSettings.getNpub();
 
                             Log.d(TAG, "Sending internet message - Location: " + location.getLatitude() + "," + location.getLongitude());
-                            Log.d(TAG, "Callsign: " + callsign);
-                            Log.d(TAG, "nsec: " + (nsec != null ? nsec.substring(0, Math.min(15, nsec.length())) + "..." : "null"));
-                            Log.d(TAG, "npub: " + (npub != null ? npub.substring(0, Math.min(15, npub.length())) + "..." : "null"));
+                            Log.d(TAG, "Callsign: " + userCallsign);
 
-                            if (callsign != null && !callsign.isEmpty() && nsec != null && !nsec.isEmpty() && npub != null && !npub.isEmpty()) {
+                            if (userCallsign != null && !userCallsign.isEmpty() && nsec != null && !nsec.isEmpty() && npub != null && !npub.isEmpty()) {
                                 boolean success = GeogramChatAPI.writeMessage(
                                         location.getLatitude(),
                                         location.getLongitude(),
                                         message,
-                                        callsign,
+                                        userCallsign,
                                         nsec,
                                         npub
                                 );
@@ -231,18 +256,12 @@ public class ChatFragmentBroadcast extends Fragment {
                                 if (success) {
                                     sentInternet = true;
                                     Log.i(TAG, "Message sent to server successfully");
-                                    // Add the sent message to database immediately
-                                    ChatMessage chatMessage = new ChatMessage(callsign, message);
-                                    chatMessage.setWrittenByMe(true);
-                                    chatMessage.setMessageType(ChatMessageType.INTERNET);
-                                    chatMessage.setTimestamp(System.currentTimeMillis());
-                                    DatabaseMessages.getInstance().add(chatMessage);
                                 } else {
                                     Log.e(TAG, "Server returned failure response");
                                     errorMessage = "Server rejected message";
                                 }
                             } else {
-                                Log.e(TAG, "User identity not configured - callsign: " + callsign + ", nsec empty: " + (nsec == null || nsec.isEmpty()) + ", npub empty: " + (npub == null || npub.isEmpty()));
+                                Log.e(TAG, "User identity not configured");
                                 errorMessage = "User identity not configured (callsign, nsec, or npub missing)";
                             }
                         } else {
@@ -261,17 +280,8 @@ public class ChatFragmentBroadcast extends Fragment {
                 final String finalError = errorMessage;
 
                 requireActivity().runOnUiThread(() -> {
+                    // Message already displayed optimistically, just show status
                     if (anySent) {
-                        messageInput.setText("");
-                        eraseMessagesFromWindow();
-                        updateMessages();
-
-                        // Force layout refresh and scroll to bottom
-                        chatMessageContainer.post(() -> {
-                            chatMessageContainer.requestLayout();
-                            chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
-                        });
-
                         // Show success message
                         if (finalSentInternet && finalSentLocal) {
                             Toast.makeText(getContext(), "Message sent via Bluetooth and Internet", Toast.LENGTH_SHORT).show();
@@ -281,7 +291,8 @@ public class ChatFragmentBroadcast extends Fragment {
                             Toast.makeText(getContext(), "Message sent via Bluetooth", Toast.LENGTH_SHORT).show();
                         }
                     } else if (finalError != null) {
-                        Toast.makeText(getContext(), finalError, Toast.LENGTH_SHORT).show();
+                        // Send failed - show error
+                        Toast.makeText(getContext(), finalError, Toast.LENGTH_LONG).show();
                     }
                 });
             }).start();
