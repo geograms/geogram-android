@@ -208,9 +208,8 @@ public class ChatFragmentBroadcast extends Fragment {
 
             DatabaseMessages.getInstance().add(optimisticMessage);
 
-            // Refresh UI immediately
-            eraseMessagesFromWindow();
-            updateMessages();
+            // Add message directly to UI for immediate display
+            addUserMessage(optimisticMessage);
             chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
 
             // Send in background
