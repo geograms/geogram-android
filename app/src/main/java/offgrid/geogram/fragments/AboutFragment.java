@@ -11,6 +11,7 @@ import androidx.fragment.app.Fragment;
 import android.widget.ImageButton;
 import android.widget.TextView;
 
+import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 
 public class AboutFragment extends Fragment {
@@ -31,5 +32,21 @@ public class AboutFragment extends Fragment {
         return view;
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Hide top action bar for detail screens
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setTopActionBarVisible(false);
+        }
+    }
 
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Show top action bar when leaving
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setTopActionBarVisible(true);
+        }
+    }
 }

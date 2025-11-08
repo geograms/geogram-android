@@ -18,6 +18,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.core.Central;
 
@@ -58,6 +59,24 @@ public class SettingsFragment extends Fragment {
         initializeUI(view);
 
         return view;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Hide top action bar for detail screens
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setTopActionBarVisible(false);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Show top action bar when leaving
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setTopActionBarVisible(true);
+        }
     }
 
     private void loadSettings() {

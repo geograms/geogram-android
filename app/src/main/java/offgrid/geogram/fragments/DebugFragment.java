@@ -15,6 +15,7 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 
+import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.core.Log;
 
@@ -67,6 +68,24 @@ public class DebugFragment extends Fragment {
         });
 
         return view;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Hide top action bar for detail screens
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setTopActionBarVisible(false);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Show top action bar when leaving
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setTopActionBarVisible(true);
+        }
     }
 
     @Override

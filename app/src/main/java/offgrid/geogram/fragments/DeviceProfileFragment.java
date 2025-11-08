@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Locale;
 
+import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.devices.Device;
 import offgrid.geogram.devices.DeviceManager;
@@ -101,6 +102,24 @@ public class DeviceProfileFragment extends Fragment {
         connectionCountView.setText("Times detected: " + totalConnections);
 
         return view;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Hide top action bar for detail screens
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setTopActionBarVisible(false);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Show top action bar when leaving
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setTopActionBarVisible(true);
+        }
     }
 
     private String formatTimestamp(long timestamp) {

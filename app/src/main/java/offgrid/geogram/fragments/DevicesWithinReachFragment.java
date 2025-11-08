@@ -18,6 +18,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.TreeSet;
 
+import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.devices.Device;
 import offgrid.geogram.devices.DeviceManager;
@@ -115,6 +116,10 @@ public class DevicesWithinReachFragment extends Fragment {
     public void onResume() {
         super.onResume();
         android.util.Log.d("DevicesFragment", "onResume called");
+        // Show top action bar for main screens
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setTopActionBarVisible(true);
+        }
         // Register event listener for real-time updates
         if (deviceUpdateListener != null) {
             EventControl.addEvent(EventType.DEVICE_UPDATED, deviceUpdateListener);

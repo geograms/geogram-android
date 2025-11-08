@@ -385,4 +385,16 @@ public class MainActivity extends AppCompatActivity {
             deviceCountBadge.setBackgroundResource(R.drawable.badge_background_green);
         }
     }
+
+    /**
+     * Show or hide the top action bar.
+     * Main screens (Chat, Messages, Devices list) should show it.
+     * Detail screens (Device Profile, Settings, etc.) should hide it.
+     */
+    public void setTopActionBarVisible(boolean visible) {
+        android.widget.LinearLayout topActionBar = findViewById(R.id.top_action_bar);
+        if (topActionBar != null) {
+            topActionBar.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+    }
 }

@@ -20,6 +20,7 @@ import androidx.fragment.app.Fragment;
 
 import java.util.Iterator;
 
+import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.ble.BluetoothSender;
 import offgrid.geogram.core.Central;
@@ -278,6 +279,11 @@ public class ChatFragmentBroadcast extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+
+        // Show top action bar for main screens
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setTopActionBarVisible(true);
+        }
 
         // Hide the floating action button
 //        FloatingActionButton btnAdd = requireActivity().findViewById(R.id.btn_add);

@@ -9,6 +9,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 
 public class MessagesFragment extends Fragment {
@@ -29,6 +30,9 @@ public class MessagesFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // TODO: Add onResume logic here
+        // Show top action bar for main screens
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).setTopActionBarVisible(true);
+        }
     }
 }
