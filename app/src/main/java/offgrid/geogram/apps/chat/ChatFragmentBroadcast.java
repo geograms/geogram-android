@@ -522,18 +522,18 @@ public class ChatFragmentBroadcast extends Fragment {
             return "light gray";
         }
 
-        // Array of pleasant, distinguishable colors
+        // Array of pleasant, distinguishable colors (avoiding red/yellow which look like warnings)
         String[] colors = {
             "light blue",
             "light green",
             "light cyan",
-            "yellow",
             "pink",
             "cyan",
             "magenta",
             "blue",
             "green",
-            "red"
+            "brown",
+            "dark gray"
         };
 
         // Generate consistent hash from authorId
