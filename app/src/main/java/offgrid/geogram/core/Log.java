@@ -70,11 +70,31 @@ public class Log {
         log(android.util.Log.DEBUG, tag, message);
     }
 
+    public static void d(String tag, String message, Throwable throwable) {
+        log(android.util.Log.DEBUG, tag, message + "\n" + android.util.Log.getStackTraceString(throwable));
+    }
+
     public static void e(String tag, String message) {
         log(android.util.Log.ERROR, tag, message);
     }
 
+    public static void e(String tag, String message, Throwable throwable) {
+        log(android.util.Log.ERROR, tag, message + "\n" + android.util.Log.getStackTraceString(throwable));
+    }
+
     public static void i(String tag, String message) {
         log(android.util.Log.INFO, tag, message);
+    }
+
+    public static void i(String tag, String message, Throwable throwable) {
+        log(android.util.Log.INFO, tag, message + "\n" + android.util.Log.getStackTraceString(throwable));
+    }
+
+    public static void w(String tag, String message) {
+        log(android.util.Log.WARN, tag, message);
+    }
+
+    public static void w(String tag, String message, Throwable throwable) {
+        log(android.util.Log.WARN, tag, message + "\n" + android.util.Log.getStackTraceString(throwable));
     }
 }

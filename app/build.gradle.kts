@@ -64,6 +64,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockito.inline)
     testImplementation(libs.slf4j.simple)
+    testImplementation("org.json:json:20230227") // For unit tests with JSON
     androidTestImplementation(libs.espresso.core)
 
     // implementation("com.github.tcheeric:nostr-java:main-SNAPSHOT")

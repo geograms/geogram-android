@@ -48,6 +48,13 @@ public class SettingsUser {
     @Expose
     private String emoticon; // one-line ascii representing the user
 
+    // Chat settings
+    @Expose
+    private String chatCommunicationMode = "Everything"; // Local only, Internet only, Everything
+
+    @Expose
+    private int chatRadiusKm = 100; // Default 100 km
+
     // Getters and Setters with Validation
     public boolean isInvisibleMode() {
         return invisibleMode;
@@ -195,6 +202,31 @@ public class SettingsUser {
             return false;
         }
         return input.matches("\\d*");
+    }
+
+    // Chat settings getters/setters
+    public String getChatCommunicationMode() {
+        return chatCommunicationMode != null ? chatCommunicationMode : "Everything";
+    }
+
+    public void setChatCommunicationMode(String mode) {
+        if ("Local only".equals(mode) || "Internet only".equals(mode) || "Everything".equals(mode)) {
+            this.chatCommunicationMode = mode;
+        } else {
+            throw new IllegalArgumentException("Invalid communication mode: " + mode);
+        }
+    }
+
+    public int getChatRadiusKm() {
+        return chatRadiusKm > 0 ? chatRadiusKm : 100;
+    }
+
+    public void setChatRadiusKm(int radiusKm) {
+        if (radiusKm >= 1 && radiusKm <= 500) {
+            this.chatRadiusKm = radiusKm;
+        } else {
+            throw new IllegalArgumentException("Radius must be between 1 and 500 km");
+        }
     }
 
 

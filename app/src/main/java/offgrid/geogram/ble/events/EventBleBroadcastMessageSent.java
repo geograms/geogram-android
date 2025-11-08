@@ -18,6 +18,8 @@ public class EventBleBroadcastMessageSent extends EventAction {
         BluetoothMessage message = (BluetoothMessage) data[0];
         ChatMessage chatMessage = ChatMessage.convert(message);
         chatMessage.setWrittenByMe(true);
+        // Tag as local Bluetooth message
+        chatMessage.setMessageType(offgrid.geogram.apps.chat.ChatMessageType.LOCAL);
         // add the message to the database
         DatabaseMessages.getInstance().add(chatMessage);
         // flush immediately to disk

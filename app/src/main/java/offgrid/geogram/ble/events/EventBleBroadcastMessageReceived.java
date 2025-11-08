@@ -17,6 +17,8 @@ public class EventBleBroadcastMessageReceived extends EventAction {
     public void action(Object... data) {
         BluetoothMessage messageBluetooth = (BluetoothMessage) data[0];
         ChatMessage message = ChatMessage.convert(messageBluetooth);
+        // Tag as local Bluetooth message
+        message.setMessageType(offgrid.geogram.apps.chat.ChatMessageType.LOCAL);
         // add the message on the database
         DatabaseMessages.getInstance().add(message);
         // flush immediately to disk

@@ -156,6 +156,9 @@ public class EventBleMessageReceived extends EventAction {
         // this is a generic message, convert to a standard format
         ChatMessage chatMessage = ChatMessage.convert(msg);
 
+        // Tag as local Bluetooth message
+        chatMessage.setMessageType(offgrid.geogram.apps.chat.ChatMessageType.LOCAL);
+
         // add to our database of broadcast messages
         DatabaseMessages.getInstance().add(chatMessage);
 

@@ -20,10 +20,10 @@ public class BluetoothPackageTest {
         String messageShort = "+053156@RY1A-ISZS";
         String messageLong = "An example of a long message to break into multiple parcels.";
 
-        BluetoothMessage msgLong = new BluetoothMessage("CR7BBQ", "ANY", messageLong);
+        BluetoothMessage msgLong = new BluetoothMessage("CR7BBQ", "ANY", messageLong, false);
         assertEquals(5, msgLong.getMessageParcels().length);
 
-        BluetoothMessage msgShort = new BluetoothMessage("CR7BBQ", "ANY", messageShort);
+        BluetoothMessage msgShort = new BluetoothMessage("CR7BBQ", "ANY", messageShort, true);
         assertEquals(1, msgShort.getMessageParcels().length);
 
         System.out.println(msgShort.getMessage());

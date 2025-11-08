@@ -13,7 +13,7 @@ public class BluePackageTest {
 
         String messageToSend = "Hello there, this is a long message just to test that we can send them";
 
-        BluetoothMessage msg = new BluetoothMessage("CR7BBQ-15", "KO6ZJI-10", messageToSend);
+        BluetoothMessage msg = new BluetoothMessage("CR7BBQ-15", "KO6ZJI-10", messageToSend, false);
         assertEquals(5, msg.getMessageParcelsTotal());
 
         // e.g. WO0:CR7BBQ-15:KO6ZJI-10:GMJA | WO1:Hello there, this  | WO2:is a long message  | WO3:just to test that  | WO4:we can send them

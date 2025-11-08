@@ -1,33 +1,45 @@
 package offgrid.geogram.apps.chat;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.graphics.drawable.GradientDrawable;
+import android.location.Location;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
 
 import java.util.Iterator;
+import java.util.List;
 
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
+import offgrid.geogram.api.GeogramChatAPI;
 import offgrid.geogram.ble.BluetoothSender;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.DatabaseMessages;
 import offgrid.geogram.old.databaseold.BioProfile;
 import offgrid.geogram.old.bluetooth_old.broadcast.BroadcastSender;
+import offgrid.geogram.settings.SettingsLoader;
+import offgrid.geogram.settings.SettingsUser;
 import offgrid.geogram.util.DateUtils;
 
 public class ChatFragmentBroadcast extends Fragment {
@@ -36,6 +48,14 @@ public class ChatFragmentBroadcast extends Fragment {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private LinearLayout chatMessageContainer;
     private ScrollView chatScrollView;
+    private Spinner spinnerCommunicationMode;
+    private Spinner spinnerRadius;
+    private String selectedCommunicationMode;
+    private String selectedRadius;
+    private Runnable internetMessagePoller;
+    private static final long POLL_INTERVAL_MS = 30000; // 30 seconds, like HTML app
+    private Location lastKnownLocation;
+    private static final int DEFAULT_RADIUS_KM = 100;
 
     public boolean canAddMessages() {
         return isAdded()                      // Fragment is attached to Activity
@@ -74,36 +94,192 @@ public class ChatFragmentBroadcast extends Fragment {
         chatMessageContainer = view.findViewById(R.id.chat_message_container);
         chatScrollView = view.findViewById(R.id.chat_scroll_view);
 
+        // Initialize spinners
+        spinnerCommunicationMode = view.findViewById(R.id.spinner_communication_mode);
+        spinnerRadius = view.findViewById(R.id.spinner_radius);
+
+        // Load saved settings
+        SettingsUser settings = Central.getInstance().getSettings();
+        selectedCommunicationMode = settings.getChatCommunicationMode();
+        int savedRadiusKm = settings.getChatRadiusKm();
+        selectedRadius = savedRadiusKm + " km";
+
+        // Setup communication mode spinner
+        ArrayAdapter<CharSequence> modeAdapter = ArrayAdapter.createFromResource(
+                requireContext(),
+                R.array.communication_modes,
+                R.layout.spinner_item
+        );
+        modeAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
+        spinnerCommunicationMode.setAdapter(modeAdapter);
+
+        // Set saved selection
+        int modePosition = getModePosition(selectedCommunicationMode);
+        spinnerCommunicationMode.setSelection(modePosition);
+
+        spinnerCommunicationMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedCommunicationMode = parent.getItemAtPosition(position).toString();
+                Log.i(TAG, "Communication mode selected: " + selectedCommunicationMode);
+
+                // Save to settings
+                SettingsUser settings = Central.getInstance().getSettings();
+                settings.setChatCommunicationMode(selectedCommunicationMode);
+                SettingsLoader.saveSettings(requireContext(), settings);
+
+                // Start/stop internet polling based on mode
+                handleCommunicationModeChange();
+
+                // Refresh messages immediately
+                eraseMessagesFromWindow();
+                updateMessages();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // Do nothing
+            }
+        });
+
+        // Setup radius spinner
+        ArrayAdapter<CharSequence> radiusAdapter = ArrayAdapter.createFromResource(
+                requireContext(),
+                R.array.radius_options,
+                R.layout.spinner_item
+        );
+        radiusAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
+        spinnerRadius.setAdapter(radiusAdapter);
+
+        // Set saved radius position
+        int radiusPosition = getRadiusPosition(savedRadiusKm);
+        spinnerRadius.setSelection(radiusPosition);
+
+        spinnerRadius.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedRadius = parent.getItemAtPosition(position).toString();
+                Log.i(TAG, "Radius selected: " + selectedRadius);
+
+                // Save to settings
+                int radiusKm = getSelectedRadiusKm();
+                SettingsUser settings = Central.getInstance().getSettings();
+                settings.setChatRadiusKm(radiusKm);
+                SettingsLoader.saveSettings(requireContext(), settings);
+
+                // Refresh messages with new radius
+                if (shouldFetchInternetMessages()) {
+                    eraseMessagesFromWindow();
+                    updateMessages();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // Do nothing
+            }
+        });
+
         // Send button functionality
         btnSend.setOnClickListener(v -> {
             String message = messageInput.getText().toString().trim();
             if(message.isEmpty() || message.isBlank()){
                 return;
             }
+
             new Thread(() -> {
+                boolean sentLocal = false;
+                boolean sentInternet = false;
+                String errorMessage = null;
+
+                // Send via Bluetooth if needed
+                if ("Local only".equals(selectedCommunicationMode) || "Everything".equals(selectedCommunicationMode)) {
+                    try {
+                        BluetoothSender.getInstance(getContext()).sendMessage(message);
+                        sentLocal = true;
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to send via Bluetooth", e);
+                        errorMessage = "Bluetooth send failed: " + e.getMessage();
+                    }
+                }
+
+                // Send via Internet if needed
+                if ("Internet only".equals(selectedCommunicationMode) || "Everything".equals(selectedCommunicationMode)) {
+                    try {
+                        Location location = getLastKnownLocation();
+                        if (location != null) {
+                            SettingsUser userSettings = Central.getInstance().getSettings();
+                            String callsign = userSettings.getCallsign();
+                            String nsec = userSettings.getNsec();
+                            String npub = userSettings.getNpub();
+
+                            Log.d(TAG, "Sending internet message - Location: " + location.getLatitude() + "," + location.getLongitude());
+                            Log.d(TAG, "Callsign: " + callsign);
+                            Log.d(TAG, "nsec: " + (nsec != null ? nsec.substring(0, Math.min(15, nsec.length())) + "..." : "null"));
+                            Log.d(TAG, "npub: " + (npub != null ? npub.substring(0, Math.min(15, npub.length())) + "..." : "null"));
+
+                            if (callsign != null && !callsign.isEmpty() && nsec != null && !nsec.isEmpty() && npub != null && !npub.isEmpty()) {
+                                boolean success = GeogramChatAPI.writeMessage(
+                                        location.getLatitude(),
+                                        location.getLongitude(),
+                                        message,
+                                        callsign,
+                                        nsec,
+                                        npub
+                                );
+
+                                if (success) {
+                                    sentInternet = true;
+                                    Log.i(TAG, "Message sent to server successfully");
+                                    // Add the sent message to database immediately
+                                    ChatMessage chatMessage = new ChatMessage(callsign, message);
+                                    chatMessage.setWrittenByMe(true);
+                                    chatMessage.setMessageType(ChatMessageType.INTERNET);
+                                    chatMessage.setTimestamp(System.currentTimeMillis());
+                                    DatabaseMessages.getInstance().add(chatMessage);
+                                } else {
+                                    Log.e(TAG, "Server returned failure response");
+                                    errorMessage = "Server rejected message";
+                                }
+                            } else {
+                                Log.e(TAG, "User identity not configured - callsign: " + callsign + ", nsec empty: " + (nsec == null || nsec.isEmpty()) + ", npub empty: " + (npub == null || npub.isEmpty()));
+                                errorMessage = "User identity not configured (callsign, nsec, or npub missing)";
+                            }
+                        } else {
+                            Log.e(TAG, "No location available for internet send");
+                            errorMessage = "No location available";
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to send via Internet", e);
+                        errorMessage = "Internet send failed: " + e.getMessage();
+                    }
+                }
+
+                final boolean anySent = sentLocal || sentInternet;
+                final boolean finalSentInternet = sentInternet;
+                final boolean finalSentLocal = sentLocal;
+                final String finalError = errorMessage;
+
                 requireActivity().runOnUiThread(() -> {
-                    // send the message
-                    BluetoothSender.getInstance(getContext()).sendMessage(message);
-                    // Send the message via BroadcastChat
-                    messageInput.setText("");
-                    // Scroll to the bottom of the chat
-                    chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
+                    if (anySent) {
+                        messageInput.setText("");
+                        eraseMessagesFromWindow();
+                        updateMessages();
+                        chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
+
+                        // Show success message
+                        if (finalSentInternet && finalSentLocal) {
+                            Toast.makeText(getContext(), "Message sent via Bluetooth and Internet", Toast.LENGTH_SHORT).show();
+                        } else if (finalSentInternet) {
+                            Toast.makeText(getContext(), "Message sent via Internet", Toast.LENGTH_SHORT).show();
+                        } else if (finalSentLocal) {
+                            Toast.makeText(getContext(), "Message sent via Bluetooth", Toast.LENGTH_SHORT).show();
+                        }
+                    } else if (finalError != null) {
+                        Toast.makeText(getContext(), finalError, Toast.LENGTH_SHORT).show();
+                    }
                 });
-//                boolean success = BroadcastSender.broadcast(messageToBroadcast, getContext());
-//                requireActivity().runOnUiThread(() -> {
-//                    if (success) {
-//                        messageInput.setText("");
-//
-//                        // Scroll to the bottom of the chat
-//                        chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
-//                    } else {
-//                        Toast.makeText(getContext(), "Failed to send message. Please check Bluetooth.", Toast.LENGTH_SHORT).show();
-//                    }
-//                });
-
-
             }).start();
-
         });
 
 
@@ -119,6 +295,7 @@ public class ChatFragmentBroadcast extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         // Stop message polling and unregister listener to avoid memory leaks
+        stopInternetMessagePolling();
         handler.removeCallbacksAndMessages(null);
         BroadcastSender.removeMessageUpdateListener();
     }
@@ -172,6 +349,11 @@ public class ChatFragmentBroadcast extends Fragment {
             return;
         }
 
+        // Filter messages based on communication mode
+        if (!shouldDisplayMessage(message)) {
+            return;
+        }
+
         // display the message on the screen
         if (message.getAuthorId().equals(idThisDevice)
             //message.isWrittenByMe()
@@ -179,6 +361,34 @@ public class ChatFragmentBroadcast extends Fragment {
             addUserMessage(message);
         } else {
             addReceivedMessage(message);
+        }
+    }
+
+    /**
+     * Check if message should be displayed based on communication mode
+     */
+    private boolean shouldDisplayMessage(ChatMessage message) {
+        if (selectedCommunicationMode == null) {
+            return true; // Show all if mode not set
+        }
+
+        ChatMessageType type = message.getMessageType();
+
+        // Old messages without a type set (DATA, TEXT, CHAT, etc.) should be treated as LOCAL
+        // since they came from Bluetooth before we added internet functionality
+        if (type != ChatMessageType.LOCAL && type != ChatMessageType.INTERNET) {
+            type = ChatMessageType.LOCAL;
+        }
+
+        switch (selectedCommunicationMode) {
+            case "Local only":
+                return type == ChatMessageType.LOCAL;
+            case "Internet only":
+                return type == ChatMessageType.INTERNET;
+            case "Everything":
+                return type == ChatMessageType.LOCAL || type == ChatMessageType.INTERNET;
+            default:
+                return true; // Show all by default
         }
     }
 
@@ -235,11 +445,12 @@ public class ChatFragmentBroadcast extends Fragment {
         String dateText = DateUtils.convertTimestampForChatMessage(timeStamp);
         textBoxUpper.setText("");
 
-        // Set the sender's name
+        // Set the sender's name with origin label
+        String origin = getMessageOriginLabel(message);
         if (nickname.isEmpty() && message.getAuthorId() != null) {
-            textBoxLower.setText(message.getAuthorId());
+            textBoxLower.setText(message.getAuthorId() + " " + origin);
         } else {
-            String idText = nickname + "    " + dateText;
+            String idText = nickname + " " + origin + "    " + dateText;
             textBoxLower.setText(idText);
         }
 
@@ -276,6 +487,26 @@ public class ChatFragmentBroadcast extends Fragment {
         chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
     }
 
+    /**
+     * Get the origin label for a message
+     * @param message The message
+     * @return "(internet)" or "(bluetooth)" based on message type
+     */
+    private String getMessageOriginLabel(ChatMessage message) {
+        ChatMessageType type = message.getMessageType();
+
+        // Treat untagged messages as LOCAL (legacy Bluetooth messages)
+        if (type != ChatMessageType.LOCAL && type != ChatMessageType.INTERNET) {
+            type = ChatMessageType.LOCAL;
+        }
+
+        if (type == ChatMessageType.INTERNET) {
+            return "(internet)";
+        } else {
+            return "(bluetooth)";
+        }
+    }
+
     @Override
     public void onResume() {
         super.onResume();
@@ -296,6 +527,10 @@ public class ChatFragmentBroadcast extends Fragment {
 
         // update the messages, ignoring the already written ones
         updateMessages();
+
+        // Start internet polling if needed
+        handleCommunicationModeChange();
+
         Log.i(TAG, "onResume");
     }
 
@@ -321,6 +556,220 @@ public class ChatFragmentBroadcast extends Fragment {
 //
 //    }
 
+
+    /**
+     * Handle communication mode changes
+     */
+    private void handleCommunicationModeChange() {
+        // Stop any existing polling
+        stopInternetMessagePolling();
+
+        // Start polling if needed
+        if (shouldFetchInternetMessages()) {
+            startInternetMessagePolling();
+        }
+    }
+
+    /**
+     * Check if we should fetch messages from the internet
+     */
+    private boolean shouldFetchInternetMessages() {
+        return "Internet only".equals(selectedCommunicationMode)
+                || "Everything".equals(selectedCommunicationMode);
+    }
+
+    /**
+     * Start polling for internet messages
+     */
+    private void startInternetMessagePolling() {
+        if (internetMessagePoller != null) {
+            return; // Already running
+        }
+
+        internetMessagePoller = new Runnable() {
+            @Override
+            public void run() {
+                fetchInternetMessages();
+                handler.postDelayed(this, POLL_INTERVAL_MS);
+            }
+        };
+
+        // Fetch immediately, then schedule periodic fetches
+        handler.post(internetMessagePoller);
+        Log.i(TAG, "Started internet message polling");
+    }
+
+    /**
+     * Stop polling for internet messages
+     */
+    private void stopInternetMessagePolling() {
+        if (internetMessagePoller != null) {
+            handler.removeCallbacks(internetMessagePoller);
+            internetMessagePoller = null;
+            Log.i(TAG, "Stopped internet message polling");
+        }
+    }
+
+    /**
+     * Fetch messages from the internet API
+     */
+    private void fetchInternetMessages() {
+        new Thread(() -> {
+            try {
+                // Get location
+                Location location = getLastKnownLocation();
+                if (location == null) {
+                    Log.i(TAG, "No location available for internet messages");
+                    return;
+                }
+
+                // Get user settings
+                SettingsUser settings = Central.getInstance().getSettings();
+                String callsign = settings.getCallsign();
+                String nsec = settings.getNsec();
+                String npub = settings.getNpub();
+
+                if (callsign == null || nsec == null || npub == null) {
+                    Log.i(TAG, "User identity not configured");
+                    return;
+                }
+
+                // Fetch messages from API
+                int radiusKm = getSelectedRadiusKm();
+                List<ChatMessage> messages = GeogramChatAPI.readMessages(
+                        location.getLatitude(),
+                        location.getLongitude(),
+                        radiusKm,
+                        callsign,
+                        nsec,
+                        npub
+                );
+
+                // Add messages to database
+                for (ChatMessage message : messages) {
+                    DatabaseMessages.getInstance().add(message);
+                }
+
+                // Update UI on main thread
+                requireActivity().runOnUiThread(() -> {
+                    eraseMessagesFromWindow();
+                    updateMessages();
+                });
+
+                Log.i(TAG, "Fetched " + messages.size() + " messages from internet");
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error fetching internet messages", e);
+                requireActivity().runOnUiThread(() -> {
+                    if (isAdded()) {
+                        Toast.makeText(getContext(),
+                                "Failed to fetch internet messages: " + e.getMessage(),
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * Get the last known location
+     */
+    private Location getLastKnownLocation() {
+        if (lastKnownLocation != null) {
+            return lastKnownLocation;
+        }
+
+        if (getContext() == null) {
+            return null;
+        }
+
+        LocationManager locationManager = (LocationManager) requireContext()
+                .getSystemService(android.content.Context.LOCATION_SERVICE);
+
+        if (locationManager == null) {
+            return null;
+        }
+
+        // Check permissions
+        if (ActivityCompat.checkSelfPermission(requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(requireContext(),
+                Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Log.i(TAG, "Location permission not granted");
+            return null;
+        }
+
+        // Try GPS first
+        Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+        if (location == null) {
+            // Fallback to network provider
+            location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+        }
+
+        lastKnownLocation = location;
+        return location;
+    }
+
+    /**
+     * Get the currently selected communication mode
+     * @return "Local only", "Internet only", or "Everything"
+     */
+    public String getSelectedCommunicationMode() {
+        return selectedCommunicationMode;
+    }
+
+    /**
+     * Get the currently selected radius
+     * @return radius string (e.g., "10 km")
+     */
+    public String getSelectedRadius() {
+        return selectedRadius;
+    }
+
+    /**
+     * Get the radius value in kilometers
+     * @return radius value as integer
+     */
+    public int getSelectedRadiusKm() {
+        if (selectedRadius == null) {
+            return DEFAULT_RADIUS_KM;
+        }
+        // Extract number from string like "10 km"
+        String[] parts = selectedRadius.split(" ");
+        try {
+            return Integer.parseInt(parts[0]);
+        } catch (NumberFormatException e) {
+            return DEFAULT_RADIUS_KM;
+        }
+    }
+
+    /**
+     * Get spinner position for communication mode
+     */
+    private int getModePosition(String mode) {
+        if ("Local only".equals(mode)) return 0;
+        if ("Internet only".equals(mode)) return 1;
+        return 2; // "Everything" is default
+    }
+
+    /**
+     * Get spinner position for radius
+     */
+    private int getRadiusPosition(int radiusKm) {
+        String[] radii = getResources().getStringArray(R.array.radius_options);
+        for (int i = 0; i < radii.length; i++) {
+            if (radii[i].startsWith(String.valueOf(radiusKm))) {
+                return i;
+            }
+        }
+        // Default to 100 km (position might vary, find it)
+        for (int i = 0; i < radii.length; i++) {
+            if (radii[i].startsWith("100")) {
+                return i;
+            }
+        }
+        return 5; // fallback to index 5 (100 km in our array)
+    }
 
     private void applyBalloonStyle(TextView messageTextView, String backgroundColor) {
         int bgColor;
