@@ -1,0 +1,9 @@
+# F-Droid repository files
+# These should be in a separate fdroid repository
+
+# All files except README.md
+*
+
+# Allow README.md
+!.gitignore
+!README.md
