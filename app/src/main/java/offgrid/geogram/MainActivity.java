@@ -296,8 +296,6 @@ public class MainActivity extends AppCompatActivity {
 
             if (item.getItemId() == R.id.nav_settings) {
                 transaction.replace(R.id.fragment_container, SettingsFragment.getInstance()).addToBackStack(null);
-            } else if (item.getItemId() == R.id.nav_broadcast) {
-                transaction.replace(R.id.fragment_container, Central.getInstance().broadcastChatFragment).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_debug) {
                 transaction.replace(R.id.fragment_container, new DebugFragment()).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_about) {
