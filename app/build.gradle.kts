@@ -55,6 +55,7 @@ dependencies {
     implementation(libs.viewpager2)
     implementation(libs.runner)
     implementation(libs.play.services.location)
+    implementation(libs.swiperefreshlayout)
 
     // Room
     implementation(libs.room.runtime)

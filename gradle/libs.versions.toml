@@ -25,6 +25,7 @@ playServicesLocation = "21.3.0"
 roomRuntime = "2.6.1"
 roomCompiler = "2.6.1"
 stetho = "1.6.0"
+swiperefreshlayout = "1.1.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -52,6 +53,7 @@ play-services-location = { group = "com.google.android.gms", name = "play-servic
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "roomRuntime" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "roomCompiler" }
 stetho = { group = "com.facebook.stetho", name = "stetho", version.ref = "stetho" }
+swiperefreshlayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "swiperefreshlayout" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -38,6 +38,7 @@ import offgrid.geogram.core.BackgroundService;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.core.PermissionsHelper;
+import offgrid.geogram.database.DatabaseConversations;
 import offgrid.geogram.database.DatabaseMessages;
 import offgrid.geogram.devices.EventConnected;
 import offgrid.geogram.devices.ConnectionType;
@@ -221,6 +222,7 @@ public class MainActivity extends AppCompatActivity {
         // Initialize settings and databases before starting service and loading fragment
         Central.getInstance().loadSettings(getApplicationContext());
         DatabaseMessages.getInstance().init(getApplicationContext());
+        DatabaseConversations.getInstance().init(getApplicationContext());
         offgrid.geogram.database.DatabaseLocations.get().init(getApplicationContext());
         offgrid.geogram.database.DatabaseDevices.get().init(getApplicationContext());
 
