@@ -265,7 +265,12 @@ public class ChatFragmentBroadcast extends Fragment {
                         messageInput.setText("");
                         eraseMessagesFromWindow();
                         updateMessages();
-                        chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
+
+                        // Force layout refresh and scroll to bottom
+                        chatMessageContainer.post(() -> {
+                            chatMessageContainer.requestLayout();
+                            chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
+                        });
 
                         // Show success message
                         if (finalSentInternet && finalSentLocal) {
@@ -469,8 +474,8 @@ public class ChatFragmentBroadcast extends Fragment {
         TextView messageTextView = receivedMessageView.findViewById(R.id.message_user_1);
         messageTextView.setText(text);
 
-        // Apply balloon style based on preferred background color
-        String colorBackground = profile != null ? profile.getColor() : "light gray";
+        // Apply balloon style based on user's unique color
+        String colorBackground = profile != null ? profile.getColor() : getUserColor(message.getAuthorId());
         applyBalloonStyle(messageTextView, colorBackground);
 
         // Add click listener to navigate to the user profile
@@ -505,6 +510,37 @@ public class ChatFragmentBroadcast extends Fragment {
         } else {
             return "(bluetooth)";
         }
+    }
+
+    /**
+     * Generate a consistent color for each user based on their authorId
+     * @param authorId The user's callsign/ID
+     * @return A color name for the balloon background
+     */
+    private String getUserColor(String authorId) {
+        if (authorId == null || authorId.isEmpty()) {
+            return "light gray";
+        }
+
+        // Array of pleasant, distinguishable colors
+        String[] colors = {
+            "light blue",
+            "light green",
+            "light cyan",
+            "yellow",
+            "pink",
+            "cyan",
+            "magenta",
+            "blue",
+            "green",
+            "red"
+        };
+
+        // Generate consistent hash from authorId
+        int hash = Math.abs(authorId.hashCode());
+        int colorIndex = hash % colors.length;
+
+        return colors[colorIndex];
     }
 
     @Override
