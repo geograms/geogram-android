@@ -100,9 +100,25 @@ public class SettingsFragment extends Fragment {
     }
 
     private void initializeUI(View view) {
-        // User Preferences
-        EditText nickname = view.findViewById(R.id.edit_preferred_nickname);
-        nickname.setText(settings.getNickname());
+        // Auto-generate identity if not present
+        if (settings.getNpub() == null || settings.getNpub().isEmpty() ||
+                settings.getNsec() == null || settings.getNsec().isEmpty()) {
+            generateNewIdentity();
+        } else if (settings.getCallsign() == null || settings.getCallsign().isEmpty()) {
+            // Derive callsign from existing npub if missing
+            try {
+                String callsign = IdentityHelper.deriveCallsignFromNpub(settings.getNpub());
+                settings.setCallsign(callsign);
+                saveSettings(settings);
+            } catch (Exception e) {
+                // If derivation fails, generate new identity
+                generateNewIdentity();
+            }
+        }
+
+        // Callsign (read-only)
+        EditText callsignField = view.findViewById(R.id.edit_callsign);
+        callsignField.setText(settings.getCallsign());
 
         Spinner preferredColorSpinner = view.findViewById(R.id.spinner_preferred_color);
         String[] colorOptions = getResources().getStringArray(R.array.color_options);
@@ -122,7 +138,7 @@ public class SettingsFragment extends Fragment {
         // Save Button
         View saveButton = view.findViewById(R.id.btn_save_settings);
         saveButton.setOnClickListener(v -> {
-            saveSettings(nickname, npub, nsec, preferredColorSpinner);
+            saveSettings(npub, nsec, preferredColorSpinner);
             sendProfileToEveryone(requireContext());
             requireActivity().onBackPressed(); // Navigate back
         });
@@ -133,6 +149,32 @@ public class SettingsFragment extends Fragment {
 
         ImageButton btnCopyNPUB = view.findViewById(R.id.btn_copy_npub);
         btnCopyNPUB.setOnClickListener(v -> copyToClipboard(npub, "NPUB"));
+
+        // Reset Identity Button
+        view.findViewById(R.id.btn_reset_identity).setOnClickListener(v -> {
+            new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                    .setTitle("Reset Identity")
+                    .setMessage("This will generate new Nostr keys and callsign. Your old identity will be lost. Continue?")
+                    .setPositiveButton("Yes, Reset", (dialog, which) -> {
+                        generateNewIdentity();
+                        reloadSettings();
+                        Toast.makeText(getContext(), "New identity generated", Toast.LENGTH_SHORT).show();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+    }
+
+    private void generateNewIdentity() {
+        try {
+            IdentityHelper.NostrIdentity identity = IdentityHelper.generateNewIdentity();
+            settings.setNpub(identity.npub);
+            settings.setNsec(identity.nsec);
+            settings.setCallsign(identity.callsign);
+            saveSettings(settings);
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Error generating identity: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void copyToClipboard(EditText editText, String label) {
@@ -148,9 +190,9 @@ public class SettingsFragment extends Fragment {
     }
 
     public void reloadSettings() {
-        // User Preferences
-        EditText nickname = view.findViewById(R.id.edit_preferred_nickname);
-        nickname.setText(settings.getNickname());
+        // Callsign
+        EditText callsignField = view.findViewById(R.id.edit_callsign);
+        callsignField.setText(settings.getCallsign());
 
         Spinner preferredColorSpinner = view.findViewById(R.id.spinner_preferred_color);
         String[] colorOptions = getResources().getStringArray(R.array.color_options);
@@ -177,12 +219,19 @@ public class SettingsFragment extends Fragment {
         }
     }
 
-    private void saveSettings(EditText nickname, EditText npub, EditText nsec, Spinner preferredColorSpinner) {
+    private void saveSettings(EditText npub, EditText nsec, Spinner preferredColorSpinner) {
         try {
-            settings.setNickname(nickname.getText().toString());
             settings.setNpub(npub.getText().toString());
             settings.setNsec(nsec.getText().toString());
             settings.setPreferredColor(preferredColorSpinner.getSelectedItem().toString());
+
+            // Update callsign from npub if npub was manually changed
+            try {
+                String callsign = IdentityHelper.deriveCallsignFromNpub(npub.getText().toString());
+                settings.setCallsign(callsign);
+            } catch (Exception e) {
+                // Keep existing callsign if derivation fails
+            }
 
             saveSettings(settings);
         } catch (Exception e) {

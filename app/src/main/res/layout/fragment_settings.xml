@@ -76,22 +76,23 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
             -->
-            <!-- User Preferences -->
+            <!-- Callsign -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="User Preferences"
+                android:text="Callsign"
                 android:textColor="@color/white"
                 android:textStyle="bold"
                 android:paddingTop="16dp" />
 
             <EditText
-                android:id="@+id/edit_preferred_nickname"
+                android:id="@+id/edit_callsign"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Preferred Nickname"
-                android:maxLength="15"
-                android:inputType="text"
+                android:hint="Callsign (e.g., X1ABCD)"
+                android:inputType="none"
+                android:focusable="false"
+                android:cursorVisible="false"
                 android:backgroundTint="@color/material_dynamic_neutral40"
                 android:padding="8dp" />
 
@@ -200,6 +201,17 @@
                     android:background="@android:color/transparent"
                     android:padding="8dp" />
             </LinearLayout>
+
+            <!-- Reset Identity Button -->
+            <Button
+                android:id="@+id/btn_reset_identity"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Reset Identity (Generate New Keys)"
+                android:backgroundTint="@color/material_dynamic_secondary40"
+                android:textColor="@color/white"
+                android:layout_marginTop="16dp"
+                android:padding="12dp" />
 
         </LinearLayout>
     </ScrollView>

@@ -14,6 +14,9 @@ public class SettingsUser {
 
     // User Preferences
     @Expose
+    private String callsign; // X1 + 4 chars derived from npub (e.g., X1ABCD)
+
+    @Expose
     private String nickname; // Limit: 15 characters
 
     @Expose
@@ -60,6 +63,18 @@ public class SettingsUser {
 
     public void setEmoticon(String emoticon) {
         this.emoticon = emoticon;
+    }
+
+    public String getCallsign() {
+        return callsign;
+    }
+
+    public void setCallsign(String callsign) {
+        if (callsign != null && callsign.matches("X1[A-Z0-9]{4}")) {
+            this.callsign = callsign.toUpperCase();
+        } else {
+            throw new IllegalArgumentException("Callsign must be in format X1XXXX (e.g., X1ABCD)");
+        }
     }
 
     public String getNickname() {
@@ -149,8 +164,13 @@ public class SettingsUser {
         }
     }
 
+    /**
+     * Get device ID - returns callsign for backward compatibility.
+     * Use getCallsign() for new code.
+     */
     public String getIdDevice() {
-        return idDevice;
+        // Return callsign instead of idDevice for backward compatibility
+        return callsign != null ? callsign : idDevice;
     }
 
     public void setIdDevice(String idDevice) {
