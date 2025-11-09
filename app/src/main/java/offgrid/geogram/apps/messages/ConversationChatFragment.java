@@ -87,9 +87,17 @@ public class ConversationChatFragment extends Fragment {
         chatScrollView = view.findViewById(R.id.chat_scroll_view);
         EditText messageInput = view.findViewById(R.id.message_input);
         ImageButton btnSend = view.findViewById(R.id.btn_send);
+        ImageButton btnBack = view.findViewById(R.id.btn_back);
 
         // Set conversation header
         conversationHeader.setText(peerId);
+
+        // Setup back button
+        btnBack.setOnClickListener(v -> {
+            if (getActivity() != null) {
+                getActivity().getSupportFragmentManager().popBackStack();
+            }
+        });
 
         // Setup send button
         btnSend.setOnClickListener(v -> {
