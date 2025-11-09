@@ -46,7 +46,6 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
-    implementation(libs.play.services.nearby)
     implementation(libs.spark.core)
     implementation(libs.car.ui.lib)
     implementation(libs.gson)
@@ -54,7 +53,6 @@ dependencies {
     implementation(libs.bcpkix.jdk15on)
     implementation(libs.viewpager2)
     implementation(libs.runner)
-    implementation(libs.play.services.location)
     implementation(libs.swiperefreshlayout)
 
     // Room

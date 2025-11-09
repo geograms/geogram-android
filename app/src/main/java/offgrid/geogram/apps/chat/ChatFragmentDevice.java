@@ -1,6 +1,6 @@
 package offgrid.geogram.apps.chat;
 
-import static offgrid.geogram.old.bluetooth_old.other.comms.BlueCommands.tagBio;
+// Removed (legacy Google Play Services code) - import static offgrid.geogram.old.bluetooth_old.other.comms.BlueCommands.tagBio;
 
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -22,8 +22,8 @@ import androidx.fragment.app.Fragment;
 
 import offgrid.geogram.R;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.old.databaseold.BioDatabase;
-import offgrid.geogram.old.databaseold.BioProfile;
+// Removed (legacy Google Play Services code) - import offgrid.geogram.old.databaseold.BioDatabase;
+// Removed (legacy Google Play Services code) - import offgrid.geogram.old.databaseold.BioProfile;
 import offgrid.geogram.events.EventAction;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
@@ -38,7 +38,8 @@ public class ChatFragmentDevice extends Fragment {
     private LinearLayout chatMessageContainer;
     private ScrollView chatScrollView;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    BioProfile profile = null;
+    // Removed - BioProfile was part of old code
+    // BioProfile profile = null;
 
     public static ChatFragmentDevice newInstance(String deviceId) {
         ChatFragmentDevice fragment = new ChatFragmentDevice();
@@ -62,12 +63,13 @@ public class ChatFragmentDevice extends Fragment {
             requireActivity().onBackPressed();
         }
 
-        BioProfile profile = BioDatabase.get(deviceId, this.getContext());
-        String nickname = "Chat";
+        // Removed - BioDatabase was part of old code
+        // BioProfile profile = BioDatabase.get(deviceId, this.getContext());
+        String nickname = deviceId; // Use device ID as nickname
 
-        if (profile != null) {
-            nickname = profile.getNick();
-        }
+        // if (profile != null) {
+        //     nickname = profile.getNick();
+        // }
 
         Log.i("DeviceChatFragment", "Chatting with device: " + deviceId);
 
@@ -266,19 +268,20 @@ public class ChatFragmentDevice extends Fragment {
 
         // Set the message content
         String text = message.getMessage();
-        if(text.startsWith(tagBio) && profile != null){
-            if(profile.getExtra() == null){
-                // add a nice one line ASCII emoticon
-                profile.setExtra(ASCII.getRandomOneliner());
-                BioDatabase.save(profile.getDeviceId(), profile, this.getContext());
-            }
-            text = profile.getExtra();
-        }
+        // Removed (legacy) - tagBio, profile, and BioDatabase were part of old code
+        // if(text.startsWith(tagBio) && profile != null){
+        //     if(profile.getExtra() == null){
+        //         profile.setExtra(ASCII.getRandomOneliner());
+        //         BioDatabase.save(profile.getDeviceId(), profile, this.getContext());
+        //     }
+        //     text = profile.getExtra();
+        // }
         TextView messageTextView = receivedMessageView.findViewById(R.id.message_user_1);
         messageTextView.setText(text);
 
         // Apply balloon style based on preferred background color
-        String colorBackground = profile != null ? profile.getColor() : "light gray";
+        // Removed (legacy) - profile was part of old code
+        String colorBackground = "light gray";
         applyBalloonStyle(messageTextView, colorBackground);
 
         // Add click listener to navigate to the user profile

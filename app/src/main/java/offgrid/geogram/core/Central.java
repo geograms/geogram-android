@@ -10,7 +10,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import offgrid.geogram.apps.chat.ChatFragmentBroadcast;
-import offgrid.geogram.old.old.WiFi_control;
+// Removed Google Play Services dependency
+// import offgrid.geogram.old.old.WiFi_control;
 import offgrid.geogram.server.SimpleSparkServer;
 import offgrid.geogram.settings.SettingsLoader;
 import offgrid.geogram.settings.SettingsUser;
@@ -31,7 +32,8 @@ public class Central {
      * Old settings, need to be incrementally removed
      */
     private static Central instance; // Singleton instance
-    public static WiFi_control wifiControl;
+    // Removed Google Play Services dependency - WiFi_control used Nearby API
+    // public static WiFi_control wifiControl;
 
     public static SimpleSparkServer server = null;
 
@@ -57,10 +59,15 @@ public class Central {
 
     /**
      * Initializes the WiFi control system.
+     * DEPRECATED: WiFi_control used Google Play Services Nearby API
      *
      * @param context The application context.
      */
+    @Deprecated
     public void initializeWiFiControl(Context context) {
+        // Removed - WiFi_control used Google Play Services Nearby API
+        // This functionality is not needed for current features
+        /*
         if (alreadyStarted) {
             return;
         }
@@ -69,6 +76,7 @@ public class Central {
         wifiControl.startDiscovery();
 
         alreadyStarted = true;
+        */
     }
 
     /**
@@ -100,9 +108,8 @@ public class Central {
             settings = SettingsLoader.loadSettings(context);
             // setup other variables
         } catch (Exception e) {
-            settings = new SettingsUser(); // Default settings if loading fails
-            log("SettingsLoader", "Failed to load settings. Using defaults.");
-            SettingsLoader.saveSettings(context, settings);
+            log("SettingsLoader", "Failed to load settings. Creating default settings with identity.");
+            settings = SettingsLoader.createDefaultSettings(context);
         }
     }
 

@@ -15,10 +15,10 @@ import androidx.fragment.app.Fragment;
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.devices.old.DeviceReachableOld;
-import offgrid.geogram.old.bluetooth_old.eddystone.DeviceFinder;
+// Removed (legacy Google Play Services code) - import offgrid.geogram.old.bluetooth_old.eddystone.DeviceFinder;
 import offgrid.geogram.core.Log;
-import offgrid.geogram.old.databaseold.BioDatabase;
-import offgrid.geogram.old.databaseold.BioProfile;
+// Removed (legacy Google Play Services code) - import offgrid.geogram.old.databaseold.BioDatabase;
+// Removed (legacy Google Play Services code) - import offgrid.geogram.old.databaseold.BioProfile;
 import offgrid.geogram.apps.chat.ChatFragmentDevice;
 
 public class DeviceDetailsFragment extends Fragment {
@@ -71,10 +71,11 @@ public class DeviceDetailsFragment extends Fragment {
         }
 
         // get the device from the list
-        DeviceReachableOld deviceDiscovered =
-                DeviceFinder.getInstance(this.getContext()).getDeviceMap().get(deviceId);
+        // Removed (legacy code) - DeviceFinder was part of old code
+        DeviceReachableOld deviceDiscovered = null;
+        // DeviceReachableOld deviceDiscovered = DeviceFinder.getInstance(this.getContext()).getDeviceMap().get(deviceId);
         if(deviceDiscovered == null){
-            Log.e(TAG, "Device not found: " + deviceId);
+            Log.e(TAG, "Device not found (legacy DeviceFinder removed): " + deviceId);
             return view;
         }
 
@@ -99,18 +100,19 @@ public class DeviceDetailsFragment extends Fragment {
 //            }
 //        }).start();
 
-        BioProfile profile = BioDatabase.get(deviceId, this.getContext());
-        if(profile == null){
-            Log.i(TAG, "No bio data found for " + deviceId);
-            return view;
-        }
-
-        String deviceName = profile.getNick() + " ("
-                + deviceDiscovered.getMacAddress()
-                + ")";
-
-        deviceDescription.setText(deviceName);
-        deviceDescriptionAdditional.setText(profile.getExtra());
+        // Removed (legacy code) - BioProfile and BioDatabase were part of old code
+        // BioProfile profile = BioDatabase.get(deviceId, this.getContext());
+        // if(profile == null){
+        //     Log.i(TAG, "No bio data found for " + deviceId);
+        //     return view;
+        // }
+        //
+        // String deviceName = profile.getNick() + " ("
+        //         + deviceDiscovered.getMacAddress()
+        //         + ")";
+        //
+        // deviceDescription.setText(deviceName);
+        // deviceDescriptionAdditional.setText(profile.getExtra());
 
 
         //disableIcon(view, R.id.section_chat);

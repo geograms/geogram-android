@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Objects;
 
 import offgrid.geogram.ble.BluetoothMessage;
-import offgrid.geogram.old.bluetooth_old.broadcast.BroadcastMessage;
+// Removed (legacy Google Play Services code) - import offgrid.geogram.old.bluetooth_old.broadcast.BroadcastMessage;
 
 public class ChatMessage implements Comparable<ChatMessage> {
 
@@ -71,6 +71,8 @@ public class ChatMessage implements Comparable<ChatMessage> {
         return output;
     }
 
+    // Removed - BroadcastMessage was part of old Google Play Services code
+    /*
     public static ChatMessage convert(BroadcastMessage message) {
         ChatMessage output = new ChatMessage(message.getDeviceId(), message.getMessage());
         output.setDestinationId(message.getDeviceId());
@@ -78,6 +80,7 @@ public class ChatMessage implements Comparable<ChatMessage> {
         output.setTimestamp(message.getTimestamp());
         return output;
     }
+    */
 
     public void setAuthorId(String authorId) {
         this.authorId = authorId;

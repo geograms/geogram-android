@@ -8,7 +8,7 @@ import offgrid.geogram.ble.events.EventBleMessageReceived;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
-import offgrid.geogram.old.EddystoneBeacon_unused;
+// Removed (legacy Google Play Services code) - import offgrid.geogram.old.EddystoneBeacon_unused;
 
 public class BluetoothCentral {
     /*
@@ -39,7 +39,8 @@ public class BluetoothCentral {
 
     private final Context context;
     private static BluetoothCentral instance;
-    public EddystoneBeacon_unused eddystoneBeacon;
+    // Removed - EddystoneBeacon_unused was part of old code
+    // public EddystoneBeacon_unused eddystoneBeacon;
 
     public static String EDDYSTONE_SERVICE_ID = "0000FEAA-0000-1000-8000-00805F9B34FB";
 

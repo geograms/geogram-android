@@ -8,8 +8,8 @@ import com.google.gson.JsonObject;
 
 import offgrid.geogram.core.Log;
 import offgrid.geogram.util.JsonUtils;
-import offgrid.geogram.old.wifi.comm.WiFiReceiver;
-import offgrid.geogram.old.wifi.messages.Message;
+// Removed (legacy Google Play Services code) - import offgrid.geogram.old.wifi.comm.WiFiReceiver;
+// Removed (legacy Google Play Services code) - import offgrid.geogram.old.wifi.messages.Message;
 
 import java.net.ServerSocket;
 
@@ -35,31 +35,11 @@ public class SimpleSparkServer implements Runnable {
         ipAddress("0.0.0.0"); // Allow access from all network interfaces
         port(SERVER_PORT); // Set the port to SERVER_PORT
 
-        // Define the root route (/) to handle JSON POST requests
+        // Removed (legacy) - POST route used old Google Play Services dependencies (Message, WiFiReceiver)
         post("/", (req, res) -> {
             res.type("application/json");
-            String text = req.body();
-            Log.d(TAG_ID, "Received POST request at root route: " + text);
-            Message message;
-            try {
-                message = gson.fromJson(text, Message.class);
-            } catch (Exception e) {
-                message = null;
-            }
-
-            if (message == null) {
-                res.status(400);
-                return gson.toJson(createErrorResponse("Invalid JSON input"));
-            }
-
-            Message reply = WiFiReceiver.processReceivedMessage(message);
-            if (reply != null) {
-                // Send back a reply JSON
-                return JsonUtils.convertToJsonText(reply);
-            } else {
-                res.status(400);
-                return gson.toJson(createErrorResponse("Invalid message input"));
-            }
+            res.status(501); // Not Implemented
+            return gson.toJson(createErrorResponse("POST endpoint removed - legacy WiFi dependencies"));
         });
 
         // Define a GET route for handling normal HTTP requests

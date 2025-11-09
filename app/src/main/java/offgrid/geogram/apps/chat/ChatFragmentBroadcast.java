@@ -36,8 +36,8 @@ import offgrid.geogram.ble.BluetoothSender;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.DatabaseMessages;
-import offgrid.geogram.old.databaseold.BioProfile;
-import offgrid.geogram.old.bluetooth_old.broadcast.BroadcastSender;
+// Removed (legacy Google Play Services code) - import offgrid.geogram.old.databaseold.BioProfile;
+// Removed (legacy Google Play Services code) - import offgrid.geogram.old.bluetooth_old.broadcast.BroadcastSender;
 import offgrid.geogram.settings.SettingsLoader;
 import offgrid.geogram.settings.SettingsUser;
 import offgrid.geogram.util.DateUtils;
@@ -312,7 +312,7 @@ public class ChatFragmentBroadcast extends Fragment {
         // Stop message polling and unregister listener to avoid memory leaks
         stopInternetMessagePolling();
         handler.removeCallbacksAndMessages(null);
-        BroadcastSender.removeMessageUpdateListener();
+        // Removed (legacy) - BroadcastSender.removeMessageUpdateListener();
     }
 
 
@@ -448,12 +448,9 @@ public class ChatFragmentBroadcast extends Fragment {
         TextView textBoxUpper = receivedMessageView.findViewById(R.id.message_boxUpper);
         TextView textBoxLower = receivedMessageView.findViewById(R.id.message_boxLower);
 
-        BioProfile profile = null; //BioDatabase.get(message.getAuthorId(), this.getContext());
-        String nickname = "";
-
-        if (profile != null) {
-            nickname = profile.getNick();
-        }
+        // Removed (legacy) - BioProfile was part of old Google Play Services code
+        // BioProfile profile = null; //BioDatabase.get(message.getAuthorId(), this.getContext());
+        String nickname = message.getAuthorId(); // Use author ID as nickname
 
         // Add the timestamp
         long timeStamp = message.getTimestamp();
@@ -462,39 +459,21 @@ public class ChatFragmentBroadcast extends Fragment {
 
         // Set the sender's name with origin label
         String origin = getMessageOriginLabel(message);
-        if (nickname.isEmpty() && message.getAuthorId() != null) {
-            textBoxLower.setText(message.getAuthorId() + " " + origin);
-        } else {
-            String idText = nickname + " " + origin + "    " + dateText;
-            textBoxLower.setText(idText);
-        }
-
-
+        String idText = nickname + " " + origin + "    " + dateText;
+        textBoxLower.setText(idText);
 
         // Set the message content
         String text = message.getMessage();
-//        if(text.startsWith(tagBio) && profile != null){
-//            if(profile.getExtra() == null){
-//                // add a nice one line ASCII emoticon
-//                profile.setExtra(ASCII.getRandomOneliner());
-//                BioDatabase.save(profile.getDeviceId(), profile, this.getContext());
-//            }
-//            text = profile.getExtra();
-//        }
         TextView messageTextView = receivedMessageView.findViewById(R.id.message_user_1);
         messageTextView.setText(text);
 
         // Apply balloon style based on user's unique color
-        String colorBackground = profile != null ? profile.getColor() : getUserColor(message.getAuthorId());
+        String colorBackground = getUserColor(message.getAuthorId());
         applyBalloonStyle(messageTextView, colorBackground);
 
-        // Add click listener to navigate to the user profile
+        // Add click listener - legacy profile navigation removed
         receivedMessageView.setOnClickListener(v -> {
-            if (profile != null) {
-                //navigateToDeviceDetails(profile);
-            } else {
-                Toast.makeText(getContext(), "Profile not found", Toast.LENGTH_SHORT).show();
-            }
+            // Removed (legacy) - profile navigation
         });
 
         // Add the view to the container

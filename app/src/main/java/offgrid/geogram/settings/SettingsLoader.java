@@ -12,9 +12,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Random;
 
-import offgrid.geogram.old.old.old.GenerateDeviceId;
+// Removed (legacy Google Play Services code) - import offgrid.geogram.old.old.old.GenerateDeviceId;
 import offgrid.geogram.util.ASCII;
-import offgrid.geogram.util.nostr.Identity;
 import offgrid.geogram.util.NicknameGenerator;
 
 public class SettingsLoader {
@@ -39,9 +38,21 @@ public class SettingsLoader {
                 if(settings.getNickname() == null || settings.getNickname().isEmpty()){
                     throw new IllegalArgumentException("Nickname cannot be empty");
                 }
+                // Validate identity fields
+                if(settings.getNpub() == null || settings.getNpub().isEmpty() ||
+                   settings.getNsec() == null || settings.getNsec().isEmpty() ||
+                   settings.getCallsign() == null || settings.getCallsign().isEmpty()){
+                    Log.w("SettingsLoader", "Settings missing identity fields, regenerating identity.");
+                    // Generate new identity for existing settings
+                    IdentityHelper.NostrIdentity identity = IdentityHelper.generateNewIdentity();
+                    settings.setNpub(identity.npub);
+                    settings.setNsec(identity.nsec);
+                    settings.setCallsign(identity.callsign);
+                    saveSettings(context, settings);
+                }
                 Log.i("SettingsLoader", "Settings loaded successfully.");
                 return settings;
-            } catch (IOException e) {
+            } catch (Exception e) {
                 Log.e("SettingsLoader", "Failed to read settings file, creating default settings.", e);
                 return createDefaultSettings(context);
             }
@@ -53,10 +64,8 @@ public class SettingsLoader {
 
     public static SettingsUser createDefaultSettings(Context context) {
 
-            // Generate identity keys
-            Identity user = Identity.generateRandomIdentity();
-            String nsec = user.getPrivateKey().toBech32String();
-            String npub = user.getPublicKey().toBech32String();
+            // Generate complete identity (npub, nsec, and callsign)
+            IdentityHelper.NostrIdentity identity = IdentityHelper.generateNewIdentity();
 
             // Create default settings
             SettingsUser defaultSettings = new SettingsUser();
@@ -65,12 +74,14 @@ public class SettingsLoader {
             // generate the emoticon
             defaultSettings.setEmoticon(ASCII.getRandomOneliner());
             defaultSettings.setInvisibleMode(false);
-            defaultSettings.setNsec(nsec);
-            defaultSettings.setNpub(npub);
+            defaultSettings.setNsec(identity.nsec);
+            defaultSettings.setNpub(identity.npub);
+            defaultSettings.setCallsign(identity.callsign);
             defaultSettings.setBeaconType("person");
             defaultSettings.setIdGroup(generateRandomNumber());
-            // generate the device ID
-            String deviceId = GenerateDeviceId.generate(context);
+            // generate the device ID (6 digits)
+            // Removed (legacy) - GenerateDeviceId was part of old code
+            String deviceId = generateRandomDeviceId();
             defaultSettings.setIdDevice(deviceId);
             defaultSettings.setPreferredColor(selectRandomColor()); // Assign a random color
             defaultSettings.setBeaconNickname(generateRandomBeaconNickname()); // Default beacon nickname
@@ -95,6 +106,12 @@ public class SettingsLoader {
         Random random = new Random();
         int number = random.nextInt(100000); // Generates a number between 0 and 99999
         return String.format("%05d", number); // Pads the number to ensure it is 5 digits
+    }
+
+    public static String generateRandomDeviceId() {
+        Random random = new Random();
+        int number = random.nextInt(900000) + 100000; // Generates a number between 100000 and 999999
+        return String.valueOf(number); // Returns 6-digit number as string
     }
 
     public static String selectRandomColor() {

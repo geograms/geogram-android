@@ -1,6 +1,6 @@
 package offgrid.geogram.settings;
 
-import static offgrid.geogram.old.bluetooth_old.broadcast.BroadcastSender.sendProfileToEveryone;
+// Removed (legacy Google Play Services code) - import static offgrid.geogram.old.bluetooth_old.broadcast.BroadcastSender.sendProfileToEveryone;
 
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -139,7 +139,7 @@ public class SettingsFragment extends Fragment {
         View saveButton = view.findViewById(R.id.btn_save_settings);
         saveButton.setOnClickListener(v -> {
             saveSettings(npub, nsec, preferredColorSpinner);
-            sendProfileToEveryone(requireContext());
+            // Removed (legacy) - sendProfileToEveryone used BroadcastSender (Google Play Services)
             requireActivity().onBackPressed(); // Navigate back
         });
 

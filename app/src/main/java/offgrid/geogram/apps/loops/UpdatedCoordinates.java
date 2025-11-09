@@ -11,8 +11,8 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresPermission;
 import androidx.core.content.ContextCompat;
 
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationServices;
+import android.location.Location;
+import android.location.LocationManager;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -141,9 +141,26 @@ public final class UpdatedCoordinates {
     @SuppressLint("MissingPermission")
     private static void getLastKnownWithPermission(@NonNull Context ctx,
                                                    @NonNull LastKnownCallback cb) {
-        FusedLocationProviderClient flp = LocationServices.getFusedLocationProviderClient(ctx.getApplicationContext());
-        flp.getLastLocation()
-                .addOnSuccessListener(loc -> cb.onResult(loc != null ? new LocationHelper.Fix(loc) : null))
-                .addOnFailureListener(e -> cb.onResult(null));
+        LocationManager locationManager = (LocationManager) ctx.getApplicationContext()
+                .getSystemService(Context.LOCATION_SERVICE);
+        if (locationManager == null) {
+            cb.onResult(null);
+            return;
+        }
+
+        // Try GPS first
+        Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+
+        // If no GPS location, try network
+        if (location == null) {
+            location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+        }
+
+        // If still no location, try passive
+        if (location == null) {
+            location = locationManager.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
+        }
+
+        cb.onResult(location != null ? new LocationHelper.Fix(location) : null);
     }
 }
