@@ -28,6 +28,7 @@ import androidx.fragment.app.Fragment;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.TreeSet;
 
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
@@ -323,8 +324,15 @@ public class ChatFragmentBroadcast extends Fragment {
     private void updateMessages() {
         boolean newMessagesWereAdded = false;
 
+        // Create a snapshot copy to avoid ConcurrentModificationException
+        // when background service adds messages while we iterate
+        TreeSet<ChatMessage> messagesCopy;
+        synchronized (DatabaseMessages.getInstance()) {
+            messagesCopy = new TreeSet<>(DatabaseMessages.getInstance().getMessages());
+        }
+
         // get the list of tickets in reverse order (most recent first)
-        Iterator<ChatMessage> messageIterator = DatabaseMessages.getInstance().getMessages().descendingIterator();
+        Iterator<ChatMessage> messageIterator = messagesCopy.descendingIterator();
         if(messageIterator.hasNext() == false){
             return;
         }

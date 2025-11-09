@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.TreeSet;
 import java.util.concurrent.Executors;
@@ -70,7 +71,10 @@ public final class DatabaseMessages {
 
             Log.d(TAG, "Getting stats for conversation: " + peerId);
 
-            for (ChatMessage msg : messages) {
+            // Create snapshot to avoid concurrent modification issues
+            List<ChatMessage> snapshot = new ArrayList<>(messages);
+
+            for (ChatMessage msg : snapshot) {
                 // Check if message belongs to this conversation
                 // Match by destinationId (for groups and direct messages)
                 // Also match by authorId for direct conversations
