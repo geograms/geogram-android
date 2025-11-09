@@ -1,9 +1,8 @@
-# F-Droid repository files
-# These should be in a separate fdroid repository
-
-# All files except README.md
-*
-
-# Allow README.md
-!.gitignore
-!README.md
+# F-Droid repository files (for self-hosted option)
+repo/
+archive/
+*.p12
+*.jks
+config.yml
+config.py
+keystore.p12

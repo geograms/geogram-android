@@ -1,0 +1,39 @@
+Categories:
+  - Internet
+  - Security
+  - Navigation
+License: Apache-2.0
+WebSite: https://github.com/geograms/geogram-android
+SourceCode: https://github.com/geograms/geogram-android
+IssueTracker: https://github.com/geograms/geogram-android/issues
+Changelog: https://github.com/geograms/geogram-android/releases
+
+AutoName: Geogram
+Summary: Offline-first mesh communication app
+
+Description: |-
+  Geogram is an offline-first communication ecosystem for resilient, decentralized
+  messaging. It uses NOSTR protocol for end-to-end encrypted messaging, BLE beacons
+  for proximity-based discovery, and integrates with radio communications (APRS/FM).
+
+  Features:
+  * NOSTR-based encrypted messaging with offline caching
+  * BLE beacon proximity detection and device discovery
+  * Native Android APIs (no Google dependencies)
+  * Automatic identity generation (npub/nsec/callsign)
+  * APRS integration for radio communications
+  * Location tracking for emergency response
+
+  All communication is end-to-end encrypted using NOSTR protocol. Messages are
+  cached locally and sync when connectivity is available. No central server required.
+
+RepoType: git
+Repo: https://github.com/geograms/geogram-android.git
+
+Builds:
+  - versionName: 0.2.0
+    versionCode: 2
+    commit: v0.2.0
+    subdir: app
+    gradle:
+      - yes
