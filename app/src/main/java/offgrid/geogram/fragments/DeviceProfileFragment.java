@@ -44,22 +44,9 @@ public class DeviceProfileFragment extends Fragment {
             return view;
         }
 
-        // Find device
-        Device device = null;
-        for (Device d : DeviceManager.getInstance().getDevicesSpotted()) {
-            if (d.ID.equals(deviceId)) {
-                device = d;
-                break;
-            }
-        }
-
-        if (device == null) {
-            return view;
-        }
-
         // Set device name as title
         TextView titleView = view.findViewById(R.id.tv_device_title);
-        titleView.setText(device.ID);
+        titleView.setText(deviceId);
 
         // Back button
         ImageButton btnBack = view.findViewById(R.id.btn_back);
@@ -69,37 +56,56 @@ public class DeviceProfileFragment extends Fragment {
             }
         });
 
-        // Display device information
+        // Find device in DeviceManager
+        Device device = null;
+        for (Device d : DeviceManager.getInstance().getDevicesSpotted()) {
+            if (d.ID.equals(deviceId)) {
+                device = d;
+                break;
+            }
+        }
+
+        // Get view references
         TextView deviceTypeView = view.findViewById(R.id.tv_device_type);
-        deviceTypeView.setText("Type: " + device.deviceType.name());
-
-        // First seen
         TextView firstSeenView = view.findViewById(R.id.tv_first_seen);
-        if (!device.connectedEvents.isEmpty()) {
-            long firstSeen = Collections.min(device.connectedEvents).latestTimestamp();
-            String firstSeenText = formatTimestamp(firstSeen);
-            firstSeenView.setText("First seen: " + firstSeenText);
-        } else {
-            firstSeenView.setText("First seen: Unknown");
-        }
-
-        // Last seen
         TextView lastSeenView = view.findViewById(R.id.tv_last_seen);
-        long lastSeen = device.latestTimestamp();
-        if (lastSeen != Long.MIN_VALUE) {
-            String lastSeenText = formatTimestamp(lastSeen);
-            lastSeenView.setText("Last seen: " + lastSeenText);
-        } else {
-            lastSeenView.setText("Last seen: Unknown");
-        }
-
-        // Connection count
         TextView connectionCountView = view.findViewById(R.id.tv_connection_count);
-        int totalConnections = 0;
-        for (offgrid.geogram.devices.EventConnected event : device.connectedEvents) {
-            totalConnections += event.timestamps.size();
+
+        if (device != null) {
+            // Device found in DeviceManager - show full details
+            deviceTypeView.setText("Type: " + device.deviceType.name());
+
+            // First seen
+            if (!device.connectedEvents.isEmpty()) {
+                long firstSeen = Collections.min(device.connectedEvents).latestTimestamp();
+                String firstSeenText = formatTimestamp(firstSeen);
+                firstSeenView.setText("First seen: " + firstSeenText);
+            } else {
+                firstSeenView.setText("First seen: Unknown");
+            }
+
+            // Last seen
+            long lastSeen = device.latestTimestamp();
+            if (lastSeen != Long.MIN_VALUE) {
+                String lastSeenText = formatTimestamp(lastSeen);
+                lastSeenView.setText("Last seen: " + lastSeenText);
+            } else {
+                lastSeenView.setText("Last seen: Unknown");
+            }
+
+            // Connection count
+            int totalConnections = 0;
+            for (offgrid.geogram.devices.EventConnected event : device.connectedEvents) {
+                totalConnections += event.timestamps.size();
+            }
+            connectionCountView.setText("Times detected: " + totalConnections);
+        } else {
+            // Device not found in DeviceManager (only seen via messages)
+            deviceTypeView.setText("Type: Message contact");
+            firstSeenView.setText("First seen: Not detected nearby");
+            lastSeenView.setText("Last seen: Unknown");
+            connectionCountView.setText("Times detected: 0 (message contact only)");
         }
-        connectionCountView.setText("Times detected: " + totalConnections);
 
         return view;
     }
