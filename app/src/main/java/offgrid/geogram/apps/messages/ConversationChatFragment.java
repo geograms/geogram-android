@@ -335,12 +335,17 @@ public class ConversationChatFragment extends Fragment {
         );
         messageLayout.setLayoutParams(layoutParams);
 
-        // Author name
+        // Author name (clickable to open profile)
         TextView authorText = new TextView(getContext());
         authorText.setText(message.getAuthor());
         authorText.setTextColor(0xFFAAAAAA);
         authorText.setTextSize(12);
         authorText.setPadding(16, 0, 0, 4);
+
+        // Make author name clickable
+        authorText.setOnClickListener(v -> openDeviceProfile(message.getAuthor()));
+        authorText.setClickable(true);
+
         messageLayout.addView(authorText);
 
         // Message bubble
@@ -424,5 +429,28 @@ public class ConversationChatFragment extends Fragment {
                 Log.d(TAG, "Marked conversation as read: " + peerId);
             }).start();
         }
+    }
+
+    /**
+     * Open the device profile fragment for a given device ID
+     * @param deviceId The device ID/callsign to show profile for
+     */
+    private void openDeviceProfile(String deviceId) {
+        if (deviceId == null || deviceId.isEmpty()) {
+            return;
+        }
+
+        if (getActivity() == null) {
+            return;
+        }
+
+        offgrid.geogram.fragments.DeviceProfileFragment fragment =
+                offgrid.geogram.fragments.DeviceProfileFragment.newInstance(deviceId);
+
+        getActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .addToBackStack(null)
+                .commit();
     }
 }

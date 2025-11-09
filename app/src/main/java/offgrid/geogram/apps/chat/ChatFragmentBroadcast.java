@@ -480,9 +480,9 @@ public class ChatFragmentBroadcast extends Fragment {
         String colorBackground = getUserColor(message.getAuthorId());
         applyBalloonStyle(messageTextView, colorBackground);
 
-        // Add click listener - legacy profile navigation removed
+        // Add click listener to open device profile
         receivedMessageView.setOnClickListener(v -> {
-            // Removed (legacy) - profile navigation
+            openDeviceProfile(message.getAuthorId());
         });
 
         // Add the view to the container
@@ -852,6 +852,29 @@ public class ChatFragmentBroadcast extends Fragment {
             background.setColor(bgColor);
         }
         messageTextView.setTextColor(textColor);
+    }
+
+    /**
+     * Open the device profile fragment for a given device ID
+     * @param deviceId The device ID/callsign to show profile for
+     */
+    private void openDeviceProfile(String deviceId) {
+        if (deviceId == null || deviceId.isEmpty()) {
+            return;
+        }
+
+        if (getActivity() == null) {
+            return;
+        }
+
+        offgrid.geogram.fragments.DeviceProfileFragment fragment =
+                offgrid.geogram.fragments.DeviceProfileFragment.newInstance(deviceId);
+
+        getActivity().getSupportFragmentManager()
+                .beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .addToBackStack(null)
+                .commit();
     }
 
 
