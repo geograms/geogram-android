@@ -7,8 +7,7 @@
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="16dp">
+        android:layout_height="match_parent">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -21,7 +20,10 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:padding="8dp">
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp">
 
                 <!-- Back Arrow -->
                 <ImageButton
@@ -83,7 +85,9 @@
                 android:text="Callsign"
                 android:textColor="@color/white"
                 android:textStyle="bold"
-                android:paddingTop="16dp" />
+                android:paddingTop="16dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp" />
 
             <EditText
                 android:id="@+id/edit_callsign"
@@ -94,7 +98,9 @@
                 android:focusable="false"
                 android:cursorVisible="false"
                 android:backgroundTint="@color/material_dynamic_neutral40"
-                android:padding="8dp" />
+                android:padding="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
 
             <!--
             <EditText
@@ -118,6 +124,8 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:layout_marginTop="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
                 android:gravity="center_vertical">
 
                 <TextView
@@ -144,13 +152,17 @@
                 android:text="NOSTR Identity"
                 android:textColor="@color/white"
                 android:textStyle="bold"
-                android:paddingTop="16dp" />
+                android:paddingTop="16dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="8dp">
+                android:layout_marginTop="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp">
 
                 <EditText
                     android:id="@+id/edit_nsec"
@@ -177,7 +189,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="8dp">
+                android:layout_marginTop="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp">
 
                 <EditText
                     android:id="@+id/edit_npub"
@@ -211,6 +225,9 @@
                 android:backgroundTint="@color/material_dynamic_secondary40"
                 android:textColor="@color/white"
                 android:layout_marginTop="16dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="16dp"
                 android:padding="12dp" />
 
         </LinearLayout>
