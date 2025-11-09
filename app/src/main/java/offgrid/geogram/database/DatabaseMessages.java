@@ -68,18 +68,28 @@ public final class DatabaseMessages {
             int unreadCount = 0;
             ChatMessage lastMessage = null;
 
+            Log.d(TAG, "Getting stats for conversation: " + peerId);
+
             for (ChatMessage msg : messages) {
                 // Check if message belongs to this conversation
-                // For group messages: destinationId matches peerId
-                // For direct messages: either authorId or destinationId matches peerId
+                // Match by destinationId (for groups and direct messages)
+                // Also match by authorId for direct conversations
                 boolean belongsToConversation = false;
 
-                if (peerId.startsWith("group-")) {
-                    // Group conversation - match by destinationId
-                    belongsToConversation = peerId.equals(msg.destinationId);
-                } else {
-                    // Direct conversation - match by either authorId or destinationId
-                    belongsToConversation = peerId.equals(msg.authorId) || peerId.equals(msg.destinationId);
+                // Try exact match first
+                if (peerId.equals(msg.destinationId) || peerId.equals(msg.authorId)) {
+                    belongsToConversation = true;
+                }
+                // Try with "group-" prefix for group messages
+                else if (msg.destinationId != null &&
+                         (msg.destinationId.equals("group-" + peerId) ||
+                          peerId.equals("group-" + msg.destinationId))) {
+                    belongsToConversation = true;
+                }
+                // Try without "group-" prefix
+                else if (peerId.startsWith("group-") && msg.destinationId != null &&
+                         msg.destinationId.equals(peerId.substring(6))) {
+                    belongsToConversation = true;
                 }
 
                 if (belongsToConversation) {
@@ -93,6 +103,7 @@ public final class DatabaseMessages {
                 }
             }
 
+            Log.d(TAG, "Conversation " + peerId + " has " + totalCount + " messages, " + unreadCount + " unread");
             return new ConversationStats(totalCount, unreadCount, lastMessage);
         }
     }
