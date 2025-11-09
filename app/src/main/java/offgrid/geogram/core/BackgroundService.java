@@ -111,8 +111,53 @@ public class BackgroundService extends Service {
     }
 
     private void runBackgroundTask() {
-        // Add background recurring logic here if needed
-        // e.g., updating BLE state, handling queues, telemetry, etc.
+        // Fetch new messages in background
+        fetchNewMessages();
+    }
+
+    private void fetchNewMessages() {
+        // Run in background thread to avoid blocking
+        new Thread(() -> {
+            try {
+                offgrid.geogram.settings.SettingsUser settings = Central.getInstance().getSettings();
+                if (settings == null) {
+                    return;
+                }
+
+                String callsign = settings.getCallsign();
+                String nsec = settings.getNsec();
+                String npub = settings.getNpub();
+
+                // Check if user has valid credentials
+                if (callsign == null || nsec == null || npub == null) {
+                    return;
+                }
+
+                // Get conversation list
+                java.util.List<String> peerIds = offgrid.geogram.api.GeogramMessagesAPI.getConversationList(callsign, nsec, npub);
+
+                log(TAG, "Fetching messages for " + peerIds.size() + " conversations");
+
+                // Fetch messages for each conversation
+                for (String peerId : peerIds) {
+                    try {
+                        String markdown = offgrid.geogram.api.GeogramMessagesAPI.getConversationMessages(callsign, peerId, nsec, npub);
+
+                        // Save markdown to cache - UI will parse when needed
+                        offgrid.geogram.database.DatabaseConversations.getInstance()
+                            .saveConversationMessages(peerId, markdown);
+
+                        log(TAG, "Fetched and cached messages for: " + peerId);
+                    } catch (Exception e) {
+                        // Log errors but continue with other conversations
+                        log(TAG, "Error fetching messages for " + peerId + ": " + e.getMessage());
+                    }
+                }
+
+            } catch (Exception e) {
+                log(TAG, "Error in background message fetch: " + e.getMessage());
+            }
+        }).start();
     }
 
     @Override
