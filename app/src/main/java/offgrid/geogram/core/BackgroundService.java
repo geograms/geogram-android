@@ -143,9 +143,12 @@ public class BackgroundService extends Service {
                     try {
                         String markdown = offgrid.geogram.api.GeogramMessagesAPI.getConversationMessages(callsign, peerId, nsec, npub);
 
-                        // Save markdown to cache - UI will parse when needed
+                        // Save markdown to cache
                         offgrid.geogram.database.DatabaseConversations.getInstance()
                             .saveConversationMessages(peerId, markdown);
+
+                        // Parse messages and add to DatabaseMessages for stats
+                        parseAndSaveMessages(markdown, peerId, callsign);
 
                         log(TAG, "Fetched and cached messages for: " + peerId);
                     } catch (Exception e) {
@@ -154,10 +157,44 @@ public class BackgroundService extends Service {
                     }
                 }
 
+
             } catch (Exception e) {
                 log(TAG, "Error in background message fetch: " + e.getMessage());
             }
         }).start();
+    }
+
+    /**
+     * Parse markdown messages and save to DatabaseMessages
+     */
+    private void parseAndSaveMessages(String markdown, String peerId, String currentUser) {
+        if (markdown == null || markdown.isEmpty()) {
+            return;
+        }
+
+        try {
+            // Parse markdown into ConversationMessage objects
+            java.util.List<offgrid.geogram.apps.messages.ConversationMessage> convMessages =
+                offgrid.geogram.apps.messages.MarkdownParser.parseConversation(markdown, currentUser);
+
+            // Convert to ChatMessage and add to database
+            for (offgrid.geogram.apps.messages.ConversationMessage convMsg : convMessages) {
+                offgrid.geogram.apps.chat.ChatMessage chatMsg =
+                    new offgrid.geogram.apps.chat.ChatMessage(convMsg.getAuthor(), convMsg.getContent());
+
+                chatMsg.setDestinationId(peerId);
+                chatMsg.setTimestamp(convMsg.getTimestamp());
+                chatMsg.isWrittenByMe = convMsg.isFromSelf();
+                chatMsg.read = convMsg.isFromSelf(); // Mark self messages as read
+
+                // Add to database (will deduplicate automatically)
+                DatabaseMessages.getInstance().add(chatMsg);
+            }
+
+            log(TAG, "Parsed and saved " + convMessages.size() + " messages for " + peerId);
+        } catch (Exception e) {
+            log(TAG, "Error parsing messages for " + peerId + ": " + e.getMessage());
+        }
     }
 
     @Override
