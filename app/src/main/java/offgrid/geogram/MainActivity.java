@@ -52,7 +52,6 @@ import offgrid.geogram.fragments.DebugFragment;
 import offgrid.geogram.fragments.DevicesFragment;
 import offgrid.geogram.fragments.DevicesWithinReachFragment;
 import offgrid.geogram.fragments.MessagesFragment;
-import offgrid.geogram.fragments.NetworksFragment;
 import offgrid.geogram.settings.SettingsFragment;
 import offgrid.geogram.util.BatteryOptimizationHelper;
 
@@ -302,8 +301,6 @@ public class MainActivity extends AppCompatActivity {
                 transaction.replace(R.id.fragment_container, new DebugFragment()).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_about) {
                 transaction.replace(R.id.fragment_container, new AboutFragment()).addToBackStack(null);
-            } else if (item.getItemId() == R.id.nav_networks) {
-                transaction.replace(R.id.fragment_container, new NetworksFragment()).addToBackStack(null);
             }
 
             transaction.commit();

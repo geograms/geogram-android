@@ -15,10 +15,6 @@
         android:icon="@drawable/ic_settings"
         android:title="Settings" />
     <item
-        android:id="@+id/nav_networks"
-        android:icon="@drawable/ic_tethering"
-        android:title="Network" />
-    <item
         android:id="@+id/nav_debug"
         android:icon="@drawable/ic_debug"
         android:title="Log" />
