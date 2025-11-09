@@ -397,6 +397,8 @@ public class ConversationChatFragment extends Fragment {
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).setTopActionBarVisible(false);
         }
+        // Mark all messages in this conversation as read
+        markMessagesAsRead();
         // Start polling for new messages
         if (messagePoller != null) {
             handler.post(messagePoller);
@@ -409,6 +411,18 @@ public class ConversationChatFragment extends Fragment {
         // Stop polling when fragment is not visible
         if (messagePoller != null) {
             handler.removeCallbacks(messagePoller);
+        }
+    }
+
+    /**
+     * Mark all messages in this conversation as read
+     */
+    private void markMessagesAsRead() {
+        if (peerId != null) {
+            new Thread(() -> {
+                offgrid.geogram.database.DatabaseMessages.getInstance().markConversationAsRead(peerId);
+                Log.d(TAG, "Marked conversation as read: " + peerId);
+            }).start();
         }
     }
 }

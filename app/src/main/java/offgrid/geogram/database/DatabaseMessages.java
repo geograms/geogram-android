@@ -113,6 +113,45 @@ public final class DatabaseMessages {
     }
 
     /**
+     * Mark all messages in a conversation as read
+     * @param peerId The conversation identifier
+     */
+    public void markConversationAsRead(String peerId) {
+        synchronized (lock) {
+            ensureInitialized();
+            int markedCount = 0;
+
+            for (ChatMessage msg : messages) {
+                // Check if message belongs to this conversation
+                boolean belongsToConversation = false;
+
+                if (peerId.equals(msg.destinationId) || peerId.equals(msg.authorId)) {
+                    belongsToConversation = true;
+                } else if (msg.destinationId != null &&
+                           (msg.destinationId.equals("group-" + peerId) ||
+                            peerId.equals("group-" + msg.destinationId))) {
+                    belongsToConversation = true;
+                } else if (peerId.startsWith("group-") && msg.destinationId != null &&
+                           msg.destinationId.equals(peerId.substring(6))) {
+                    belongsToConversation = true;
+                }
+
+                // Mark as read if it belongs to this conversation and was not written by me
+                if (belongsToConversation && !msg.isWrittenByMe && !msg.read) {
+                    msg.read = true;
+                    markedCount++;
+                }
+            }
+
+            if (markedCount > 0) {
+                Log.d(TAG, "Marked " + markedCount + " messages as read for conversation: " + peerId);
+                // Queue for disk write to persist the read status
+                pending.addAll(messages);
+            }
+        }
+    }
+
+    /**
      * Container for conversation statistics
      */
     public static class ConversationStats {
