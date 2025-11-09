@@ -188,32 +188,12 @@ public class ChatFragmentBroadcast extends Fragment {
                 return;
             }
 
-            // Clear input and show message immediately (optimistic UI)
+            // Clear input
             messageInput.setText("");
 
-            // Add message to database immediately for instant display
-            String callsign = Central.getInstance().getSettings().getCallsign();
-            ChatMessage optimisticMessage = new ChatMessage(callsign, message);
-            optimisticMessage.setWrittenByMe(true);
-            optimisticMessage.setTimestamp(System.currentTimeMillis());
-
-            // Determine message type based on mode
-            if ("Internet only".equals(selectedCommunicationMode)) {
-                optimisticMessage.setMessageType(ChatMessageType.INTERNET);
-            } else if ("Local only".equals(selectedCommunicationMode)) {
-                optimisticMessage.setMessageType(ChatMessageType.LOCAL);
-            } else {
-                // For "Everything" mode, default to LOCAL (will get internet copy too)
-                optimisticMessage.setMessageType(ChatMessageType.LOCAL);
-            }
-
-            DatabaseMessages.getInstance().add(optimisticMessage);
-
-            // Add message directly to UI for immediate display
-            addUserMessage(optimisticMessage);
-            chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
-
             // Send in background
+            // Note: Message will be added to database and UI by event handlers
+            // (EventBleBroadcastMessageSent for local, or after API success for internet)
             new Thread(() -> {
                 boolean sentLocal = false;
                 boolean sentInternet = false;
@@ -256,6 +236,13 @@ public class ChatFragmentBroadcast extends Fragment {
                                 if (success) {
                                     sentInternet = true;
                                     Log.i(TAG, "Message sent to server successfully");
+
+                                    // Add internet message to database (no event handler for internet sends)
+                                    ChatMessage internetMessage = new ChatMessage(userCallsign, message);
+                                    internetMessage.setWrittenByMe(true);
+                                    internetMessage.setTimestamp(System.currentTimeMillis());
+                                    internetMessage.setMessageType(ChatMessageType.INTERNET);
+                                    DatabaseMessages.getInstance().add(internetMessage);
                                 } else {
                                     Log.e(TAG, "Server returned failure response");
                                     errorMessage = "Server rejected message";
@@ -280,9 +267,14 @@ public class ChatFragmentBroadcast extends Fragment {
                 final String finalError = errorMessage;
 
                 requireActivity().runOnUiThread(() -> {
-                    // Message already displayed optimistically, just show status
+                    // Refresh UI to show sent messages
+                    if (anySent && canAddMessages()) {
+                        eraseMessagesFromWindow();
+                        updateMessages();
+                    }
+
+                    // Show success message
                     if (anySent) {
-                        // Show success message
                         if (finalSentInternet && finalSentLocal) {
                             Toast.makeText(getContext(), "Message sent via Bluetooth and Internet", Toast.LENGTH_SHORT).show();
                         } else if (finalSentInternet) {
@@ -391,6 +383,15 @@ public class ChatFragmentBroadcast extends Fragment {
      * Check if message should be displayed based on communication mode
      */
     private boolean shouldDisplayMessage(ChatMessage message) {
+        // First check: Only show broadcast/global messages in this fragment
+        // Broadcast messages have destinationId == null or "ANY"
+        // Direct/group messages have specific device IDs or group identifiers
+        String destination = message.destinationId;
+        if (destination != null && !destination.equals("ANY")) {
+            // This is a direct or group message, not a broadcast - don't show it here
+            return false;
+        }
+
         if (selectedCommunicationMode == null) {
             return true; // Show all if mode not set
         }

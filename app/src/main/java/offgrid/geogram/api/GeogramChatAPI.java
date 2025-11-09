@@ -331,38 +331,19 @@ public class GeogramChatAPI {
             // Replace underscore with colon for parsing
             timestamp = timestamp.replace("_", ":");
 
-            // Simple parsing (you might want to use SimpleDateFormat for robustness)
-            String[] parts = timestamp.split(" ");
-            if (parts.length != 2) return System.currentTimeMillis();
+            // Use SimpleDateFormat for proper date parsing
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+            sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            java.util.Date date = sdf.parse(timestamp);
 
-            String[] dateParts = parts[0].split("-");
-            String[] timeParts = parts[1].split(":");
-
-            if (dateParts.length != 3 || timeParts.length != 3) {
+            if (date != null) {
+                return date.getTime();
+            } else {
                 return System.currentTimeMillis();
             }
 
-            // Create a simple timestamp (not perfect but workable)
-            // For production, use SimpleDateFormat
-            int year = Integer.parseInt(dateParts[0]);
-            int month = Integer.parseInt(dateParts[1]);
-            int day = Integer.parseInt(dateParts[2]);
-            int hour = Integer.parseInt(timeParts[0]);
-            int minute = Integer.parseInt(timeParts[1]);
-            int second = Integer.parseInt(timeParts[2]);
-
-            // Very rough conversion - for production use proper date parsing
-            long milliseconds = ((year - 1970L) * 365L * 24L * 60L * 60L * 1000L);
-            milliseconds += (month * 30L * 24L * 60L * 60L * 1000L);
-            milliseconds += (day * 24L * 60L * 60L * 1000L);
-            milliseconds += (hour * 60L * 60L * 1000L);
-            milliseconds += (minute * 60L * 1000L);
-            milliseconds += (second * 1000L);
-
-            return milliseconds;
-
         } catch (Exception e) {
-            Log.e(TAG, "Failed to parse timestamp: " + timestamp);
+            Log.e(TAG, "Failed to parse timestamp: " + timestamp + " - " + e.getMessage());
             return System.currentTimeMillis();
         }
     }
