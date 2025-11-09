@@ -318,8 +318,11 @@ public final class DatabaseMessages {
     /** Build a dedupe key (authorId|timestamp|message). */
     private static String keyOf(ChatMessage m) {
         String a = m.authorId == null ? "" : m.authorId;
+        String dest = m.destinationId == null ? "" : m.destinationId;
         String msg = m.getMessage() == null ? "" : m.getMessage();
-        return a + "|" + m.timestamp + "|" + msg;
+        // Don't use timestamp in key - it changes on every parse
+        // Use destinationId + authorId + message content for stable deduplication
+        return dest + "|" + a + "|" + msg;
     }
 
     /** Thread-safe wrapper for flush; never throws. */
