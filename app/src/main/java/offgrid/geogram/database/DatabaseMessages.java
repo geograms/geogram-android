@@ -145,8 +145,9 @@ public final class DatabaseMessages {
 
             if (markedCount > 0) {
                 Log.d(TAG, "Marked " + markedCount + " messages as read for conversation: " + peerId);
-                // Queue for disk write to persist the read status
-                pending.addAll(messages);
+                // Immediately flush to disk to persist the read status
+                // Don't wait for the 60-second periodic flush
+                writeAllToDisk(new ArrayList<>(messages));
             }
         }
     }
@@ -425,10 +426,12 @@ public final class DatabaseMessages {
         JSONObject o = new JSONObject();
         try {
             o.put("authorId", m.authorId);
+            o.put("destinationId", m.destinationId);
             o.put("message", m.message);
             o.put("timestamp", m.timestamp);
             o.put("delivered", m.delivered);
             o.put("read", m.read);
+            o.put("isWrittenByMe", m.isWrittenByMe);
             o.put("messageType", m.messageType != null ? m.messageType.name() : ChatMessageType.DATA.name());
 
             JSONArray atts = new JSONArray();
@@ -447,9 +450,11 @@ public final class DatabaseMessages {
             long timestamp = o.getLong("timestamp");
 
             ChatMessage m = new ChatMessage(authorId, message);
+            m.destinationId = o.optString("destinationId", null);
             m.timestamp = timestamp;
             m.delivered = o.optBoolean("delivered", false);
             m.read = o.optBoolean("read", false);
+            m.isWrittenByMe = o.optBoolean("isWrittenByMe", false);
 
             String type = o.optString("messageType", ChatMessageType.DATA.name());
             try { m.messageType = ChatMessageType.valueOf(type); }
