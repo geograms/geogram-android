@@ -52,6 +52,7 @@ import offgrid.geogram.fragments.DebugFragment;
 import offgrid.geogram.fragments.DevicesFragment;
 import offgrid.geogram.fragments.DevicesWithinReachFragment;
 import offgrid.geogram.fragments.MessagesFragment;
+import offgrid.geogram.fragments.RelayFragment;
 import offgrid.geogram.settings.SettingsFragment;
 import offgrid.geogram.util.BatteryOptimizationHelper;
 
@@ -297,6 +298,8 @@ public class MainActivity extends AppCompatActivity {
 
             if (item.getItemId() == R.id.nav_settings) {
                 transaction.replace(R.id.fragment_container, SettingsFragment.getInstance()).addToBackStack(null);
+            } else if (item.getItemId() == R.id.nav_relay) {
+                transaction.replace(R.id.fragment_container, new RelayFragment()).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_debug) {
                 transaction.replace(R.id.fragment_container, new DebugFragment()).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_about) {

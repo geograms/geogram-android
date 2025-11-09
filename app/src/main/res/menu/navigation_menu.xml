@@ -15,6 +15,10 @@
         android:icon="@drawable/ic_settings"
         android:title="Settings" />
     <item
+        android:id="@+id/nav_relay"
+        android:icon="@drawable/ic_tethering"
+        android:title="Relay" />
+    <item
         android:id="@+id/nav_debug"
         android:icon="@drawable/ic_debug"
         android:title="Log" />
