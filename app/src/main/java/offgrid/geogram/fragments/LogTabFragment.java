@@ -29,6 +29,9 @@ public class LogTabFragment extends Fragment {
     private EditText logFilter;
     private boolean isPaused = false;
 
+    // Limit the number of log messages displayed to prevent performance issues
+    private static final int MAX_LOG_MESSAGES = 1000;
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -106,8 +109,15 @@ public class LogTabFragment extends Fragment {
             StringBuilder text = new StringBuilder();
             String filter = logFilter.getText().toString().toLowerCase();
 
-            // Filter and append log messages
-            for (String message : Log.logMessages) {
+            // Get the total number of log messages
+            int totalMessages = Log.logMessages.size();
+
+            // Calculate the starting index to show only the last MAX_LOG_MESSAGES
+            int startIndex = Math.max(0, totalMessages - MAX_LOG_MESSAGES);
+
+            // Filter and append log messages (only the last MAX_LOG_MESSAGES)
+            for (int i = startIndex; i < totalMessages; i++) {
+                String message = Log.logMessages.get(i);
                 if (filter.isEmpty() || message.toLowerCase().contains(filter)) {
                     text.append(message).append("\n");
                 }
