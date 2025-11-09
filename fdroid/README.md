@@ -1,25 +1,151 @@
 # F-Droid Publishing Guide
 
-Geogram Android uses Google Play Services (Nearby API, Location), which are **proprietary dependencies not allowed** in the official F-Droid repository.
+Geogram Android is now **fully compatible with F-Droid** after removing all Google Play Services dependencies in v0.2.0.
 
-## Solution: Host Your Own F-Droid Repository
+## Option 1: Submit to Official F-Droid Repository (Recommended)
 
-This approach allows you to distribute Geogram via F-Droid without removing Google dependencies.
+This is the best option for maximum reach and user trust.
 
 ### Prerequisites
 
-1. Install `fdroidserver`:
+1. Ensure your app is published on GitHub with proper tags
+2. Have a clear LICENSE file (Apache-2.0, GPL, etc.)
+3. Ensure the app builds reproducibly
+
+### Step 1: Fork fdroiddata Repository
+
+```bash
+git clone https://gitlab.com/fdroid/fdroiddata.git
+cd fdroiddata
+git checkout -b add-geogram
+```
+
+### Step 2: Create Metadata File
+
+Create `metadata/offgrid.geogram.yml`:
+
+```yaml
+Categories:
+  - Internet
+  - Security
+  - Navigation
+License: Apache-2.0
+WebSite: https://github.com/geograms/geogram-android
+SourceCode: https://github.com/geograms/geogram-android
+IssueTracker: https://github.com/geograms/geogram-android/issues
+Changelog: https://github.com/geograms/geogram-android/releases
+
+AutoName: Geogram
+Summary: Offline-first mesh communication app
+
+Description: |-
+  Geogram is an offline-first communication ecosystem for resilient, decentralized
+  messaging. It uses NOSTR protocol for end-to-end encrypted messaging, BLE beacons
+  for proximity-based discovery, and integrates with radio communications (APRS/FM).
+
+  Features:
+  * NOSTR-based encrypted messaging
+  * BLE beacon proximity detection
+  * Offline message caching and sync
+  * Native Android APIs (no Google dependencies)
+  * APRS integration for radio communications
+
+RepoType: git
+Repo: https://github.com/geograms/geogram-android.git
+
+Builds:
+  - versionName: 0.2.0
+    versionCode: 2
+    commit: v0.2.0
+    subdir: app
+    gradle:
+      - yes
+```
+
+### Step 3: Test Local Build
+
+Before submitting, test that F-Droid can build your app:
+
+```bash
+fdroid build offgrid.geogram:2
+```
+
+If successful, you'll see "Build succeeded" at the end.
+
+### Step 4: Submit Merge Request
+
+1. Commit your changes:
    ```bash
-   sudo apt-get install fdroidserver
+   git add metadata/offgrid.geogram.yml
+   git commit -m "New app: Geogram"
+   git push origin add-geogram
    ```
 
-2. Create a signing key (one-time setup):
-   ```bash
-   keytool -genkey -v -keystore fdroid-key.jks -alias geogram -keyalg RSA -keysize 2048 -validity 10000
-   ```
-   **IMPORTANT**: Keep `fdroid-key.jks` secure and backed up!
+2. Create merge request on GitLab:
+   - Go to https://gitlab.com/fdroid/fdroiddata/-/merge_requests/new
+   - Select your branch: `add-geogram`
+   - Fill in the template (they have a checklist)
+   - Submit
 
-### Step 1: Initialize F-Droid Repository
+3. Monitor the merge request for feedback from F-Droid reviewers
+
+### Step 5: Wait for Review
+
+- Initial response: Usually within 1-2 weeks
+- Full review and merge: Can take 2-4 weeks
+- Once merged, your app appears in F-Droid within 24-48 hours
+
+### Common Review Feedback
+
+Be prepared to address:
+- **Reproducible builds**: They verify the build produces the same APK
+- **Non-free dependencies**: All dependencies must be open source
+- **Build issues**: Gradle version, SDK requirements, etc.
+- **Metadata accuracy**: Description, license, categories
+
+---
+
+## Option 2: IzzyOnDroid Repository (Faster Alternative)
+
+IzzyOnDroid is a trusted third-party F-Droid repository with easier submission.
+
+### Advantages
+- Much faster approval (usually 1-3 days)
+- Uses pre-built APKs from GitHub releases
+- Good for getting started quickly
+
+### How to Submit
+
+1. Go to https://apt.izzysoft.de/fdroid/index/info
+2. Click "Submit an app"
+3. Provide:
+   - Package name: `offgrid.geogram`
+   - GitHub releases URL: `https://github.com/geograms/geogram-android/releases`
+   - APK name pattern: `geogram.apk`
+
+4. Wait for Izzy to review (usually 1-3 days)
+
+### Users Add IzzyOnDroid
+
+1. Open F-Droid app
+2. Settings → Repositories
+3. Tap `+` add repository
+4. Enter: `https://apt.izzysoft.de/fdroid/repo`
+5. Search for "Geogram"
+
+---
+
+## Option 3: Host Your Own F-Droid Repository
+
+Only use this if you want complete control or need to test before official submission.
+
+### Step 1: Install fdroidserver
+
+```bash
+sudo apt-get install fdroidserver
+```
+
+### Step 2: Initialize Repository
 
 ```bash
 mkdir -p fdroid/repo
@@ -27,146 +153,63 @@ cd fdroid
 fdroid init
 ```
 
-This creates:
-- `config.yml` - Repository configuration
-- `keystore.p12` - Repository signing key
-
-### Step 2: Configure Repository
+### Step 3: Configure Repository
 
 Edit `fdroid/config.yml`:
 
 ```yaml
-repo_url: "https://geograms.github.io/fdroid/repo"
-repo_name: "Geogram F-Droid Repository"
-repo_description: "Official F-Droid repository for Geogram Android"
-repo_icon: "icon.png"
+repo_url: "https://geograms.github.io/geogram-android/fdroid/repo"
+repo_name: "Geogram Official Repository"
+repo_description: "F-Droid repository for Geogram Android"
 archive_older: 3
 ```
 
-### Step 3: Add APK to Repository
+### Step 4: Add APK and Publish
 
 ```bash
-# Copy latest release APK
-cp ../app/build/outputs/apk/debug/app-debug.apk repo/geogram-0.1.0.apk
+# Copy APK from releases
+cp ../app/build/outputs/apk/debug/app-debug.apk repo/offgrid.geogram_2.apk
 
 # Update repository index
 fdroid update --create-metadata
 
-# Sign repository
+# Sign and publish
 fdroid publish
 ```
 
-### Step 4: Host Repository on GitHub Pages
-
-1. Create a new repository: `geograms/fdroid`
-
-2. Push the repository:
-   ```bash
-   git init
-   git add .
-   git commit -m "Initialize Geogram F-Droid repository"
-   git branch -M main
-   git remote add origin https://github.com/geograms/fdroid.git
-   git push -u origin main
-   ```
-
-3. Enable GitHub Pages:
-   - Go to repository Settings → Pages
-   - Source: Deploy from branch `main`
-   - Folder: `/ (root)`
-
-4. Your F-Droid repository will be available at:
-   `https://geograms.github.io/fdroid/repo`
-
-### Step 5: Users Add Your Repository
-
-Users install F-Droid app, then:
-
-1. Open F-Droid
-2. Settings → Repositories
-3. Tap `+` to add repository
-4. Enter URL: `https://geograms.github.io/fdroid/repo`
-5. Find and install Geogram
-
-### Automated Updates
-
-Add this to your `release.sh`:
+### Step 5: Host on GitHub Pages
 
 ```bash
-# After building APK
-if [ -d "../fdroid" ]; then
-    echo "Updating F-Droid repository..."
-    cp geogram.apk ../fdroid/repo/geogram-${VERSION}.apk
-    cd ../fdroid
-    fdroid update
-    fdroid publish
-    git add .
-    git commit -m "Update Geogram to v${VERSION}"
-    git push
-    cd ../geogram-android
-fi
+# From fdroid directory
+git init
+git add .
+git commit -m "Initialize F-Droid repository"
+git push
 ```
 
----
-
-## Alternative: Submit to Official F-Droid (Requires Major Refactoring)
-
-To submit to official F-Droid, you must:
-
-1. **Remove all Google Play Services dependencies**:
-   - Remove `play.services.nearby` (BLE Direct)
-   - Remove `play.services.location`
-   - Implement alternative BLE solutions using Android SDK directly
-
-2. **Create build variants**:
-   ```kotlin
-   flavorDimensions += "distribution"
-   productFlavors {
-       create("fdroid") {
-           dimension = "distribution"
-           // No Google dependencies
-       }
-       create("standard") {
-           dimension = "distribution"
-           // Includes Google dependencies
-       }
-   }
-   ```
-
-3. **Fork fdroiddata repository**:
-   ```bash
-   git clone https://gitlab.com/fdroid/fdroiddata.git
-   ```
-
-4. **Create metadata file** `metadata/offgrid.geogram.yml`:
-   ```yaml
-   Categories:
-     - Internet
-     - Connectivity
-   License: Apache-2.0
-   WebSite: https://github.com/geograms/geogram-android
-   SourceCode: https://github.com/geograms/geogram-android
-   IssueTracker: https://github.com/geograms/geogram-android/issues
-
-   AutoName: Geogram
-
-   RepoType: git
-   Repo: https://github.com/geograms/geogram-android.git
-
-   Builds:
-     - versionName: 0.1.0
-       versionCode: 1
-       commit: v0.1.0
-       gradle:
-         - fdroid
-   ```
-
-5. **Submit merge request** to fdroiddata
-
-6. **Wait for review** (can take weeks/months)
+Enable GitHub Pages in repository settings, then users can add:
+`https://geograms.github.io/geogram-android/fdroid/repo`
 
 ---
 
 ## Recommendation
 
-**Start with your own F-Droid repository** (Option 1). It's much faster and doesn't require code changes. Later, you can create an F-Droid flavor if you want official F-Droid inclusion.
+**Start with IzzyOnDroid** (Option 2) for immediate availability, then submit to official F-Droid (Option 1) for long-term presence. This gives you:
+
+1. Quick availability (IzzyOnDroid: 1-3 days)
+2. Official presence (F-Droid: 2-4 weeks)
+3. Maximum user reach
+
+Both repositories can coexist - users will get the same APK from either source.
+
+---
+
+## Version Code Guidelines
+
+F-Droid requires monotonically increasing version codes:
+
+- v0.1.0 → versionCode: 1
+- v0.2.0 → versionCode: 2
+- v0.3.0 → versionCode: 3
+
+Never reuse or decrease version codes.
