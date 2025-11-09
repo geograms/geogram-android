@@ -56,6 +56,62 @@ public final class DatabaseMessages {
         return this.messages;
     }
 
+    /**
+     * Get message statistics for a specific conversation/peer
+     * @param peerId The conversation identifier (group name or callsign)
+     * @return ConversationStats with message count, last message, and unread count
+     */
+    public ConversationStats getConversationStats(String peerId) {
+        synchronized (lock) {
+            ensureInitialized();
+            int totalCount = 0;
+            int unreadCount = 0;
+            ChatMessage lastMessage = null;
+
+            for (ChatMessage msg : messages) {
+                // Check if message belongs to this conversation
+                // For group messages: destinationId matches peerId
+                // For direct messages: either authorId or destinationId matches peerId
+                boolean belongsToConversation = false;
+
+                if (peerId.startsWith("group-")) {
+                    // Group conversation - match by destinationId
+                    belongsToConversation = peerId.equals(msg.destinationId);
+                } else {
+                    // Direct conversation - match by either authorId or destinationId
+                    belongsToConversation = peerId.equals(msg.authorId) || peerId.equals(msg.destinationId);
+                }
+
+                if (belongsToConversation) {
+                    totalCount++;
+                    if (!msg.read && !msg.isWrittenByMe) {
+                        unreadCount++;
+                    }
+                    if (lastMessage == null || msg.timestamp > lastMessage.timestamp) {
+                        lastMessage = msg;
+                    }
+                }
+            }
+
+            return new ConversationStats(totalCount, unreadCount, lastMessage);
+        }
+    }
+
+    /**
+     * Container for conversation statistics
+     */
+    public static class ConversationStats {
+        public final int totalMessages;
+        public final int unreadCount;
+        public final ChatMessage lastMessage;
+
+        public ConversationStats(int totalMessages, int unreadCount, ChatMessage lastMessage) {
+            this.totalMessages = totalMessages;
+            this.unreadCount = unreadCount;
+            this.lastMessage = lastMessage;
+        }
+    }
+
     private static final class Holder { static final DatabaseMessages I = new DatabaseMessages(); }
     public static DatabaseMessages getInstance() { return Holder.I; }
 

@@ -9,6 +9,7 @@ public class Conversation {
     private String lastMessage;         // Last message content
     private long lastMessageTime;       // Timestamp of last message
     private int unreadCount;            // Number of unread messages
+    private int messageCount;           // Total number of messages
     private boolean isGroup;            // True if this is a group conversation
 
     public Conversation(String peerId) {
@@ -17,6 +18,7 @@ public class Conversation {
         this.lastMessage = "";
         this.lastMessageTime = 0;
         this.unreadCount = 0;
+        this.messageCount = 0;
         this.isGroup = peerId.startsWith("group-");
     }
 
@@ -66,5 +68,13 @@ public class Conversation {
 
     public void setGroup(boolean group) {
         isGroup = group;
+    }
+
+    public int getMessageCount() {
+        return messageCount;
+    }
+
+    public void setMessageCount(int messageCount) {
+        this.messageCount = messageCount;
     }
 }

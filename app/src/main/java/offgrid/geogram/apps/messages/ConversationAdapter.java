@@ -82,11 +82,16 @@ public class ConversationAdapter extends RecyclerView.Adapter<ConversationAdapte
             // Set conversation name
             conversationName.setText(conversation.getDisplayName());
 
-            // Set last message
+            // Set last message with message count
             String lastMsg = conversation.getLastMessage();
-            if (lastMsg == null || lastMsg.isEmpty()) {
+            int msgCount = conversation.getMessageCount();
+
+            if (msgCount == 0) {
                 conversationLastMessage.setText("No messages yet");
+            } else if (lastMsg == null || lastMsg.isEmpty()) {
+                conversationLastMessage.setText(msgCount + " message" + (msgCount != 1 ? "s" : ""));
             } else {
+                // Show last message preview
                 conversationLastMessage.setText(lastMsg);
             }
 

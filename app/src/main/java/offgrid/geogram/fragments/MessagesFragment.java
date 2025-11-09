@@ -31,6 +31,7 @@ import offgrid.geogram.apps.messages.ConversationChatFragment;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.DatabaseConversations;
+import offgrid.geogram.database.DatabaseMessages;
 import offgrid.geogram.settings.SettingsUser;
 
 public class MessagesFragment extends Fragment {
@@ -42,6 +43,8 @@ public class MessagesFragment extends Fragment {
     private TextView emptyState;
     private ConversationAdapter adapter;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private static final long AUTO_REFRESH_INTERVAL_MS = 30000; // 30 seconds
+    private Runnable autoRefreshRunnable;
 
     @Nullable
     @Override
@@ -103,9 +106,16 @@ public class MessagesFragment extends Fragment {
 
         // Load conversations in background thread
         new Thread(() -> {
-            // First, load cached conversations immediately
+            // First, load cached conversations immediately and enrich with current stats
             List<Conversation> cachedConversations = DatabaseConversations.getInstance().loadConversationList();
             if (!cachedConversations.isEmpty()) {
+                // Enrich cached conversations with latest message stats
+                for (Conversation conv : cachedConversations) {
+                    enrichConversationWithStats(conv);
+                }
+                // Sort by most recent
+                cachedConversations.sort((c1, c2) -> Long.compare(c2.getLastMessageTime(), c1.getLastMessageTime()));
+
                 handler.post(() -> {
                     emptyState.setVisibility(View.GONE);
                     conversationsRecyclerView.setVisibility(View.VISIBLE);
@@ -119,12 +129,17 @@ public class MessagesFragment extends Fragment {
                 // Fetch conversation list from API
                 List<String> peerIds = GeogramMessagesAPI.getConversationList(callsign, nsec, npub);
 
-                // Convert to Conversation objects
+                // Convert to Conversation objects and populate stats from local database
                 List<Conversation> conversations = new ArrayList<>();
                 for (String peerId : peerIds) {
                     Conversation conv = new Conversation(peerId);
+                    // Populate with message statistics from local database
+                    enrichConversationWithStats(conv);
                     conversations.add(conv);
                 }
+
+                // Sort by most recent message time (newest first)
+                conversations.sort((c1, c2) -> Long.compare(c2.getLastMessageTime(), c1.getLastMessageTime()));
 
                 // Save to cache
                 DatabaseConversations.getInstance().saveConversationList(conversations);
@@ -178,6 +193,58 @@ public class MessagesFragment extends Fragment {
         // Refresh conversations when returning to this screen
         if (swipeRefreshLayout != null) {
             loadConversations();
+        }
+        // Start auto-refresh
+        startAutoRefresh();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Stop auto-refresh to save resources
+        stopAutoRefresh();
+    }
+
+    private void startAutoRefresh() {
+        if (autoRefreshRunnable == null) {
+            autoRefreshRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    if (isAdded() && swipeRefreshLayout != null) {
+                        Log.d(TAG, "Auto-refreshing conversations");
+                        loadConversations();
+                        // Schedule next refresh
+                        handler.postDelayed(this, AUTO_REFRESH_INTERVAL_MS);
+                    }
+                }
+            };
+        }
+        // Start the auto-refresh cycle
+        handler.postDelayed(autoRefreshRunnable, AUTO_REFRESH_INTERVAL_MS);
+    }
+
+    private void stopAutoRefresh() {
+        if (autoRefreshRunnable != null) {
+            handler.removeCallbacks(autoRefreshRunnable);
+        }
+    }
+
+    /**
+     * Enrich a conversation with message statistics from the local database
+     */
+    private void enrichConversationWithStats(Conversation conversation) {
+        DatabaseMessages.ConversationStats stats =
+            DatabaseMessages.getInstance().getConversationStats(conversation.getPeerId());
+
+        conversation.setMessageCount(stats.totalMessages);
+        conversation.setUnreadCount(stats.unreadCount);
+
+        if (stats.lastMessage != null) {
+            conversation.setLastMessage(stats.lastMessage.getMessage());
+            conversation.setLastMessageTime(stats.lastMessage.getTimestamp());
+        } else {
+            conversation.setLastMessage("");
+            conversation.setLastMessageTime(0);
         }
     }
 }
