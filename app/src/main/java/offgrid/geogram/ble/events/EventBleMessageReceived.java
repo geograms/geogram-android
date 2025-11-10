@@ -5,6 +5,7 @@ import java.util.HashMap;
 
 import offgrid.geogram.apps.chat.ChatMessage;
 import offgrid.geogram.ble.BluetoothMessage;
+import offgrid.geogram.ble.BluetoothSender;
 import offgrid.geogram.ble.ValidCommands;
 import offgrid.geogram.ble.missing.MissingMessagesBLE;
 import offgrid.geogram.core.Central;
@@ -103,8 +104,13 @@ public class EventBleMessageReceived extends EventAction {
         if(missingParcels.isEmpty()){
             return;
         }
-        // ask for the missing parcels
 
+        // Send NACK request for each missing parcel
+        for(String missingParcelId : missingParcels) {
+            String nackMessage = "/repeat " + missingParcelId;
+            BluetoothSender.getInstance(null).sendMessage(nackMessage);
+            Log.i(TAG, "Requesting missing parcel: " + missingParcelId);
+        }
 
         // messages are sent in sequence. If there is a missing sequence, ask for it
         Log.i(TAG, msg.getId() + " is missing packages: " + missingParcels.size());

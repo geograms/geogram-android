@@ -3,7 +3,6 @@ package offgrid.geogram.relay;
 import android.util.Log;
 
 import org.json.JSONArray;
-import org.json.JSONException;
 
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -362,7 +361,11 @@ public class RelayMessage {
             byte[] hash = NostrUtil.sha256(jsonStr.getBytes());
             return NostrUtil.bytesToHex(hash);
 
-        } catch (NoSuchAlgorithmException | JSONException e) {
+        } catch (NoSuchAlgorithmException e) {
+            Log.e(TAG, "Error generating message ID: " + e.getMessage());
+            return null;
+        } catch (Exception e) {
+            // Catch any other exceptions (e.g., JSON errors)
             Log.e(TAG, "Error generating message ID: " + e.getMessage());
             return null;
         }

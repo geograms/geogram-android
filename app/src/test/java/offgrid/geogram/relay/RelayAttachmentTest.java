@@ -3,19 +3,19 @@ package offgrid.geogram.relay;
 import android.util.Base64;
 
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.robolectric.RobolectricTestRunner;
 
 import java.security.NoSuchAlgorithmException;
 
 import offgrid.geogram.util.nostr.NostrUtil;
 
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for RelayAttachment.
+ *
+ * Note: Base64 is mocked since Android's Base64 is not available in JUnit tests.
  */
-@RunWith(RobolectricTestRunner.class)
 public class RelayAttachmentTest {
 
     @Test
