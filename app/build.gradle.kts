@@ -34,6 +34,12 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 /** Kill duplicate classes by excluding the old IntelliJ annotations everywhere. */
@@ -63,6 +69,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockito.inline)
     testImplementation(libs.slf4j.simple)
+    testImplementation(libs.robolectric)
     testImplementation("org.json:json:20230227") // For unit tests with JSON
     androidTestImplementation(libs.espresso.core)
 

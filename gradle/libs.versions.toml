@@ -24,6 +24,7 @@ roomRuntime = "2.6.1"
 roomCompiler = "2.6.1"
 stetho = "1.6.0"
 swiperefreshlayout = "1.1.0"
+robolectric = "4.11.1"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -50,6 +51,7 @@ room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "roomCompiler" }
 stetho = { group = "com.facebook.stetho", name = "stetho", version.ref = "stetho" }
 swiperefreshlayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "swiperefreshlayout" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -2,21 +2,24 @@ package offgrid.geogram.relay;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.RuntimeEnvironment;
 
 import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for RelayMessage.
  */
+@RunWith(RobolectricTestRunner.class)
 public class RelayMessageTest {
 
     private RelaySettings mockSettings;
 
     @Before
     public void setUp() {
-        mockSettings = mock(RelaySettings.class);
-        when(mockSettings.getAcceptedMessageTypes()).thenReturn("everything");
+        mockSettings = new RelaySettings(RuntimeEnvironment.getApplication());
+        mockSettings.setAcceptedMessageTypes("everything");
     }
 
     @Test
