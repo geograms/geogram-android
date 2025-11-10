@@ -211,6 +211,9 @@ public class MainActivity extends AppCompatActivity {
         // Initialize device count badge
         updateDeviceCount();
 
+        // Initialize relay count badge
+        updateRelayCount();
+
         if (wasCreatedBefore) {
             // On subsequent calls, just reload the fragment (database already initialized)
             loadNearbyFragment();
@@ -289,6 +292,15 @@ public class MainActivity extends AppCompatActivity {
             FragmentManager fragmentManager = getSupportFragmentManager();
             FragmentTransaction transaction = fragmentManager.beginTransaction();
             transaction.replace(R.id.fragment_container, new MessagesFragment()).addToBackStack(null);
+            transaction.commit();
+        });
+
+        // Relay button
+        ImageButton btnRelay = findViewById(R.id.btn_relay);
+        btnRelay.setOnClickListener(v -> {
+            FragmentManager fragmentManager = getSupportFragmentManager();
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.replace(R.id.fragment_container, new RelayFragment()).addToBackStack(null);
             transaction.commit();
         });
 
@@ -384,6 +396,43 @@ public class MainActivity extends AppCompatActivity {
         } else {
             // Green when active devices are nearby
             deviceCountBadge.setBackgroundResource(R.drawable.badge_background_green);
+        }
+    }
+
+    /**
+     * Update the relay message count badge.
+     * Shows the total number of messages in the relay (inbox + outbox).
+     * Call this method whenever relay messages are added/removed.
+     */
+    public void updateRelayCount() {
+        TextView relayCountBadge = findViewById(R.id.tv_relay_count);
+        if (relayCountBadge == null) return;
+
+        try {
+            offgrid.geogram.relay.RelayStorage storage = new offgrid.geogram.relay.RelayStorage(this);
+            offgrid.geogram.relay.RelaySettings settings = new offgrid.geogram.relay.RelaySettings(this);
+
+            // Count messages in inbox and outbox
+            int inboxCount = storage.getMessageCount("inbox");
+            int outboxCount = storage.getMessageCount("outbox");
+            int totalCount = inboxCount + outboxCount;
+
+            relayCountBadge.setText(String.valueOf(totalCount));
+
+            // Update badge background color based on relay status
+            if (!settings.isRelayEnabled()) {
+                // Grey when relay is disabled
+                relayCountBadge.setBackgroundResource(R.drawable.badge_background_grey);
+            } else if (totalCount == 0) {
+                // Grey when no messages
+                relayCountBadge.setBackgroundResource(R.drawable.badge_background_grey);
+            } else {
+                // Green when relay is active with messages
+                relayCountBadge.setBackgroundResource(R.drawable.badge_background_green);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating relay count: " + e.getMessage());
+            relayCountBadge.setText("0");
         }
     }
 
