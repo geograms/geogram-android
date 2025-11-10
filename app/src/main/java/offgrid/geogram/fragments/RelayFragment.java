@@ -85,9 +85,15 @@ public class RelayFragment extends Fragment {
         // Action buttons
         Button btnViewMessages = view.findViewById(R.id.btn_view_messages);
         Button btnClearSent = view.findViewById(R.id.btn_clear_sent);
+        Button btnTestInbox = view.findViewById(R.id.btn_test_inbox);
+        Button btnTestOutbox = view.findViewById(R.id.btn_test_outbox);
+        Button btnTestMultiple = view.findViewById(R.id.btn_test_multiple);
 
         btnViewMessages.setOnClickListener(v -> showMessagesDialog());
         btnClearSent.setOnClickListener(v -> clearSentMessages());
+        btnTestInbox.setOnClickListener(v -> createTestMessage("inbox"));
+        btnTestOutbox.setOnClickListener(v -> createTestMessage("outbox"));
+        btnTestMultiple.setOnClickListener(v -> createMultipleTestMessages());
 
         // Load current settings
         loadSettings();
@@ -306,6 +312,112 @@ public class RelayFragment extends Fragment {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private void createTestMessage(String folder) {
+        try {
+            // Generate unique message ID
+            long timestamp = System.currentTimeMillis();
+            String messageId = "TEST-" + timestamp;
+
+            // Create test message
+            offgrid.geogram.relay.RelayMessage message = new offgrid.geogram.relay.RelayMessage();
+            message.setId(messageId);
+            message.setFromCallsign("TEST-K5ABC");
+            message.setToCallsign("DEST-W6XYZ");
+            message.setContent("Test relay message created at " +
+                new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+                    .format(new java.util.Date(timestamp)));
+            message.setType("private");
+            message.setPriority("normal");
+            message.setTtl(604800); // 7 days
+            message.setTimestamp(timestamp / 1000);
+
+            // Save to specified folder
+            boolean saved = storage.saveMessage(message, folder);
+
+            if (saved) {
+                Toast.makeText(requireContext(),
+                    "Test message added to " + folder,
+                    Toast.LENGTH_SHORT).show();
+                updateStatus();
+            } else {
+                Toast.makeText(requireContext(),
+                    "Failed to save test message",
+                    Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(requireContext(),
+                "Error creating test message: " + e.getMessage(),
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void createMultipleTestMessages() {
+        try {
+            int created = 0;
+
+            // Create 2 messages in inbox
+            for (int i = 0; i < 2; i++) {
+                long timestamp = System.currentTimeMillis() + i;
+                String messageId = "TEST-IN-" + timestamp;
+
+                offgrid.geogram.relay.RelayMessage message = new offgrid.geogram.relay.RelayMessage();
+                message.setId(messageId);
+                message.setFromCallsign("REMOTE-K" + (5000 + i));
+                message.setToCallsign("LOCAL-W6ABC");
+                message.setContent("Incoming test message #" + (i + 1));
+                message.setType("private");
+                message.setPriority(i == 0 ? "urgent" : "normal");
+                message.setTtl(604800);
+                message.setTimestamp(timestamp / 1000);
+
+                if (storage.saveMessage(message, "inbox")) {
+                    created++;
+                }
+            }
+
+            // Create 3 messages in outbox
+            for (int i = 0; i < 3; i++) {
+                long timestamp = System.currentTimeMillis() + 100 + i;
+                String messageId = "TEST-OUT-" + timestamp;
+
+                offgrid.geogram.relay.RelayMessage message = new offgrid.geogram.relay.RelayMessage();
+                message.setId(messageId);
+                message.setFromCallsign("LOCAL-K5XYZ");
+                message.setToCallsign("REMOTE-W" + (6000 + i));
+                message.setContent("Outgoing test message #" + (i + 1) + " ready to relay");
+                message.setType("private");
+                message.setPriority("normal");
+                message.setTtl(604800);
+                message.setTimestamp(timestamp / 1000);
+
+                // Optionally add an attachment to one message
+                if (i == 1) {
+                    offgrid.geogram.relay.RelayAttachment attachment =
+                        new offgrid.geogram.relay.RelayAttachment();
+                    attachment.setMimeType("image/jpeg");
+                    attachment.setFilename("test.jpg");
+                    attachment.setData(new byte[]{1, 2, 3, 4, 5, 6, 7, 8});
+                    attachment.calculateChecksum();
+                    message.addAttachment(attachment);
+                }
+
+                if (storage.saveMessage(message, "outbox")) {
+                    created++;
+                }
+            }
+
+            Toast.makeText(requireContext(),
+                "Created " + created + " test messages (2 inbox, 3 outbox)",
+                Toast.LENGTH_LONG).show();
+            updateStatus();
+
+        } catch (Exception e) {
+            Toast.makeText(requireContext(),
+                "Error creating test messages: " + e.getMessage(),
+                Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
