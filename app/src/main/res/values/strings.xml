@@ -108,7 +108,8 @@
 
     <!-- Permissions Intro Activity -->
     <string name="welcome_to_geogram">Welcome to Geogram</string>
-    <string name="permissions_intro_subtitle">To enable offline mesh networking, we need a few permissions</string>
+    <string name="geogram_intro_description">Offline-first communication through Bluetooth mesh networking. Messages relay through nearby devices even without internet.</string>
+    <string name="permissions_intro_subtitle">To enable mesh networking, we need a few permissions:</string>
     <string name="permissions_required_title">Permissions Required</string>
 
     <string name="perm_bluetooth_title">Bluetooth</string>
