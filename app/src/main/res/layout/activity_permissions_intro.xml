@@ -1,24 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="?attr/colorPrimaryDark"
-    android:fillViewport="true">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp"
-        android:gravity="center_horizontal">
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:gravity="center_horizontal">
 
         <!-- App Icon -->
         <ImageView
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:layout_marginTop="32dp"
-            android:layout_marginBottom="16dp"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
             android:src="@mipmap/ic_launcher"
             android:contentDescription="@string/app_name" />
 
@@ -27,26 +22,26 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/welcome_to_geogram"
-            android:textSize="24sp"
+            android:textSize="22sp"
             android:textStyle="bold"
             android:textColor="?attr/colorOnPrimary"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="4dp" />
 
         <!-- Subtitle -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/permissions_intro_subtitle"
-            android:textSize="16sp"
+            android:textSize="14sp"
             android:textColor="?attr/colorOnSecondary"
             android:textAlignment="center"
-            android:layout_marginBottom="32dp" />
+            android:layout_marginBottom="12dp" />
 
         <!-- Permissions Explanation Card -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="8dp"
             app:cardBackgroundColor="?attr/colorSurface"
             app:cardCornerRadius="8dp"
             app:cardElevation="4dp">
@@ -55,29 +50,29 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="12dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/permissions_required_title"
-                    android:textSize="18sp"
+                    android:textSize="16sp"
                     android:textStyle="bold"
                     android:textColor="?attr/colorOnSurface"
-                    android:layout_marginBottom="12dp" />
+                    android:layout_marginBottom="8dp" />
 
                 <!-- Bluetooth Permission -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginBottom="12dp">
+                    android:layout_marginBottom="6dp">
 
                     <TextView
-                        android:layout_width="32dp"
+                        android:layout_width="24dp"
                         android:layout_height="wrap_content"
                         android:text="📡"
-                        android:textSize="20sp"
+                        android:textSize="16sp"
                         android:gravity="center" />
 
                     <LinearLayout
@@ -85,20 +80,21 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:orientation="vertical"
-                        android:layout_marginStart="12dp">
+                        android:layout_marginStart="8dp">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/perm_bluetooth_title"
                             android:textStyle="bold"
+                            android:textSize="13sp"
                             android:textColor="?attr/colorOnSurface" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/perm_bluetooth_description"
-                            android:textSize="12sp"
+                            android:textSize="11sp"
                             android:textColor="?attr/colorOnSecondary" />
                     </LinearLayout>
                 </LinearLayout>
@@ -108,13 +104,13 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginBottom="12dp">
+                    android:layout_marginBottom="6dp">
 
                     <TextView
-                        android:layout_width="32dp"
+                        android:layout_width="24dp"
                         android:layout_height="wrap_content"
                         android:text="📍"
-                        android:textSize="20sp"
+                        android:textSize="16sp"
                         android:gravity="center" />
 
                     <LinearLayout
@@ -122,20 +118,21 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:orientation="vertical"
-                        android:layout_marginStart="12dp">
+                        android:layout_marginStart="8dp">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/perm_location_title"
                             android:textStyle="bold"
+                            android:textSize="13sp"
                             android:textColor="?attr/colorOnSurface" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/perm_location_description"
-                            android:textSize="12sp"
+                            android:textSize="11sp"
                             android:textColor="?attr/colorOnSecondary" />
                     </LinearLayout>
                 </LinearLayout>
@@ -145,13 +142,13 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginBottom="12dp">
+                    android:layout_marginBottom="6dp">
 
                     <TextView
-                        android:layout_width="32dp"
+                        android:layout_width="24dp"
                         android:layout_height="wrap_content"
                         android:text="🔋"
-                        android:textSize="20sp"
+                        android:textSize="16sp"
                         android:gravity="center" />
 
                     <LinearLayout
@@ -159,20 +156,21 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:orientation="vertical"
-                        android:layout_marginStart="12dp">
+                        android:layout_marginStart="8dp">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/perm_battery_title"
                             android:textStyle="bold"
+                            android:textSize="13sp"
                             android:textColor="?attr/colorOnSurface" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/perm_battery_description"
-                            android:textSize="12sp"
+                            android:textSize="11sp"
                             android:textColor="?attr/colorOnSecondary" />
                     </LinearLayout>
                 </LinearLayout>
@@ -184,10 +182,10 @@
                     android:orientation="horizontal">
 
                     <TextView
-                        android:layout_width="32dp"
+                        android:layout_width="24dp"
                         android:layout_height="wrap_content"
                         android:text="🌐"
-                        android:textSize="20sp"
+                        android:textSize="16sp"
                         android:gravity="center" />
 
                     <LinearLayout
@@ -195,20 +193,21 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:orientation="vertical"
-                        android:layout_marginStart="12dp">
+                        android:layout_marginStart="8dp">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/perm_internet_title"
                             android:textStyle="bold"
+                            android:textSize="13sp"
                             android:textColor="?attr/colorOnSurface" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/perm_internet_description"
-                            android:textSize="12sp"
+                            android:textSize="11sp"
                             android:textColor="?attr/colorOnSecondary" />
                     </LinearLayout>
                 </LinearLayout>
@@ -220,10 +219,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/privacy_note"
-            android:textSize="12sp"
+            android:textSize="11sp"
             android:textColor="?attr/colorOnSecondary"
             android:textAlignment="center"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="6dp" />
 
         <!-- Learn More Link -->
         <TextView
@@ -231,13 +231,20 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/learn_more_details"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:textColor="?attr/colorPrimary"
             android:textStyle="bold"
-            android:layout_marginBottom="32dp"
-            android:padding="8dp"
+            android:layout_marginBottom="12dp"
+            android:padding="4dp"
             android:clickable="true"
-            android:focusable="true" />
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground" />
+
+        <!-- Spacer to push buttons to bottom -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
 
         <!-- Buttons -->
         <Button
@@ -245,9 +252,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/accept_and_continue"
-            android:textSize="16sp"
-            android:padding="16dp"
-            android:layout_marginBottom="8dp"
+            android:textSize="15sp"
+            android:layout_marginBottom="6dp"
             style="@style/Widget.AppCompat.Button.Colored" />
 
         <Button
@@ -255,13 +261,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/decline_and_exit"
-            android:textSize="16sp"
-            android:padding="16dp"
+            android:textSize="15sp"
             style="@style/Widget.AppCompat.Button.Borderless" />
 
-        <Space
-            android:layout_width="match_parent"
-            android:layout_height="32dp" />
-
-    </LinearLayout>
-</ScrollView>
+</LinearLayout>
