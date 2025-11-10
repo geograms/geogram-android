@@ -56,16 +56,22 @@
         tools:targetApi="33">
 
 
-        <!-- Main Activity -->
+        <!-- Permissions Intro Activity (First Run) -->
         <activity
-            android:name=".MainActivity"
-            android:windowSoftInputMode="adjustResize"
-            android:exported="true">
+            android:name=".PermissionsIntroActivity"
+            android:exported="true"
+            android:theme="@style/AppTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Main Activity -->
+        <activity
+            android:name=".MainActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="false" />
 
         <!-- Background Service -->
         <service

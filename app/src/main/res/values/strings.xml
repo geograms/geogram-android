@@ -106,4 +106,26 @@
     <string name="about_geogram">About Geogram</string>
     <string name="filter">Filter</string>
 
+    <!-- Permissions Intro Activity -->
+    <string name="welcome_to_geogram">Welcome to Geogram</string>
+    <string name="permissions_intro_subtitle">To enable offline mesh networking, we need a few permissions</string>
+    <string name="permissions_required_title">Permissions Required</string>
+
+    <string name="perm_bluetooth_title">Bluetooth</string>
+    <string name="perm_bluetooth_description">Required for discovering and connecting to nearby devices via BLE mesh networking. This is the core functionality for offline message relay.</string>
+
+    <string name="perm_location_title">Location</string>
+    <string name="perm_location_description">Android requires location permission for Bluetooth scanning. We optionally use it to tag messages with geographic coordinates for relay routing.</string>
+
+    <string name="perm_battery_title">Battery Optimization Exemption</string>
+    <string name="perm_battery_description">Allows the app to run in the background for continuous message relay. You can disable relay mode if you prefer.</string>
+
+    <string name="perm_internet_title">Internet (Optional)</string>
+    <string name="perm_internet_description">Used for NOSTR messaging when available. The app works fully offline without internet access.</string>
+
+    <string name="privacy_note">All data stays on your device. Messages are end-to-end encrypted. We do not collect or transmit personal information.</string>
+    <string name="learn_more_details">📄 Learn more about permissions</string>
+    <string name="accept_and_continue">Accept and Continue</string>
+    <string name="decline_and_exit">Decline and Exit</string>
+
 </resources>
