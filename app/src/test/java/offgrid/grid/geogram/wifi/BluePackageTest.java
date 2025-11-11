@@ -14,39 +14,38 @@ public class BluePackageTest {
         String messageToSend = "Hello there, this is a long message just to test that we can send them";
 
         BluetoothMessage msg = new BluetoothMessage("CR7BBQ-15", "KO6ZJI-10", messageToSend, false);
-        assertEquals(5, msg.getMessageParcelsTotal());
+        // With maxSizeOfMessages=40: 70 chars -> ceil(70/40)=2 data parcels + 1 header = 3 total
+        assertEquals(3, msg.getMessageParcelsTotal());
 
-        // e.g. WO0:CR7BBQ-15:KO6ZJI-10:GMJA | WO1:Hello there, this  | WO2:is a long message  | WO3:just to test that  | WO4:we can send them
+        // e.g. WO0:CR7BBQ-15:KO6ZJI-10:GMJA | WO1:Hello there, this is a long message just  | WO2:to test that we can send them
         String output = msg.getOutput();
 
 
         // test the reconstruction of messages
         BluetoothMessage msg2 = new BluetoothMessage();
+        // Add parcel 1 first (out of order)
         msg2.addMessageParcel(msg.getMessageParcels()[1]);
 
-        // get the missing results
+        // get the missing results - should request header (parcel 0)
         String missingParcel = msg2.getFirstMissingParcel();
         String expectedId = msg.getId() + "0";
         assertEquals(expectedId, missingParcel);
+
+        // Now add header
         msg2.addMessageParcel(msg.getMessageParcels()[0]);
 
+        // Message should not be completed yet (missing parcel 2)
         assertFalse(msg2.isMessageCompleted());
 
-        // get the missing results
+        // get the missing results - should request parcel 2
         missingParcel = msg2.getFirstMissingParcel();
         expectedId = msg.getId() + "2";
         assertEquals(expectedId, missingParcel);
 
+        // Add the last parcel
         msg2.addMessageParcel(msg.getMessageParcels()[2]);
-        msg2.addMessageParcel(msg.getMessageParcels()[4]);
 
-        // get the missing results
-        missingParcel = msg2.getFirstMissingParcel();
-        expectedId = msg.getId() + "3";
-        assertEquals(expectedId, missingParcel);
-
-        msg2.addMessageParcel(msg.getMessageParcels()[3]);
-
+        // Now message should be complete
         assertTrue(msg2.isMessageCompleted());
 
         System.gc();

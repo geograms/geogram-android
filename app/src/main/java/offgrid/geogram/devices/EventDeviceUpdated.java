@@ -27,8 +27,13 @@ public class EventDeviceUpdated extends EventAction {
 
     @Override
     public void action(Object... data) {
-        Device device = (Device) data[0];
-        Log.d("DEVICE_UPDATED", "Device updated: " + device.ID);
+        // Handle both specific device updates and general "reload all" signals
+        if (data == null || data.length == 0) {
+            Log.d("DEVICE_UPDATED", "Reload all devices signal received");
+        } else {
+            Device device = (Device) data[0];
+            Log.d("DEVICE_UPDATED", "Device updated: " + device.ID);
+        }
         // start updating the UI when possible
         if (MainActivity.getInstance() == null) {
             Log.e("DEVICE_UPDATED", "MainActivity is null");

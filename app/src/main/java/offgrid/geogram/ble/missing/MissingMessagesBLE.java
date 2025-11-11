@@ -1,5 +1,6 @@
 package offgrid.geogram.ble.missing;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import offgrid.geogram.ble.BluetoothMessage;
@@ -50,20 +51,30 @@ public class MissingMessagesBLE {
         long timePeriod = 60 * 60 * 1000;
         long timeNow = System.currentTimeMillis();
 
-        // a clean up needs to be performed
+        // a clean up needs to be performed - remove expired messages
+        // Use ArrayList to avoid ConcurrentModificationException
+        ArrayList<String> toRemove = new ArrayList<>();
         for(String id : messagesArchived.keySet()){
-            if(messagesArchived.containsKey(id) == false){
+            ArchivedMessageBLE archived = messagesArchived.get(id);
+            if(archived == null){
                 continue;
             }
-            long timeFirstReceived = messagesArchived.get(id).timeFirstReceived;
+            long timeFirstReceived = archived.timeFirstReceived;
             long timeToExpire = timeNow - timeFirstReceived;
             if(timeToExpire > timePeriod){
-                messagesArchived.remove(id);
+                toRemove.add(id);
             }
         }
 
-        // in case we are being spammed, just delete all messages as emergency measure
-        messagesArchived.clear();
+        for(String id : toRemove){
+            messagesArchived.remove(id);
+        }
+
+        // in case we are being spammed and cleanup didn't help, delete all as emergency measure
+        if(messagesArchived.size() >= maxMessagesArchived){
+            Log.i(TAG, "Emergency cleanup: clearing all archived messages due to spam");
+            messagesArchived.clear();
+        }
     }
 
     /**
@@ -104,6 +115,12 @@ public class MissingMessagesBLE {
             return;
         }
         String[] parcelData = messageArchived.message.getMessageParcels();
+
+        // Check bounds before accessing array
+        if(parcelNumber < 0 || parcelNumber >= parcelData.length){
+            Log.i(TAG, "Parcel number " + parcelNumber + " out of bounds (0-" + (parcelData.length - 1) + ")");
+            return;
+        }
 
         String parcelText = parcelData[parcelNumber];
         if(parcelText == null){

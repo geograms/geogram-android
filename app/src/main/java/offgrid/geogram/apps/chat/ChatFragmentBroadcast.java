@@ -81,6 +81,28 @@ public class ChatFragmentBroadcast extends Fragment {
         }
     }
 
+    /**
+     * Refreshes the entire message list from the database.
+     * This method is safe to call from any thread - it will automatically
+     * switch to the UI thread if needed.
+     * Used by event handlers to trigger UI updates without direct addMessage() calls.
+     */
+    public void refreshMessagesFromDatabase(){
+        if(!canAddMessages()){
+            return;
+        }
+
+        // Ensure we're on the UI thread
+        if(getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                if(canAddMessages()){
+                    eraseMessagesFromWindow();
+                    updateMessages();
+                }
+            });
+        }
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -268,7 +290,8 @@ public class ChatFragmentBroadcast extends Fragment {
 
                 requireActivity().runOnUiThread(() -> {
                     // Refresh UI to show sent messages
-                    if (anySent && canAddMessages()) {
+                    // Only refresh for internet messages - BLE messages are refreshed by event handlers
+                    if (finalSentInternet && canAddMessages()) {
                         eraseMessagesFromWindow();
                         updateMessages();
                     }
@@ -493,16 +516,23 @@ public class ChatFragmentBroadcast extends Fragment {
     /**
      * Get the origin label for a message
      * @param message The message
-     * @return "(internet)" or "(bluetooth)" based on message type
+     * @return "(internet)", "(bluetooth)", or "(bluetooth + internet)" based on message channels
      */
     private String getMessageOriginLabel(ChatMessage message) {
-        ChatMessageType type = message.getMessageType();
+        boolean hasLocal = message.hasChannel(ChatMessageType.LOCAL);
+        boolean hasInternet = message.hasChannel(ChatMessageType.INTERNET);
 
-        // Treat untagged messages as LOCAL (legacy Bluetooth messages)
-        if (type != ChatMessageType.LOCAL && type != ChatMessageType.INTERNET) {
-            type = ChatMessageType.LOCAL;
+        // Handle multi-channel messages
+        if (hasLocal && hasInternet) {
+            return "(bluetooth + internet)";
+        } else if (hasInternet) {
+            return "(internet)";
+        } else if (hasLocal) {
+            return "(bluetooth)";
         }
 
+        // Fallback to old behavior for legacy messages
+        ChatMessageType type = message.getMessageType();
         if (type == ChatMessageType.INTERNET) {
             return "(internet)";
         } else {

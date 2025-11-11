@@ -17,6 +17,7 @@ import offgrid.geogram.devices.DeviceManager;
 import offgrid.geogram.devices.DeviceType;
 import offgrid.geogram.devices.EventConnected;
 import offgrid.geogram.events.EventAction;
+import offgrid.geogram.relay.RelayMessageSync;
 import offgrid.geogram.util.GeoCode4;
 
 public class EventBleMessageReceived extends EventAction {
@@ -90,7 +91,26 @@ public class EventBleMessageReceived extends EventAction {
 
         // is this a broadcast message?
         if(msg.getIdDestination().equalsIgnoreCase("ANY")){
-            handleBroadcastMessage(msg);
+            // Check if this is a relay command (INV:, REQ:, MSG:)
+            String content = msg.getMessage();
+            if (content != null && (content.startsWith("INV:") || content.startsWith("REQ:") || content.startsWith("MSG:"))) {
+                // This is a relay message, forward to RelayMessageSync
+                try {
+                    if (Central.getInstance() != null && Central.getInstance().broadcastChatFragment != null) {
+                        RelayMessageSync relaySync = RelayMessageSync.getInstance(Central.getInstance().broadcastChatFragment.getContext());
+                        relaySync.handleIncomingMessage(msg);
+                        Log.i(TAG, "Forwarded relay command to RelayMessageSync: " + content.substring(0, Math.min(20, content.length())));
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to process relay message: " + e.getMessage());
+                }
+                // Don't process relay messages as regular chat messages
+                Log.i(TAG, "-->> Message completed: " + msg.getOutput());
+                return;
+            } else {
+                // Regular broadcast message
+                handleBroadcastMessage(msg);
+            }
         }
 
         Log.i(TAG, "-->> Message completed: " + msg.getOutput());
@@ -159,6 +179,43 @@ public class EventBleMessageReceived extends EventAction {
     }
 
     private void handleBroadcastMessage(BluetoothMessage msg) {
+        String content = msg.getMessage();
+
+        // Filter out system/relay commands - don't save to database or show in UI
+        if (content != null && (
+            content.startsWith("INV:") ||
+            content.startsWith("REQ:") ||
+            content.startsWith("MSG:") ||
+            content.startsWith("/repeat") ||
+            content.startsWith("/"))) {
+            Log.d(TAG, "Filtered system command from geochat: " + content.substring(0, Math.min(20, content.length())));
+            return;
+        }
+
+        // Skip own messages - they were already added by EventBleBroadcastMessageSent
+        String senderCallsign = msg.getIdFromSender();
+        Log.d(TAG, "Checking broadcast message sender: '" + senderCallsign + "'");
+
+        try {
+            offgrid.geogram.settings.SettingsUser settings = Central.getInstance().getSettings();
+            if (settings != null) {
+                String localCallsign = settings.getCallsign();
+
+                if (localCallsign != null && senderCallsign != null) {
+                    // Use case-insensitive comparison and trim whitespace
+                    if (localCallsign.trim().equalsIgnoreCase(senderCallsign.trim())) {
+                        Log.d(TAG, "Skipping own broadcast message (local: '" + localCallsign + "' == sender: '" + senderCallsign + "')");
+                        return;
+                    } else {
+                        Log.d(TAG, "Not own message (local: '" + localCallsign + "' != sender: '" + senderCallsign + "')");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking message sender: " + e.getMessage(), e);
+            // Continue processing - better to risk a duplicate than lose messages
+        }
+
         // this is a generic message, convert to a standard format
         ChatMessage chatMessage = ChatMessage.convert(msg);
 
@@ -168,29 +225,45 @@ public class EventBleMessageReceived extends EventAction {
         // add to our database of broadcast messages
         DatabaseMessages.getInstance().add(chatMessage);
 
-        // place it on the chat (when possible)
-        Central.getInstance().broadcastChatFragment.addMessage(chatMessage);
+        // Trigger UI refresh from database to prevent duplicates
+        Central.getInstance().broadcastChatFragment.refreshMessagesFromDatabase();
     }
 
     private void handleLocationMessage(BluetoothMessage msg) {
         Log.i(TAG, "Location message received");
-        // example of messages: +053156@RY19-IUZS or +X1A2B3 (ping from T-Dongle)
+        // example of messages: +053156@RY19-IUZS#Android Phone or +X1A2B3#T-Dongle ESP32
         String text = msg.getMessage();
+
+        // Extract device model if present (format: ...#MODEL)
+        String deviceModel = null;
+        if(text.contains("#")){
+            int hashIndex = text.indexOf("#");
+            deviceModel = text.substring(hashIndex + 1);
+            text = text.substring(0, hashIndex); // Remove model from text for further parsing
+        }
 
         // Check if this is a simple ping message (no coordinates)
         if(text.contains("@") == false){
-            // This is a simple ping from T-Dongle: +CALLSIGN
+            // This is a simple ping: +CALLSIGN or +CALLSIGN#MODEL
             String callsign = text.substring(1); // Remove the '+' prefix
 
             if(callsign.isEmpty()){
                 return;
             }
 
-            Log.i(TAG, "Ping received from: " + callsign);
+            Log.i(TAG, "Ping received from: " + callsign + (deviceModel != null ? " (" + deviceModel + ")" : ""));
+
+            // Determine device type based on device model
+            // Android phones (APP) are potential relays, so classify as INTERNET_IGATE
+            DeviceType deviceType = DeviceType.HT_PORTABLE;  // Default
+            if (deviceModel != null && deviceModel.startsWith("APP-")) {
+                deviceType = DeviceType.INTERNET_IGATE;  // Android phones with relay capability
+                Log.i(TAG, "Detected Android device with relay capability");
+            }
 
             // Add device without geocode (null geocode indicates BLE ping only)
             EventConnected event = new EventConnected(ConnectionType.BLE, null);
-            DeviceManager.getInstance().addNewLocationEvent(callsign, DeviceType.HT_PORTABLE, event);
+            DeviceManager.getInstance().addNewLocationEvent(callsign, deviceType, event, deviceModel);
             return;
         }
 
@@ -202,9 +275,17 @@ public class EventBleMessageReceived extends EventAction {
             return;
         }
 
+        // Determine device type based on device model
+        // Android phones (APP) are potential relays, so classify as INTERNET_IGATE
+        DeviceType deviceType = DeviceType.HT_PORTABLE;  // Default
+        if (deviceModel != null && deviceModel.startsWith("APP-")) {
+            deviceType = DeviceType.INTERNET_IGATE;  // Android phones with relay capability
+            Log.i(TAG, "Detected Android device with relay capability");
+        }
+
         // notify other parts of the code that a new location was received
         EventConnected event = new EventConnected(ConnectionType.BLE, geocodeExtracted);
-        DeviceManager.getInstance().addNewLocationEvent(authorId, DeviceType.HT_PORTABLE, event);
+        DeviceManager.getInstance().addNewLocationEvent(authorId, deviceType, event, deviceModel);
 
     }
 

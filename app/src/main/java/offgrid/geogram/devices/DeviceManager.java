@@ -1,5 +1,6 @@
 package offgrid.geogram.devices;
 
+import android.content.Context;
 import android.util.Log;
 
 import java.util.List;
@@ -10,6 +11,7 @@ import offgrid.geogram.database.DatabaseDevices;
 import offgrid.geogram.database.DatabaseLocations;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
+import offgrid.geogram.relay.RelayMessageSync;
 
 /**
  * Singleton managing devices found nearby (physically or remotely).
@@ -23,9 +25,17 @@ public class DeviceManager {
 
     private final TreeSet<Device> devicesSpotted = new TreeSet<>();
     private boolean isLoadedFromDatabase = false;
+    private Context context;
 
     /** Private constructor prevents instantiation outside this class. */
     private DeviceManager() { }
+
+    /** Initialize with context (call once from Application or MainActivity). */
+    public void initialize(Context context) {
+        if (this.context == null) {
+            this.context = context.getApplicationContext();
+        }
+    }
 
     /** Access the single shared instance. */
     public static DeviceManager getInstance() {
@@ -48,7 +58,24 @@ public class DeviceManager {
                 Log.d(TAG, "Loading " + deviceRows.size() + " devices from database");
 
                 for (DatabaseDevices.DeviceRow row : deviceRows) {
-                    Device device = new Device(row.callsign, DeviceType.valueOf(row.deviceType));
+                    DeviceType deviceType = DeviceType.valueOf(row.deviceType);
+
+                    // Check if device already exists (avoid duplicates)
+                    Device device = null;
+                    synchronized (devicesSpotted) {
+                        for (Device d : devicesSpotted) {
+                            if (d.ID.equalsIgnoreCase(row.callsign) && d.deviceType == deviceType) {
+                                device = d;
+                                break;
+                            }
+                        }
+
+                        // Create new device if not found
+                        if (device == null) {
+                            device = new Device(row.callsign, deviceType);
+                            devicesSpotted.add(device);
+                        }
+                    }
 
                     // Reconstruct event history from ping records
                     List<DatabaseDevices.DevicePingRow> pings = DatabaseDevices.get().getPingsForDevice(row.callsign, 1000);
@@ -59,17 +86,14 @@ public class DeviceManager {
                         event.timestamps.add(ping.timestamp);
                         device.connectedEvents.add(event);
                     }
-
-                    synchronized (devicesSpotted) {
-                        devicesSpotted.add(device);
-                    }
                 }
 
                 isLoadedFromDatabase = true;
                 Log.d(TAG, "Loaded " + devicesSpotted.size() + " devices from database");
 
-                // Notify UI to update
-                EventControl.startEvent(EventType.DEVICE_UPDATED, null);
+                // Notify UI to update - pass empty object array instead of null
+                // This is a general "reload all devices" signal, not for a specific device
+                EventControl.startEvent(EventType.DEVICE_UPDATED, new Object[0]);
 
             } catch (Exception e) {
                 Log.e(TAG, "Error loading devices from database", e);
@@ -98,8 +122,14 @@ public class DeviceManager {
     }
 
     public synchronized void addNewLocationEvent(String callsign, DeviceType deviceType, EventConnected event){
+        addNewLocationEvent(callsign, deviceType, event, null);
+    }
+
+    public synchronized void addNewLocationEvent(String callsign, DeviceType deviceType, EventConnected event, String deviceModel){
         Device deviceFound = null;
         for(Device device : devicesSpotted){
+            // Match by callsign only - allow device type to be updated if capability changes
+            // (e.g., HT_PORTABLE -> INTERNET_IGATE when relay capability detected)
             if(device.ID.equalsIgnoreCase(callsign)){
                 deviceFound = device;
                 break;
@@ -109,9 +139,22 @@ public class DeviceManager {
         if(deviceFound == null){
             deviceFound = new Device(callsign, deviceType);
             devicesSpotted.add(deviceFound);
+        } else {
+            // CRITICAL FIX: Remove device from TreeSet before updating
+            // TreeSets don't automatically re-sort when element's comparison value changes
+            devicesSpotted.remove(deviceFound);
         }
+
+        // Update device model if provided (e.g., "APP-0.4.0")
+        if(deviceModel != null && !deviceModel.isEmpty()){
+            deviceFound.setDeviceModelFromString(deviceModel);
+        }
+
         // add the event
         deviceFound.addEvent(event);
+
+        // Re-add to TreeSet to trigger re-sorting by updated timestamp
+        devicesSpotted.add(deviceFound);
 
         // Save to databases
         // 1. Add location event to DatabaseLocations only if geocode is present
@@ -155,6 +198,17 @@ public class DeviceManager {
 
         // a new event happened with the device
         EventControl.startEvent(EventType.DEVICE_UPDATED, deviceFound);
+
+        // Trigger relay sync if this is an Internet Relay device
+        if (context != null && deviceType == DeviceType.INTERNET_IGATE) {
+            try {
+                RelayMessageSync relaySync = RelayMessageSync.getInstance(context);
+                relaySync.startSync(callsign);
+                Log.d(TAG, "Triggered relay sync with " + callsign);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to start relay sync: " + e.getMessage());
+            }
+        }
 
     }
 

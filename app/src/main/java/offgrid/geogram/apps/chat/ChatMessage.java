@@ -1,7 +1,9 @@
 package offgrid.geogram.apps.chat;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 import offgrid.geogram.ble.BluetoothMessage;
 // Removed (legacy Google Play Services code) - import offgrid.geogram.old.bluetooth_old.broadcast.BroadcastMessage;
@@ -17,6 +19,8 @@ public class ChatMessage implements Comparable<ChatMessage> {
 
     // define the message type, by default is only data
     public ChatMessageType messageType = ChatMessageType.DATA;
+    // Track multiple channels this message was sent/received through
+    public Set<ChatMessageType> channels = new HashSet<>();
     // SHA1 list of attachments
     public ArrayList<String> attachments = new ArrayList<>();
 
@@ -128,6 +132,31 @@ public class ChatMessage implements Comparable<ChatMessage> {
 
     public void setMessageType(ChatMessageType messageType) {
         this.messageType = messageType;
+        // Also add to channels set
+        if (messageType != null && messageType != ChatMessageType.DATA) {
+            channels.add(messageType);
+        }
+    }
+
+    /**
+     * Add a channel to this message's delivery channels
+     * @param channel The channel type (LOCAL or INTERNET)
+     */
+    public void addChannel(ChatMessageType channel) {
+        if (channel != null && channel != ChatMessageType.DATA) {
+            channels.add(channel);
+            // Update primary messageType if not set
+            if (messageType == ChatMessageType.DATA) {
+                messageType = channel;
+            }
+        }
+    }
+
+    /**
+     * Check if this message was sent/received via a specific channel
+     */
+    public boolean hasChannel(ChatMessageType channel) {
+        return channels.contains(channel);
     }
 
     @Override

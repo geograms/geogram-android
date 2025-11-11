@@ -230,19 +230,50 @@ public final class DatabaseMessages {
 
     /** Add a single message; returns true if added (i.e., not a duplicate). */
     public boolean add(@NonNull ChatMessage msg) {
-        Log.d(TAG, "add: " + msg);
         Objects.requireNonNull(msg, "msg");
         synchronized (lock) {
             ensureInitialized();
             String key = keyOf(msg);
-            if (!dedupe.add(key)) {
+            boolean wasAdded = dedupe.add(key);
+
+            if (!wasAdded) {
+                // Message already exists - check if we need to add a new channel
+                ChatMessage existing = findMessageByKey(key);
+                if (existing != null && msg.messageType != null && msg.messageType != ChatMessageType.DATA) {
+                    if (!existing.hasChannel(msg.messageType)) {
+                        existing.addChannel(msg.messageType);
+                        Log.d(TAG, "CHANNEL ADDED - Key: '" + key + "', Added channel: " + msg.messageType +
+                              ", Total channels: " + existing.channels.size());
+                        pending.addLast(existing); // queue for disk update
+                        return true; // Channel was added
+                    }
+                }
+
+                Log.d(TAG, "DUPLICATE BLOCKED - Key: '" + key + "', Message: '" +
+                      (msg.message != null && msg.message.length() > 20 ? msg.message.substring(0, 20) + "..." : msg.message) +
+                      "' from '" + msg.authorId + "'");
                 return false; // duplicate
             }
+
+            Log.d(TAG, "ADDED - Key: '" + key + "', Message: '" +
+                  (msg.message != null && msg.message.length() > 20 ? msg.message.substring(0, 20) + "..." : msg.message) +
+                  "' from '" + msg.authorId + "', Channel: " + msg.messageType);
+
             messages.add(msg);
             trimToCapacityLocked();
             pending.addLast(msg); // queue for disk write
             return true;
         }
+    }
+
+    /** Find an existing message by its dedupe key */
+    private ChatMessage findMessageByKey(String key) {
+        for (ChatMessage m : messages) {
+            if (key.equals(keyOf(m))) {
+                return m;
+            }
+        }
+        return null;
     }
 
     /** Add a batch of messages; returns number actually added (non-duplicates). */
@@ -437,6 +468,15 @@ public final class DatabaseMessages {
             o.put("isWrittenByMe", m.isWrittenByMe);
             o.put("messageType", m.messageType != null ? m.messageType.name() : ChatMessageType.DATA.name());
 
+            // Serialize channels
+            JSONArray channelsArray = new JSONArray();
+            if (m.channels != null) {
+                for (ChatMessageType channel : m.channels) {
+                    channelsArray.put(channel.name());
+                }
+            }
+            o.put("channels", channelsArray);
+
             JSONArray atts = new JSONArray();
             if (m.attachments != null) {
                 for (String s : m.attachments) atts.put(s);
@@ -462,6 +502,24 @@ public final class DatabaseMessages {
             String type = o.optString("messageType", ChatMessageType.DATA.name());
             try { m.messageType = ChatMessageType.valueOf(type); }
             catch (Exception ignored) { m.messageType = ChatMessageType.DATA; }
+
+            // Deserialize channels
+            JSONArray channelsArray = o.optJSONArray("channels");
+            if (channelsArray != null) {
+                for (int i = 0; i < channelsArray.length(); i++) {
+                    String channelName = channelsArray.optString(i, null);
+                    if (channelName != null) {
+                        try {
+                            m.channels.add(ChatMessageType.valueOf(channelName));
+                        } catch (Exception ignored) { }
+                    }
+                }
+            } else {
+                // Backward compatibility: if no channels array, use messageType
+                if (m.messageType != null && m.messageType != ChatMessageType.DATA) {
+                    m.channels.add(m.messageType);
+                }
+            }
 
             JSONArray atts = o.optJSONArray("attachments");
             if (atts != null) {

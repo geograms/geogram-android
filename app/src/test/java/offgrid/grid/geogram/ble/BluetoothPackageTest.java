@@ -21,7 +21,8 @@ public class BluetoothPackageTest {
         String messageLong = "An example of a long message to break into multiple parcels.";
 
         BluetoothMessage msgLong = new BluetoothMessage("CR7BBQ", "ANY", messageLong, false);
-        assertEquals(5, msgLong.getMessageParcels().length);
+        // With maxSizeOfMessages=40: 61 chars -> ceil(61/40)=2 data parcels + 1 header = 3 total
+        assertEquals(3, msgLong.getMessageParcels().length);
 
         BluetoothMessage msgShort = new BluetoothMessage("CR7BBQ", "ANY", messageShort, true);
         assertEquals(1, msgShort.getMessageParcels().length);

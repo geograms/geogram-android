@@ -236,37 +236,49 @@ public class BluetoothMessage {
 
         // check if we have all the parcels
         if(messageBox.size() == 1){
-            // too empty, we need at least two of them
+            // too empty, we need at least two of them (header + at least one data parcel)
             return;
         }
 
         // are we ready to compute the checksum?
         if(checksum == null){
-            // not yet
+            // not yet, we need the header first
             return;
         }
 
-        String result = "";
+        // Optimization: Check if there are any missing parcels before attempting reconstruction
+        // This avoids reconstructing incomplete messages on every parcel arrival
+        ArrayList<String> missing = getMissingParcels();
+        if(!missing.isEmpty()){
+            // Still waiting for parcels, don't attempt reconstruction
+            return;
+        }
 
+        // All parcels received, now reconstruct the message
+        StringBuilder result = new StringBuilder();
         String[] lines = this.getMessageParcels();
 
         for(int i = 1; i < lines.length; i++){
             String line = lines[i];
             int anchor = line.indexOf(":");
+            if(anchor == -1){
+                // Malformed parcel, skip
+                continue;
+            }
             String text = line.substring(anchor + 1);
-            result += text;
+            result.append(text);
         }
 
-
-
         // compute the checksum
-        String currentChecksum = calculateChecksum(result);
+        String messageText = result.toString();
+        String currentChecksum = calculateChecksum(messageText);
         // needs to match
         if(currentChecksum.equals(this.checksum) == false){
+            Log.i(TAG, "Checksum mismatch: expected " + this.checksum + ", got " + currentChecksum);
             return;
         }
         // this message is concluded
-        this.message = result;
+        this.message = messageText;
         this.messageCompleted = true;
     }
 
@@ -317,16 +329,26 @@ public class BluetoothMessage {
             return id + "1";
         }
 
-        // it is a long message, so let's try to see which ones are missing
-        for(int i = 0; i < messageBox.size(); i++){
+        // Find the highest index we've seen
+        int maxSeen = -1;
+        for (String key : messageBox.keySet()) {
+            if (key.length() < 3) continue;
+            try {
+                int idx = Integer.parseInt(key.substring(2));
+                if (idx > maxSeen) maxSeen = idx;
+            } catch (NumberFormatException ignore) { }
+        }
+
+        // Check all indices from 0 to maxSeen for gaps
+        for(int i = 0; i <= maxSeen; i++){
             String key = id + i;
             if(messageBox.containsKey(key) == false){
                 return key;
             }
         }
 
-        // not the case, so we ask for a future value
-        return id + messageBox.size();
+        // No gaps found, ask for the next parcel after maxSeen
+        return id + (maxSeen + 1);
     }
 
     /** List all missing parcel IDs up to the highest index we've seen (past gaps only). */

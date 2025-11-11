@@ -135,10 +135,6 @@ public class BluetoothSender {
         if (isRunning && !isPaused) {
             tryToSendNext();
         }
-        // need to repeat for sending the last parcel
-        if (isRunning && !isPaused) {
-            tryToSendNext();
-        }
     }
 
     private void tryToSendNext() {
