@@ -134,19 +134,20 @@ public class RelayMessage {
             Log.d(TAG, "parseMarkdown: First line length: " + lines[0].length());
 
             // Parse header (> YYYY-MM-DD HH:MM_SS -- SENDER-CALLSIGN)
-            Pattern headerPattern = Pattern.compile("^>\\s+(\\d{4}-\\d{2}-\\d{2})\\s+(\\d{2}):(\\d{2})_(\\d{2})\\s+--\\s+(.+)$");
+            // Accept both HH:MM_SS and HH_MM_SS formats for robustness
+            Pattern headerPattern = Pattern.compile("^>\\s+(\\d{4}-\\d{2}-\\d{2})\\s+(\\d{2})[_:](\\d{2})[_:](\\d{2})\\s+--\\s+(.+)$");
             Matcher headerMatcher = headerPattern.matcher(lines[0].trim());
 
             if (!headerMatcher.matches()) {
                 if (debugFile != null) {
                     writeDebugLog(debugFile, "ERROR: Invalid message header: " + lines[0]);
-                    writeDebugLog(debugFile, "ERROR: Expected format: > YYYY-MM-DD HH:MM_SS -- CALLSIGN");
-                    writeDebugLog(debugFile, "ERROR: Pattern: ^>\\s+(\\d{4}-\\d{2}-\\d{2})\\s+(\\d{2}):(\\d{2})_(\\d{2})\\s+--\\s+(.+)$");
+                    writeDebugLog(debugFile, "ERROR: Expected format: > YYYY-MM-DD HH:MM_SS -- CALLSIGN (or HH_MM_SS)");
+                    writeDebugLog(debugFile, "ERROR: Pattern: ^>\\s+(\\d{4}-\\d{2}-\\d{2})\\s+(\\d{2})[_:](\\d{2})[_:](\\d{2})\\s+--\\s+(.+)$");
                 }
 
                 Log.e(TAG, "Invalid message header: " + lines[0]);
-                Log.e(TAG, "Expected format: > YYYY-MM-DD HH:MM_SS -- CALLSIGN");
-                Log.e(TAG, "Pattern: ^>\\s+(\\d{4}-\\d{2}-\\d{2})\\s+(\\d{2}):(\\d{2})_(\\d{2})\\s+--\\s+(.+)$");
+                Log.e(TAG, "Expected format: > YYYY-MM-DD HH:MM_SS -- CALLSIGN (or HH_MM_SS)");
+                Log.e(TAG, "Pattern: ^>\\s+(\\d{4}-\\d{2}-\\d{2})\\s+(\\d{2})[_:](\\d{2})[_:](\\d{2})\\s+--\\s+(.+)$");
                 return null;
             }
 

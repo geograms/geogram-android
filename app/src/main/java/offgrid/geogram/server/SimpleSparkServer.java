@@ -31,8 +31,8 @@ public class SimpleSparkServer implements Runnable {
 
     private static final String TAG_ID = "offgrid-server";
     private static final int SERVER_PORT = 45678;
-    private static final String BUILD_TIMESTAMP = "2025-01-12T05:00:00Z"; // Updated on each build
-    private static final String API_VERSION = "0.5.6"; // Increment on API changes
+    private static final String BUILD_TIMESTAMP = "2025-01-12T06:00:00Z"; // Updated on each build
+    private static final String API_VERSION = "0.5.7"; // Increment on API changes
     private static final Gson gson = new Gson();
     private volatile boolean isRunning = false;
     private android.content.Context context;

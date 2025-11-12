@@ -114,15 +114,30 @@ public class RelayMessageSync {
         Log.i(TAG, "Sending inventory to " + remoteDeviceId);
         Log.i(TAG, "Outbox contains " + outboxIds.size() + " messages");
 
-        if (outboxIds.isEmpty()) {
-            Log.d(TAG, "No messages in outbox - sending empty inventory");
+        // Filter out messages that can't be parsed - prevents sync from getting stuck
+        List<String> validIds = new ArrayList<>();
+        for (String messageId : outboxIds) {
+            RelayMessage msg = storage.getMessage(messageId, "outbox");
+            if (msg != null) {
+                validIds.add(messageId);
+            } else {
+                Log.w(TAG, "⚠ Skipping unparsable message from inventory: " + messageId);
+            }
+        }
+
+        if (validIds.size() < outboxIds.size()) {
+            Log.w(TAG, "Filtered out " + (outboxIds.size() - validIds.size()) + " unparsable messages from inventory");
+        }
+
+        if (validIds.isEmpty()) {
+            Log.d(TAG, "No valid messages in outbox - sending empty inventory");
             sendBluetoothMessage(remoteDeviceId, CMD_INVENTORY);
             return;
         }
 
         // Limit inventory size
-        int count = Math.min(outboxIds.size(), MAX_INVENTORY_SIZE);
-        List<String> inventoryIds = outboxIds.subList(0, count);
+        int count = Math.min(validIds.size(), MAX_INVENTORY_SIZE);
+        List<String> inventoryIds = validIds.subList(0, count);
 
         // Build inventory message
         StringBuilder inv = new StringBuilder(CMD_INVENTORY);
@@ -135,7 +150,7 @@ public class RelayMessageSync {
 
         // Send via BLE
         sendBluetoothMessage(remoteDeviceId, inv.toString());
-        Log.i(TAG, "✓ Sent inventory with " + inventoryIds.size() + " messages");
+        Log.i(TAG, "✓ Sent inventory with " + inventoryIds.size() + " valid messages");
     }
 
     /**
