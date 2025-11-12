@@ -2,6 +2,7 @@ package offgrid.geogram.ble.events;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.TreeSet;
 
 import offgrid.geogram.apps.chat.ChatMessage;
 import offgrid.geogram.ble.BluetoothMessage;
@@ -154,6 +155,8 @@ public class EventBleMessageReceived extends EventAction {
     private void handleSingleMessage(BluetoothMessage msg) {
         String text = msg.getMessage();
 
+        android.util.Log.d("ReadReceipts", "handleSingleMessage: " + text.substring(0, Math.min(30, text.length())));
+
         // + is for location messages
         if(text.startsWith("+")){
             handleLocationMessage(msg);
@@ -162,6 +165,7 @@ public class EventBleMessageReceived extends EventAction {
 
         // handle commands that start with /
         if(text.startsWith("/")){
+            android.util.Log.d("ReadReceipts", "Command detected: " + text.substring(0, Math.min(30, text.length())));
             // handle commands
             handleCommand(msg);
             return;
@@ -170,11 +174,24 @@ public class EventBleMessageReceived extends EventAction {
 
     private void handleCommand(BluetoothMessage msg) {
         String text = msg.getMessage();
+        android.util.Log.d("ReadReceipts", "handleCommand - isValidRequest: " + ValidCommands.isValidRequest(text) + " for: " + text.substring(0, Math.min(30, text.length())));
+
         if(ValidCommands.isValidRequest(text) == false){
+            android.util.Log.w("ReadReceipts", "Command NOT valid request: " + text);
             return;
         }
         if(text.startsWith(ValidCommands.PARCEL_REPEAT)){
             handleParcelRepeat(text);
+            return;
+        }
+        if(text.startsWith(ValidCommands.READ_RECEIPT)){
+            android.util.Log.i("ReadReceipts", "Calling handleReadReceipt for: " + text);
+            handleReadReceipt(text, msg.getIdFromSender());
+            return;
+        }
+        if(text.startsWith(ValidCommands.READ_RECEIPT_COMPACT)){
+            android.util.Log.i("ReadReceipts", "Calling handleReadReceipt for compact format: " + text);
+            handleReadReceipt(text, msg.getIdFromSender());
             return;
         }
         Log.i(TAG, "Command received but not understood: " + text);
@@ -190,6 +207,82 @@ public class EventBleMessageReceived extends EventAction {
         String messageId = data.substring(0,2);
         String parcelNumber = data.substring(2);
         MissingMessagesBLE.addToQueue(ConnectionType.BLE, messageId, parcelNumber);
+    }
+
+    /**
+     * Handle a read receipt notification from another device
+     * @param text /read 1234567890 AUTHOR_ID OR /R 949441328 AUTHOR_ID (compact format)
+     * @param readerCallsign The callsign of the device that read the message
+     */
+    private void handleReadReceipt(String text, String readerCallsign) {
+        try {
+            // Parse: /read TIMESTAMP AUTHOR_ID or /R COMPACT_TIMESTAMP AUTHOR_ID
+            boolean isCompact = text.startsWith("/R ");
+            String commandPrefix = isCompact ? "/R" : ValidCommands.READ_RECEIPT;
+            String data = text.substring(commandPrefix.length()).trim();
+            String[] parts = data.split(" ", 2);
+            if (parts.length != 2) {
+                Log.w(TAG, "Invalid read receipt format: " + text);
+                return;
+            }
+
+            String timestampPart = parts[0];
+            String authorId = parts[1];
+
+            // For compact format, we need to match against the last N digits
+            boolean usePartialMatch = isCompact || timestampPart.length() < 13;
+
+            // Find the message in database by timestamp and author
+            TreeSet<ChatMessage> messages = DatabaseMessages.getInstance().getMessages();
+            ChatMessage targetMessage = null;
+
+            for (ChatMessage msg : messages) {
+                if (!authorId.equals(msg.authorId)) {
+                    continue; // Author must match exactly
+                }
+
+                if (usePartialMatch) {
+                    // Compact format: match last N digits of timestamp
+                    String msgTimestampStr = String.valueOf(msg.timestamp);
+                    String msgCompactTimestamp = msgTimestampStr.length() > timestampPart.length() ?
+                            msgTimestampStr.substring(msgTimestampStr.length() - timestampPart.length()) : msgTimestampStr;
+                    if (msgCompactTimestamp.equals(timestampPart)) {
+                        targetMessage = msg;
+                        Log.d(TAG, "Matched compact read receipt: " + timestampPart + " -> full timestamp: " + msg.timestamp);
+                        break;
+                    }
+                } else {
+                    // Full format: exact timestamp match
+                    long timestamp = Long.parseLong(timestampPart);
+                    if (msg.timestamp == timestamp) {
+                        targetMessage = msg;
+                        break;
+                    }
+                }
+            }
+
+            if (targetMessage == null) {
+                Log.d(TAG, "Message not found for read receipt: timestamp=" + timestampPart +
+                        " (compact=" + isCompact + ") author=" + authorId);
+                return;
+            }
+
+            // Add the read receipt
+            targetMessage.addReadReceipt(readerCallsign, System.currentTimeMillis());
+            android.util.Log.i("ReadReceipts", "RECEIVED READ receipt from " + readerCallsign +
+                    " for message from " + authorId + " (timestamp=" + targetMessage.timestamp + ")");
+
+            // Save to database
+            DatabaseMessages.getInstance().flushNow();
+
+            // Refresh UI if available
+            if (Central.getInstance() != null && Central.getInstance().broadcastChatFragment != null) {
+                Central.getInstance().broadcastChatFragment.refreshMessagesFromDatabase();
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to handle read receipt: " + e.getMessage(), e);
+        }
     }
 
     private void handleBroadcastMessage(BluetoothMessage msg) {

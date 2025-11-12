@@ -23,6 +23,8 @@ public class ChatMessage implements Comparable<ChatMessage> {
     public Set<ChatMessageType> channels = new HashSet<>();
     // SHA1 list of attachments
     public ArrayList<String> attachments = new ArrayList<>();
+    // Read receipts - who read this message and when
+    public ArrayList<ReadReceipt> readReceipts = new ArrayList<>();
 
     public ChatMessage(String authorId, String message) {
         this.authorId = authorId;
@@ -162,5 +164,43 @@ public class ChatMessage implements Comparable<ChatMessage> {
     @Override
     public int hashCode() {
         return Objects.hash(authorId, message, timestamp);
+    }
+
+    /**
+     * Add a read receipt for this message.
+     * Avoids duplicates from the same callsign.
+     */
+    public void addReadReceipt(String callsign, long timestamp) {
+        // Check if this callsign already has a receipt
+        for (ReadReceipt receipt : readReceipts) {
+            if (callsign.equals(receipt.callsign)) {
+                // Update timestamp if newer
+                if (timestamp > receipt.timestamp) {
+                    receipt.timestamp = timestamp;
+                }
+                return;
+            }
+        }
+        // Add new receipt
+        readReceipts.add(new ReadReceipt(callsign, timestamp));
+    }
+
+    /**
+     * Get the count of unique readers (excluding self)
+     */
+    public int getReadCount() {
+        return readReceipts.size();
+    }
+
+    /**
+     * Check if a specific callsign has read this message
+     */
+    public boolean hasReadReceipt(String callsign) {
+        for (ReadReceipt receipt : readReceipts) {
+            if (callsign.equals(receipt.callsign)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

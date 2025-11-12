@@ -519,6 +519,9 @@ public class ChatFragmentBroadcast extends Fragment {
         // Add the view to the container
         chatMessageContainer.addView(receivedMessageView);
         chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
+
+        // Send READ receipt for messages received via Bluetooth
+        sendReadReceiptIfNeeded(message);
     }
 
     /**
@@ -557,6 +560,35 @@ public class ChatFragmentBroadcast extends Fragment {
             params.setMargins(0, 0, 8, 0);
             bleIndicator.setLayoutParams(params);
             container.addView(bleIndicator);
+
+            // Add read count badge for messages sent by me (only for broadcast messages)
+            android.util.Log.d("ReadReceipts", "Badge check - isWrittenByMe: " + message.isWrittenByMe() +
+                    ", readCount: " + message.getReadCount() +
+                    ", msg: " + message.getMessage().substring(0, Math.min(20, message.getMessage().length())));
+
+            if (message.isWrittenByMe() && message.getReadCount() > 0) {
+                android.util.Log.i("ReadReceipts", "SHOWING READ BADGE - count: " + message.getReadCount());
+
+                TextView readCountBadge = new TextView(getContext());
+                readCountBadge.setText("\uD83D\uDC41 " + message.getReadCount()); // Eye emoji + count
+                readCountBadge.setTextSize(10);
+                readCountBadge.setTextColor(getResources().getColor(android.R.color.white));
+                readCountBadge.setBackgroundColor(0xFF4A90E2); // Blue background to indicate interactivity
+                readCountBadge.setPadding(8, 4, 8, 4);
+                LinearLayout.LayoutParams readCountParams = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+                readCountParams.setMargins(0, 0, 8, 0);
+                readCountBadge.setLayoutParams(readCountParams);
+
+                // Make it clickable to show reader list
+                readCountBadge.setOnClickListener(v -> showReadReceiptDialog(message));
+
+                container.addView(readCountBadge);
+            } else if (message.isWrittenByMe()) {
+                android.util.Log.d("ReadReceipts", "My message but no reads yet");
+            }
         }
 
         // Add Internet indicator
@@ -942,6 +974,89 @@ public class ChatFragmentBroadcast extends Fragment {
                 .replace(R.id.fragment_container, fragment)
                 .addToBackStack(null)
                 .commit();
+    }
+
+    /**
+     * Send a READ receipt for a message if it was received via Bluetooth and is from someone else
+     * @param message The message that was displayed
+     */
+    private void sendReadReceiptIfNeeded(ChatMessage message) {
+        try {
+            // Only send READ receipts for messages received via Bluetooth (LOCAL channel)
+            if (!message.hasChannel(ChatMessageType.LOCAL)) {
+                return;
+            }
+
+            // Don't send READ receipts for our own messages
+            if (message.isWrittenByMe()) {
+                return;
+            }
+
+            // Don't send READ receipts if we don't have a local callsign
+            if (Central.getInstance() == null || Central.getInstance().getSettings() == null) {
+                return;
+            }
+
+            String localCallsign = Central.getInstance().getSettings().getCallsign();
+            if (localCallsign == null || localCallsign.isEmpty()) {
+                return;
+            }
+
+            // DEBUG: Log the message details before sending READ receipt
+            android.util.Log.d("ReadReceipts", "Preparing READ receipt - localCallsign: " + localCallsign +
+                    ", message.authorId: " + message.authorId +
+                    ", message.timestamp: " + message.timestamp +
+                    ", message text: " + message.getMessage().substring(0, Math.min(20, message.getMessage().length())));
+
+            // Send compact READ receipt: /R LAST9DIGITS AUTHOR_ID
+            // Format fits in BLE advertising (20 bytes): /R 949441328 X1ADK0
+            // Last 9 digits covers ~277 hours (11.5 days) of unique timestamps
+            String timestampStr = String.valueOf(message.timestamp);
+            String compactTimestamp = timestampStr.length() > 9 ?
+                    timestampStr.substring(timestampStr.length() - 9) : timestampStr;
+            String readReceipt = "/R " + compactTimestamp + " " + message.authorId;
+            offgrid.geogram.ble.BluetoothSender.getInstance(getContext()).sendMessage(readReceipt);
+
+            android.util.Log.i("ReadReceipts", "SENT compact READ receipt: " + readReceipt +
+                    " (full timestamp: " + message.timestamp + ")");
+
+        } catch (Exception e) {
+            android.util.Log.e("ReadReceipts", "Failed to send READ receipt: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Show a dialog with the list of people who read the message
+     * @param message The message to show read receipts for
+     */
+    private void showReadReceiptDialog(ChatMessage message) {
+        if (getContext() == null) {
+            return;
+        }
+
+        // Sort read receipts by timestamp (oldest first)
+        java.util.List<ReadReceipt> receipts = new java.util.ArrayList<>(message.readReceipts);
+        java.util.Collections.sort(receipts);
+
+        // Build the message list
+        StringBuilder messageBuilder = new StringBuilder();
+        if (receipts.isEmpty()) {
+            messageBuilder.append("No one has read this message yet.");
+        } else {
+            messageBuilder.append("Read by ").append(receipts.size()).append(" people:\n\n");
+            for (ReadReceipt receipt : receipts) {
+                String dateText = offgrid.geogram.util.DateUtils.convertTimestampForChatMessage(receipt.timestamp);
+                messageBuilder.append("\u2022 ").append(receipt.callsign)
+                        .append("\n  ").append(dateText).append("\n\n");
+            }
+        }
+
+        // Show dialog
+        new android.app.AlertDialog.Builder(getContext())
+                .setTitle("Read Receipts")
+                .setMessage(messageBuilder.toString())
+                .setPositiveButton("OK", null)
+                .show();
     }
 
 

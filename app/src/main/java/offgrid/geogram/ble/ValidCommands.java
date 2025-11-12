@@ -10,6 +10,11 @@ public class ValidCommands {
     // syntax: /repeat AV83
     public static final String PARCEL_REPEAT = "/repeat";
 
+    // syntax: /read 1234567890 CALLSIGN (timestamp and author of the message being read)
+    public static final String READ_RECEIPT = "/read";
+    // syntax: /R 949441328 CALLSIGN (compact format - last 9 digits of timestamp + callsign)
+    public static final String READ_RECEIPT_COMPACT = "/R";
+
 
     public static boolean isValidCommand(String command) {
         if(command == null){
@@ -30,6 +35,12 @@ public class ValidCommands {
      */
     public static boolean isValidRequest(String command){
         if(command.startsWith(PARCEL_REPEAT + " ")){
+            return true;
+        }
+        if(command.startsWith(READ_RECEIPT + " ")){
+            return true;
+        }
+        if(command.startsWith(READ_RECEIPT_COMPACT + " ")){
             return true;
         }
         return false;

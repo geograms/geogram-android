@@ -32,6 +32,22 @@ public class EventBleBroadcastMessageSent extends EventAction {
 
         ChatMessage chatMessage = ChatMessage.convert(message);
         chatMessage.setWrittenByMe(true);
+
+        // CRITICAL FIX: Set the authorId to the local device's callsign
+        // When sending a message, message.getIdFromSender() may be null/empty
+        // because the message hasn't been broadcast yet with full sender info
+        try {
+            if (Central.getInstance() != null && Central.getInstance().getSettings() != null) {
+                String localCallsign = Central.getInstance().getSettings().getCallsign();
+                if (localCallsign != null && !localCallsign.isEmpty()) {
+                    chatMessage.setAuthorId(localCallsign);
+                    Log.d(TAG, "Set authorId for sent message: " + localCallsign);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to set authorId for sent message: " + e.getMessage());
+        }
+
         // Tag as local Bluetooth message
         chatMessage.setMessageType(offgrid.geogram.apps.chat.ChatMessageType.LOCAL);
         // add the message to the database
