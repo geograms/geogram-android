@@ -123,6 +123,23 @@ public class MainActivity extends AppCompatActivity {
         } else if (!wasCreatedBefore) {
             initializeApp();
         }
+
+        // Handle intent extras (e.g., from notification tap)
+        handleIntent(getIntent());
+    }
+
+    /**
+     * Handle intent extras, such as opening chat from notification
+     */
+    private void handleIntent(Intent intent) {
+        if (intent != null && intent.getBooleanExtra("open_chat", false)) {
+            // Open chat fragment (clear back stack first)
+            FragmentManager fragmentManager = getSupportFragmentManager();
+            fragmentManager.popBackStack(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+            loadNearbyFragment();
+            // Clear the extra so we don't reopen on next resume
+            intent.removeExtra("open_chat");
+        }
     }
 
     @Override
@@ -239,6 +256,9 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize relay count badge
         updateRelayCount();
+
+        // Initialize chat count badge
+        updateChatCount();
 
         if (wasCreatedBefore) {
             // On subsequent calls, just reload the fragment (database already initialized)
@@ -462,6 +482,39 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             Log.e(TAG, "Error updating relay count: " + e.getMessage());
             relayCountBadge.setText("0");
+        }
+    }
+
+    /**
+     * Update the chat message count badge.
+     * Shows the number of unread messages in geochat.
+     * Call this method when new messages arrive or when user opens chat.
+     */
+    public void updateChatCount() {
+        TextView chatCountBadge = findViewById(R.id.tv_chat_count);
+        if (chatCountBadge == null) return;
+
+        try {
+            // Count unread messages that were NOT written by me
+            int unreadCount = 0;
+            for (offgrid.geogram.apps.chat.ChatMessage message : offgrid.geogram.database.DatabaseMessages.getInstance().getMessages()) {
+                if (!message.isWrittenByMe() && !message.isRead()) {
+                    unreadCount++;
+                }
+            }
+
+            if (unreadCount > 0) {
+                chatCountBadge.setText(String.valueOf(unreadCount));
+                chatCountBadge.setVisibility(android.view.View.VISIBLE);
+                // Red background for unread messages
+                chatCountBadge.setBackgroundResource(R.drawable.badge_background_red);
+            } else {
+                // Hide badge when no unread messages
+                chatCountBadge.setVisibility(android.view.View.GONE);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating chat count: " + e.getMessage());
+            chatCountBadge.setVisibility(android.view.View.GONE);
         }
     }
 

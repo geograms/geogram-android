@@ -50,9 +50,10 @@ public class ChatFragmentBroadcast extends Fragment {
     private LinearLayout chatMessageContainer;
     private ScrollView chatScrollView;
     private Spinner spinnerCommunicationMode;
-    private Spinner spinnerRadius;
+    private android.widget.SeekBar seekBarRadius;
+    private android.widget.TextView tvRadiusValue;
     private String selectedCommunicationMode;
-    private String selectedRadius;
+    private int selectedRadiusKm;
     private Runnable internetMessagePoller;
     private static final long POLL_INTERVAL_MS = 30000; // 30 seconds, like HTML app
     private Location lastKnownLocation;
@@ -123,15 +124,15 @@ public class ChatFragmentBroadcast extends Fragment {
         chatMessageContainer = view.findViewById(R.id.chat_message_container);
         chatScrollView = view.findViewById(R.id.chat_scroll_view);
 
-        // Initialize spinners
+        // Initialize controls
         spinnerCommunicationMode = view.findViewById(R.id.spinner_communication_mode);
-        spinnerRadius = view.findViewById(R.id.spinner_radius);
+        seekBarRadius = view.findViewById(R.id.seekbar_radius);
+        tvRadiusValue = view.findViewById(R.id.tv_radius_value);
 
         // Load saved settings
         SettingsUser settings = Central.getInstance().getSettings();
         selectedCommunicationMode = settings.getChatCommunicationMode();
-        int savedRadiusKm = settings.getChatRadiusKm();
-        selectedRadius = savedRadiusKm + " km";
+        selectedRadiusKm = settings.getChatRadiusKm();
 
         // Setup communication mode spinner
         ArrayAdapter<CharSequence> modeAdapter = ArrayAdapter.createFromResource(
@@ -171,29 +172,35 @@ public class ChatFragmentBroadcast extends Fragment {
             }
         });
 
-        // Setup radius spinner
-        ArrayAdapter<CharSequence> radiusAdapter = ArrayAdapter.createFromResource(
-                requireContext(),
-                R.array.radius_options,
-                R.layout.spinner_item
-        );
-        radiusAdapter.setDropDownViewResource(R.layout.spinner_dropdown_item);
-        spinnerRadius.setAdapter(radiusAdapter);
+        // Setup radius SeekBar (1-200 km range)
+        seekBarRadius.setMax(200);
+        seekBarRadius.setMin(1);
+        seekBarRadius.setProgress(selectedRadiusKm);
+        tvRadiusValue.setText(selectedRadiusKm + " km");
 
-        // Set saved radius position
-        int radiusPosition = getRadiusPosition(savedRadiusKm);
-        spinnerRadius.setSelection(radiusPosition);
-
-        spinnerRadius.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        seekBarRadius.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
             @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                selectedRadius = parent.getItemAtPosition(position).toString();
-                Log.i(TAG, "Radius selected: " + selectedRadius);
+            public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                // Ensure minimum is 1 km
+                if (progress < 1) {
+                    progress = 1;
+                    seekBar.setProgress(1);
+                }
+                selectedRadiusKm = progress;
+                tvRadiusValue.setText(progress + " km");
+            }
 
-                // Save to settings
-                int radiusKm = getSelectedRadiusKm();
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
+                // Not needed
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
+                // Save to settings when user releases the slider
+                Log.i(TAG, "Radius selected: " + selectedRadiusKm + " km");
                 SettingsUser settings = Central.getInstance().getSettings();
-                settings.setChatRadiusKm(radiusKm);
+                settings.setChatRadiusKm(selectedRadiusKm);
                 SettingsLoader.saveSettings(requireContext(), settings);
 
                 // Refresh messages with new radius
@@ -201,11 +208,6 @@ public class ChatFragmentBroadcast extends Fragment {
                     eraseMessagesFromWindow();
                     updateMessages();
                 }
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                // Do nothing
             }
         });
 
@@ -229,6 +231,15 @@ public class ChatFragmentBroadcast extends Fragment {
                 String errorMessage = null;
                 int wifiDeviceCount = 0;
 
+                // Create a single message that we'll add channels to
+                ChatMessage combinedMessage = new ChatMessage(
+                    Central.getInstance().getSettings().getCallsign(),
+                    message
+                );
+                combinedMessage.setWrittenByMe(true);
+                combinedMessage.setTimestamp(System.currentTimeMillis());
+                combinedMessage.setDestinationId("ANY");
+
                 // Send via WiFi and/or Bluetooth if needed (LOCAL communication)
                 if ("Local only".equals(selectedCommunicationMode) || "Everything".equals(selectedCommunicationMode)) {
                     try {
@@ -242,39 +253,19 @@ public class ChatFragmentBroadcast extends Fragment {
                             // WiFi devices available - send ONLY via WiFi, never via BLE
                             // This prevents duplicate messages on receivers
                             Log.i(TAG, "WiFi devices available (" + wifiDeviceCount + ") - sending via WiFi ONLY (no BLE)");
-                            java.util.List<String> wifiRecipients = wifiSender.sendBroadcastMessage(message);
+                            wifiSender.sendBroadcastMessage(message);
 
-                            if (!wifiRecipients.isEmpty()) {
-                                sentWiFi = true;
-                                Log.i(TAG, "✓ Sent via WiFi to " + wifiRecipients.size() + " devices");
-                            } else {
-                                Log.w(TAG, "WiFi send returned empty recipient list (possible network error)");
-                                sentWiFi = false;
-                            }
-
-                            // Add WiFi message to database
-                            ChatMessage wifiMessage = new ChatMessage(
-                                Central.getInstance().getSettings().getCallsign(),
-                                message
-                            );
-                            wifiMessage.setWrittenByMe(true);
-                            wifiMessage.setTimestamp(System.currentTimeMillis());
-                            wifiMessage.setMessageType(ChatMessageType.WIFI);
-                            wifiMessage.addChannel(ChatMessageType.WIFI);
-                            wifiMessage.setDestinationId("ANY");
-                            DatabaseMessages.getInstance().add(wifiMessage);
-                            DatabaseMessages.getInstance().flushNow();
-
-                            // Refresh UI to show WiFi message immediately
-                            requireActivity().runOnUiThread(() -> {
-                                refreshMessagesFromDatabase();
-                            });
+                            // Mark as sent via WiFi (sends happen asynchronously in background)
+                            sentWiFi = true;
+                            combinedMessage.addChannel(ChatMessageType.WIFI);
+                            Log.i(TAG, "✓ WiFi message queued for " + wifiDeviceCount + " devices");
 
                         } else {
                             // NO WiFi devices - send via BLE instead
                             Log.i(TAG, "No WiFi devices available - sending via BLE");
                             BluetoothSender.getInstance(getContext()).sendMessage(message);
                             sentBLE = true;
+                            combinedMessage.addChannel(ChatMessageType.LOCAL);
                         }
 
                     } catch (Exception e) {
@@ -308,16 +299,8 @@ public class ChatFragmentBroadcast extends Fragment {
 
                                 if (success) {
                                     sentInternet = true;
+                                    combinedMessage.addChannel(ChatMessageType.INTERNET);
                                     Log.i(TAG, "Message sent to server successfully");
-
-                                    // Add internet message to database (no event handler for internet sends)
-                                    ChatMessage internetMessage = new ChatMessage(userCallsign, message);
-                                    internetMessage.setWrittenByMe(true);
-                                    internetMessage.setTimestamp(System.currentTimeMillis());
-                                    internetMessage.setMessageType(ChatMessageType.INTERNET);
-                                    // Set destinationId to match BLE messages for proper deduplication
-                                    internetMessage.setDestinationId("ANY");
-                                    DatabaseMessages.getInstance().add(internetMessage);
                                 } else {
                                     Log.e(TAG, "Server returned failure response");
                                     errorMessage = "Server rejected message";
@@ -335,6 +318,50 @@ public class ChatFragmentBroadcast extends Fragment {
                         errorMessage = "Internet send failed: " + e.getMessage();
                     }
                 }
+
+                // Save the combined message ONCE with all channels
+                // NOTE: If BLE was used, EventBleBroadcastMessageSent already saved it
+                if (sentBLE && sentInternet) {
+                    // BLE + Internet: BLE event handler saved the message, add INTERNET channel to it
+                    // Wait a moment for the BLE event handler to save the message
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        // Ignore
+                    }
+
+                    // Find the message that was just saved by the BLE event handler and add INTERNET channel
+                    ChatMessage savedMessage = findRecentMessage(message, 5000);
+                    if (savedMessage != null) {
+                        savedMessage.addChannel(ChatMessageType.INTERNET);
+                        DatabaseMessages.getInstance().flushNow();
+                        Log.i(TAG, "Added INTERNET channel to BLE message");
+                    } else {
+                        Log.w(TAG, "Could not find BLE message to add INTERNET channel");
+                    }
+
+                    // Refresh UI
+                    requireActivity().runOnUiThread(() -> {
+                        refreshMessagesFromDatabase();
+                    });
+
+                } else if (sentWiFi || sentInternet) {
+                    // WiFi and/or Internet only (no BLE): Save our combined message
+                    if (sentWiFi) {
+                        combinedMessage.setMessageType(ChatMessageType.WIFI);
+                    } else if (sentInternet) {
+                        combinedMessage.setMessageType(ChatMessageType.INTERNET);
+                    }
+
+                    DatabaseMessages.getInstance().add(combinedMessage);
+                    DatabaseMessages.getInstance().flushNow();
+
+                    // Refresh UI to show message immediately
+                    requireActivity().runOnUiThread(() -> {
+                        refreshMessagesFromDatabase();
+                    });
+                }
+                // If only BLE was sent, the event handler already saved it, so do nothing
 
                 final boolean anySent = sentWiFi || sentBLE || sentInternet;
                 final boolean finalSentWiFi = sentWiFi;
@@ -525,8 +552,8 @@ public class ChatFragmentBroadcast extends Fragment {
 
         long timeStamp = message.getTimestamp();
         String dateText = DateUtils.convertTimestampForChatMessage(timeStamp);
-        // Show "Me" + timestamp in upper text
-        textBoxUpper.setText("Me - " + dateText);
+        // Show only timestamp in upper text
+        textBoxUpper.setText(dateText);
 
         // Add channel indicators
         LinearLayout channelIndicators = userMessageView.findViewById(R.id.channel_indicators);
@@ -750,6 +777,17 @@ public class ChatFragmentBroadcast extends Fragment {
         // update the messages, ignoring the already written ones
         updateMessages();
 
+        // Mark all messages as read when user opens chat
+        markAllMessagesAsRead();
+
+        // Clear Android notification
+        ChatNotificationManager.getInstance(getContext()).clearNotification();
+
+        // Update the unread message counter (should now be 0)
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).updateChatCount();
+        }
+
         // Start internet polling if needed
         handleCommunicationModeChange();
 
@@ -762,6 +800,31 @@ public class ChatFragmentBroadcast extends Fragment {
 
         if (chatMessageContainer != null) {
             chatMessageContainer.removeAllViews();
+        }
+    }
+
+    /**
+     * Mark all received messages as read when user opens the chat.
+     * This resets the unread message counter.
+     */
+    private void markAllMessagesAsRead() {
+        try {
+            boolean hasChanges = false;
+            for (ChatMessage message : DatabaseMessages.getInstance().getMessages()) {
+                // Only mark messages we received (not written by us) as read
+                if (!message.isWrittenByMe() && !message.isRead()) {
+                    message.setRead(true);
+                    hasChanges = true;
+                }
+            }
+
+            // Save changes to database if any messages were marked as read
+            if (hasChanges) {
+                DatabaseMessages.getInstance().flushNow();
+                Log.d(TAG, "Marked all received messages as read");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error marking messages as read: " + e.getMessage());
         }
     }
 
@@ -867,16 +930,28 @@ public class ChatFragmentBroadcast extends Fragment {
                         npub
                 );
 
-                // Add messages to database
+                // Add messages to database (check for duplicates first)
+                int newMessagesAdded = 0;
                 for (ChatMessage message : messages) {
-                    DatabaseMessages.getInstance().add(message);
+                    // Check if this message already exists in database
+                    if (!messageExists(message)) {
+                        DatabaseMessages.getInstance().add(message);
+                        newMessagesAdded++;
+                    } else {
+                        Log.d(TAG, "Skipping duplicate message: " + message.getMessage().substring(0, Math.min(30, message.getMessage().length())));
+                    }
                 }
 
-                // Update UI on main thread
-                requireActivity().runOnUiThread(() -> {
-                    eraseMessagesFromWindow();
-                    updateMessages();
-                });
+                // Update UI on main thread only if new messages were added
+                if (newMessagesAdded > 0) {
+                    Log.i(TAG, "Fetched " + newMessagesAdded + " new messages from internet");
+                    requireActivity().runOnUiThread(() -> {
+                        eraseMessagesFromWindow();
+                        updateMessages();
+                    });
+                } else {
+                    Log.d(TAG, "No new messages from internet");
+                }
 
                 Log.i(TAG, "Fetched " + messages.size() + " messages from internet");
 
@@ -933,6 +1008,46 @@ public class ChatFragmentBroadcast extends Fragment {
     }
 
     /**
+     * Find a recently saved message by content and timestamp
+     * Used to locate the message saved by BLE event handler
+     */
+    private ChatMessage findRecentMessage(String messageText, long maxAgeMs) {
+        long now = System.currentTimeMillis();
+        String myCallsign = Central.getInstance().getSettings().getCallsign();
+
+        for (ChatMessage msg : DatabaseMessages.getInstance().getMessages()) {
+            if (msg.isWrittenByMe() &&
+                msg.getMessage().equals(messageText) &&
+                msg.authorId.equals(myCallsign) &&
+                (now - msg.getTimestamp()) < maxAgeMs) {
+                return msg;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Check if a message already exists in the database
+     * Compares author, message content, and timestamp (within 60 seconds tolerance)
+     */
+    private boolean messageExists(ChatMessage newMessage) {
+        for (ChatMessage existingMsg : DatabaseMessages.getInstance().getMessages()) {
+            // Same author and message content
+            if (existingMsg.authorId.equals(newMessage.authorId) &&
+                existingMsg.getMessage().equals(newMessage.getMessage())) {
+
+                // Check if timestamps are close (within 60 seconds)
+                // This accounts for slight time differences between devices/servers
+                long timeDiff = Math.abs(existingMsg.getTimestamp() - newMessage.getTimestamp());
+                if (timeDiff < 60000) { // 60 seconds tolerance
+                    return true; // Duplicate found
+                }
+            }
+        }
+        return false; // Not a duplicate
+    }
+
+    /**
      * Get the currently selected communication mode
      * @return "Local only", "Internet only", or "Everything"
      */
@@ -945,7 +1060,7 @@ public class ChatFragmentBroadcast extends Fragment {
      * @return radius string (e.g., "10 km")
      */
     public String getSelectedRadius() {
-        return selectedRadius;
+        return selectedRadiusKm + " km";
     }
 
     /**
@@ -953,16 +1068,7 @@ public class ChatFragmentBroadcast extends Fragment {
      * @return radius value as integer
      */
     public int getSelectedRadiusKm() {
-        if (selectedRadius == null) {
-            return DEFAULT_RADIUS_KM;
-        }
-        // Extract number from string like "10 km"
-        String[] parts = selectedRadius.split(" ");
-        try {
-            return Integer.parseInt(parts[0]);
-        } catch (NumberFormatException e) {
-            return DEFAULT_RADIUS_KM;
-        }
+        return selectedRadiusKm;
     }
 
     /**
@@ -972,25 +1078,6 @@ public class ChatFragmentBroadcast extends Fragment {
         if ("Local only".equals(mode)) return 0;
         if ("Internet only".equals(mode)) return 1;
         return 2; // "Everything" is default
-    }
-
-    /**
-     * Get spinner position for radius
-     */
-    private int getRadiusPosition(int radiusKm) {
-        String[] radii = getResources().getStringArray(R.array.radius_options);
-        for (int i = 0; i < radii.length; i++) {
-            if (radii[i].startsWith(String.valueOf(radiusKm))) {
-                return i;
-            }
-        }
-        // Default to 100 km (position might vary, find it)
-        for (int i = 0; i < radii.length; i++) {
-            if (radii[i].startsWith("100")) {
-                return i;
-            }
-        }
-        return 5; // fallback to index 5 (100 km in our array)
     }
 
     private void applyBalloonStyle(TextView messageTextView, String backgroundColor) {

@@ -104,9 +104,18 @@ public class WiFiMessageSender {
             conn.setReadTimeout(HTTP_TIMEOUT_MS);
             conn.setDoOutput(true);
 
-            // Build JSON payload
+            // Build JSON payload with sender's callsign
             JsonObject payload = new JsonObject();
             payload.addProperty("message", message);
+
+            // Include sender's callsign so receiver knows who sent it
+            if (Central.getInstance() != null && Central.getInstance().getSettings() != null) {
+                String callsign = Central.getInstance().getSettings().getCallsign();
+                if (callsign != null && !callsign.isEmpty()) {
+                    payload.addProperty("callsign", callsign);
+                }
+            }
+
             String jsonPayload = gson.toJson(payload);
 
             // Send request

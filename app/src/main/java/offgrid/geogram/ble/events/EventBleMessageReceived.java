@@ -369,6 +369,31 @@ public class EventBleMessageReceived extends EventAction {
 
         // Trigger UI refresh from database to prevent duplicates
         Central.getInstance().broadcastChatFragment.refreshMessagesFromDatabase();
+
+        // Check if chat is currently visible
+        boolean chatIsOpen = Central.getInstance().broadcastChatFragment != null &&
+            Central.getInstance().broadcastChatFragment.isVisible();
+
+        if (chatIsOpen) {
+            // Chat is open - mark message as read immediately
+            Log.i(TAG, "Chat is open, marking BLE message as read immediately");
+            chatMessage.setRead(true);
+            DatabaseMessages.getInstance().flushNow();
+        } else {
+            // Chat is not open - update counter and show notification
+            offgrid.geogram.MainActivity mainActivity = offgrid.geogram.MainActivity.getInstance();
+            if (mainActivity != null) {
+                mainActivity.runOnUiThread(() -> {
+                    mainActivity.updateChatCount();
+                    Log.i(TAG, "Updated chat counter badge for BLE message");
+
+                    // Show Android notification
+                    Log.i(TAG, "Showing notification for BLE message");
+                    offgrid.geogram.apps.chat.ChatNotificationManager.getInstance(mainActivity)
+                        .showUnreadMessagesNotification();
+                });
+            }
+        }
     }
 
     private void handleLocationMessage(BluetoothMessage msg) {

@@ -10,63 +10,60 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
-        android:orientation="vertical"
+        android:orientation="horizontal"
         android:background="#1F1F1F"
         android:padding="12dp"
+        android:gravity="center_vertical"
         android:elevation="4dp">
 
-        <!-- Communication Mode Row -->
+        <!-- Communication Mode Icon -->
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_broadcast"
+            android:contentDescription="Communication Mode"
+            app:tint="#FFFFFF"
+            android:layout_marginEnd="8dp" />
+
+        <!-- Communication Mode Spinner -->
+        <Spinner
+            android:id="@+id/spinner_communication_mode"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="@drawable/input_background"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:popupBackground="#1F1F1F"
+            android:layout_marginEnd="16dp" />
+
+        <!-- Radius Slider Section -->
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="8dp">
+            android:layout_weight="1.2"
+            android:orientation="vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
+            <!-- SeekBar for radius -->
+            <SeekBar
+                android:id="@+id/seekbar_radius"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Mode:"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:layout_marginEnd="8dp" />
+                android:max="200"
+                android:progress="100"
+                android:progressTint="#4CAF50"
+                android:thumbTint="#4CAF50" />
 
-            <Spinner
-                android:id="@+id/spinner_communication_mode"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:background="@drawable/input_background"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:popupBackground="#1F1F1F" />
-
-        </LinearLayout>
-
-        <!-- Radius Selection Row -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
+            <!-- Radius value display -->
             <TextView
-                android:layout_width="wrap_content"
+                android:id="@+id/tv_radius_value"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Radius:"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:layout_marginEnd="8dp" />
-
-            <Spinner
-                android:id="@+id/spinner_radius"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:background="@drawable/input_background"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:popupBackground="#1F1F1F" />
+                android:text="100 km"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp"
+                android:gravity="center"
+                android:layout_marginTop="-4dp" />
 
         </LinearLayout>
 

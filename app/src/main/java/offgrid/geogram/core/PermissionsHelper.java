@@ -39,6 +39,11 @@ public class PermissionsHelper {
             permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION);
         }
 
+        // POST_NOTIFICATIONS required for Android 13+ to show notifications
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS);
+        }
+
 //        permissions.add(Manifest.permission.ACCESS_WIFI_STATE);
 //        permissions.add(Manifest.permission.CHANGE_WIFI_STATE);
 //        permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES);

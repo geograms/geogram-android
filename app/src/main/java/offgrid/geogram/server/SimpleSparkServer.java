@@ -136,28 +136,39 @@ public class SimpleSparkServer implements Runnable {
                     return gson.toJson(createErrorResponse("Server context not initialized"));
                 }
 
-                // Extract sender info from request if available
+                // Extract sender info from request
                 String senderIp = req.ip();
                 Log.i(TAG_ID, "API: Message received via WiFi from " + senderIp + ": " + message);
 
-                // Parse the message to extract author
-                // Message format is typically just the text content from geochat
-                // The sender's callsign is in the WiFi discovery map
-                offgrid.geogram.wifi.WiFiDiscoveryService wifiService =
-                    offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(context);
-
-                // Find which device sent this based on IP
+                // Extract sender's callsign from JSON payload (preferred method)
                 String senderCallsign = null;
-                for (java.util.Map.Entry<String, String> entry : wifiService.getDiscoveredDevices().entrySet()) {
-                    if (entry.getValue().equals(senderIp)) {
-                        senderCallsign = entry.getKey();
-                        break;
+                try {
+                    if (jsonRequest.has("callsign") && !jsonRequest.get("callsign").isJsonNull()) {
+                        senderCallsign = jsonRequest.get("callsign").getAsString();
+                        Log.i(TAG_ID, "Extracted callsign from payload: " + senderCallsign);
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG_ID, "Failed to extract callsign from payload: " + e.getMessage());
+                }
+
+                // Fallback: Try to find sender by IP lookup if callsign not in payload
+                if (senderCallsign == null || senderCallsign.isEmpty()) {
+                    offgrid.geogram.wifi.WiFiDiscoveryService wifiService =
+                        offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(context);
+
+                    for (java.util.Map.Entry<String, String> entry : wifiService.getDiscoveredDevices().entrySet()) {
+                        if (entry.getValue().equals(senderIp)) {
+                            senderCallsign = entry.getKey();
+                            Log.i(TAG_ID, "Found callsign via IP lookup: " + senderCallsign);
+                            break;
+                        }
                     }
                 }
 
-                // If we can't find the sender, use IP-based identifier
-                if (senderCallsign == null) {
+                // Last resort: If we still can't find the sender, use IP-based identifier
+                if (senderCallsign == null || senderCallsign.isEmpty()) {
                     senderCallsign = "WIFI-" + senderIp.replace(".", "-");
+                    Log.w(TAG_ID, "Using IP-based fallback identifier: " + senderCallsign);
                 }
 
                 Log.i(TAG_ID, "WiFi message from " + senderCallsign + " (" + senderIp + "): " + message);
@@ -180,6 +191,32 @@ public class SimpleSparkServer implements Runnable {
                     offgrid.geogram.core.Central.getInstance().broadcastChatFragment != null) {
                     offgrid.geogram.core.Central.getInstance().broadcastChatFragment.refreshMessagesFromDatabase();
                     Log.i(TAG_ID, "Triggered immediate UI refresh for WiFi message");
+                }
+
+                // Check if chat is currently visible
+                boolean chatIsOpen = offgrid.geogram.core.Central.getInstance() != null &&
+                    offgrid.geogram.core.Central.getInstance().broadcastChatFragment != null &&
+                    offgrid.geogram.core.Central.getInstance().broadcastChatFragment.isVisible();
+
+                if (chatIsOpen) {
+                    // Chat is open - mark message as read immediately
+                    Log.i(TAG_ID, "Chat is open, marking WiFi message as read immediately");
+                    wifiMessage.setRead(true);
+                    offgrid.geogram.database.DatabaseMessages.getInstance().flushNow();
+                } else {
+                    // Chat is not open - update counter and show notification
+                    offgrid.geogram.MainActivity mainActivity = offgrid.geogram.MainActivity.getInstance();
+                    if (mainActivity != null) {
+                        mainActivity.runOnUiThread(() -> {
+                            mainActivity.updateChatCount();
+                            Log.i(TAG_ID, "Updated chat counter badge for WiFi message");
+                        });
+                    }
+
+                    // Show Android notification
+                    Log.i(TAG_ID, "Showing notification for WiFi message");
+                    offgrid.geogram.apps.chat.ChatNotificationManager.getInstance(context)
+                        .showUnreadMessagesNotification();
                 }
 
                 // DON'T rebroadcast via BLE - this creates duplicate messages
