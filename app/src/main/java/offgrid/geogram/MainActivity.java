@@ -272,6 +272,8 @@ public class MainActivity extends AppCompatActivity {
     private void setupLoops() {
         UpdatedCoordinates.getInstance().start(this);
         PingDevice.getInstance().start();
+        // Start WiFi device discovery for local network communication
+        offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(this).start();
     }
 
     private void setupEvents() {

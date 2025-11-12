@@ -17,11 +17,11 @@ import offgrid.geogram.util.LocationHelper;
 /*
     Sends a broadcast to everywhere about this device.
     - Singleton (no Context held -> no leaks)
-    - Repeats `broadcastPing()` every 60 seconds AFTER the previous run completes.
+    - Repeats `broadcastPing()` every 30 seconds AFTER the previous run completes.
 */
 public final class PingDevice {
     private static final String TAG = "PingDevice";
-    private static final long REFRESH_INTERVAL_SECONDS = 10L;
+    private static final long REFRESH_INTERVAL_SECONDS = 30L;
 
     // --- Singleton (Initialization-on-demand holder) ---
     private PingDevice() {}
@@ -49,10 +49,10 @@ public final class PingDevice {
             // Immediate, async (doesn't block caller thread)
             scheduler.execute(this::safeBroadcastPing);
 
-            // Next runs start 60s AFTER the previous one finishes
+            // Next runs start after REFRESH_INTERVAL_SECONDS AFTER the previous one finishes
             repeatingTask = scheduler.scheduleWithFixedDelay(
                     this::safeBroadcastPing,
-                    REFRESH_INTERVAL_SECONDS,            // initial delay (start after 60s)
+                    REFRESH_INTERVAL_SECONDS,            // initial delay
                     REFRESH_INTERVAL_SECONDS,            // period
                     TimeUnit.SECONDS
             );
@@ -132,8 +132,8 @@ public final class PingDevice {
             coordinates = "@" + coordinates;
         }
 
-        // Include device model code and version: +CALLSIGN@COORDS#APP-0.5.18
-        String deviceModelCode = "APP-0.5.18";  // Device code: APP = Android Phone
+        // Include device model code and version: +CALLSIGN@COORDS#APP-0.5.19
+        String deviceModelCode = "APP-0.5.19";  // Device code: APP = Android Phone
         String message = "+" + callsign + coordinates + "#" + deviceModelCode;
 
         // BLE advertising has 31-byte limit. With overhead, we have ~20 bytes for data.

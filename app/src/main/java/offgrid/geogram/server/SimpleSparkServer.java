@@ -130,16 +130,61 @@ public class SimpleSparkServer implements Runnable {
                     return gson.toJson(createErrorResponse("Message cannot be empty"));
                 }
 
-                // Send the BLE message
+                // Handle message received via WiFi
                 if (context == null) {
                     res.status(503);
                     return gson.toJson(createErrorResponse("Server context not initialized"));
                 }
 
-                BluetoothSender sender = BluetoothSender.getInstance(context);
-                sender.sendMessage(message);
+                // Extract sender info from request if available
+                String senderIp = req.ip();
+                Log.i(TAG_ID, "API: Message received via WiFi from " + senderIp + ": " + message);
 
-                Log.i(TAG_ID, "API: BLE message sent via HTTP: " + message);
+                // Parse the message to extract author
+                // Message format is typically just the text content from geochat
+                // The sender's callsign is in the WiFi discovery map
+                offgrid.geogram.wifi.WiFiDiscoveryService wifiService =
+                    offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(context);
+
+                // Find which device sent this based on IP
+                String senderCallsign = null;
+                for (java.util.Map.Entry<String, String> entry : wifiService.getDiscoveredDevices().entrySet()) {
+                    if (entry.getValue().equals(senderIp)) {
+                        senderCallsign = entry.getKey();
+                        break;
+                    }
+                }
+
+                // If we can't find the sender, use IP-based identifier
+                if (senderCallsign == null) {
+                    senderCallsign = "WIFI-" + senderIp.replace(".", "-");
+                }
+
+                Log.i(TAG_ID, "WiFi message from " + senderCallsign + " (" + senderIp + "): " + message);
+
+                // Save WiFi message to database
+                offgrid.geogram.apps.chat.ChatMessage wifiMessage =
+                    new offgrid.geogram.apps.chat.ChatMessage(senderCallsign, message);
+                wifiMessage.setWrittenByMe(false); // NOT written by me - received from another device
+                wifiMessage.setTimestamp(System.currentTimeMillis());
+                wifiMessage.setMessageType(offgrid.geogram.apps.chat.ChatMessageType.WIFI);
+                wifiMessage.addChannel(offgrid.geogram.apps.chat.ChatMessageType.WIFI);
+                wifiMessage.setDestinationId("ANY");
+                offgrid.geogram.database.DatabaseMessages.getInstance().add(wifiMessage);
+                offgrid.geogram.database.DatabaseMessages.getInstance().flushNow();
+
+                Log.i(TAG_ID, "Saved WiFi message to database with WIFI channel tag");
+
+                // Immediately trigger UI refresh to show WiFi message without polling delay
+                if (offgrid.geogram.core.Central.getInstance() != null &&
+                    offgrid.geogram.core.Central.getInstance().broadcastChatFragment != null) {
+                    offgrid.geogram.core.Central.getInstance().broadcastChatFragment.refreshMessagesFromDatabase();
+                    Log.i(TAG_ID, "Triggered immediate UI refresh for WiFi message");
+                }
+
+                // DON'T rebroadcast via BLE - this creates duplicate messages
+                // WiFi messages should stay on WiFi, BLE messages on BLE
+                // If sender wanted BLE coverage, they would send via BLE too
 
                 // Create success response
                 JsonObject response = new JsonObject();
@@ -302,6 +347,14 @@ public class SimpleSparkServer implements Runnable {
                 response.addProperty("version", API_VERSION);
                 response.addProperty("build_timestamp", BUILD_TIMESTAMP);
                 response.addProperty("running", true);
+
+                // Include device callsign for WiFi discovery
+                if (context != null && Central.getInstance() != null && Central.getInstance().getSettings() != null) {
+                    String callsign = Central.getInstance().getSettings().getCallsign();
+                    if (callsign != null && !callsign.isEmpty()) {
+                        response.addProperty("callsign", callsign);
+                    }
+                }
 
                 res.status(200);
                 return gson.toJson(response);

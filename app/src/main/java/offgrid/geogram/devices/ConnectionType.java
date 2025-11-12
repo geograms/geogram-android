@@ -5,4 +5,5 @@ public enum ConnectionType {
     BRIDGE,     // received by another device, sent to that device on a different method
     INTERNET,   // received through the internet
     PIDGEON,    // message carried and delivered on behalf of another user
+    WIFI,       // local WiFi/LAN connection via HTTP API
 }

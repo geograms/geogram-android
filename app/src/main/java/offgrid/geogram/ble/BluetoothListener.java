@@ -44,7 +44,7 @@ public class BluetoothListener {
     private static final long MESSAGE_EXPIRY_MS = 60000; // Discard messages older than 60s
     private static final long DEVICE_EXPIRY_MS = 30000; // Consider device disconnected after 30 seconds
 
-    private final Map<String, Long> recentMessages = new HashMap<>();
+    private final Map<String, Long> recentMessages = new ConcurrentHashMap<>();
 
     // Track discovered devices for GATT connection
     private final Map<String, DiscoveredDevice> discoveredDevices = new ConcurrentHashMap<>();

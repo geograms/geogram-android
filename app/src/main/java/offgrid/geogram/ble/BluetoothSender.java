@@ -36,6 +36,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -59,6 +60,11 @@ public class BluetoothSender {
     private static final String TAG = "BluetoothSender";
     private static final UUID SERVICE_UUID = UUID.fromString("0000FEAA-0000-1000-8000-00805F9B34FB");
 
+    // Message priority levels (lower number = higher priority)
+    private static final int PRIORITY_HIGH = 1;    // User chat messages
+    private static final int PRIORITY_NORMAL = 2;  // /repeat, relay messages
+    private static final int PRIORITY_LOW = 3;     // Pings (+), read receipts (/R, /read)
+
     private static BluetoothSender instance;
     private final Context context;
     private final Handler handler = new Handler();
@@ -73,8 +79,8 @@ public class BluetoothSender {
     private boolean isRunning = false;
     private boolean isPaused = false;
 
-    // Message queue
-    private final Queue<QueuedMessage> messageQueue = new LinkedList<>();
+    // Message queue with priority (lower priority number = sent first)
+    private final Queue<QueuedMessage> messageQueue = new PriorityQueue<>();
     private boolean isSending = false;
 
     // GATT connection management
@@ -226,8 +232,27 @@ public class BluetoothSender {
                 parcel = ">" + parcel;
             }
 
-            // Create queued message with all active connections as targets
-            QueuedMessage queuedMsg = new QueuedMessage(parcel, msg.getIdFromSender());
+            // Detect message priority based on content
+            int priority = PRIORITY_HIGH;  // Default: user chat messages
+            String content = parcel.substring(1); // Remove ">" prefix
+
+            if (content.startsWith("+")) {
+                // Ping/location message -> low priority
+                priority = PRIORITY_LOW;
+            } else if (content.startsWith("/R ") || content.startsWith("/read ")) {
+                // Read receipt -> low priority
+                priority = PRIORITY_LOW;
+            } else if (content.startsWith("/repeat")) {
+                // Parcel retransmission request -> normal priority
+                priority = PRIORITY_NORMAL;
+            } else if (content.startsWith("INV:") || content.startsWith("REQ:") || content.startsWith("MSG:")) {
+                // Relay protocol messages -> normal priority
+                priority = PRIORITY_NORMAL;
+            }
+            // Everything else (user chat messages) keeps PRIORITY_HIGH
+
+            // Create queued message with priority
+            QueuedMessage queuedMsg = new QueuedMessage(parcel, msg.getIdFromSender(), priority);
 
             // Prevent duplicates
             boolean isDuplicate = false;
@@ -974,13 +999,21 @@ public class BluetoothSender {
     }
 
     // Helper classes
-    private static class QueuedMessage {
+    private static class QueuedMessage implements Comparable<QueuedMessage> {
         final String parcel;
         final String senderId;
+        final int priority;
 
-        QueuedMessage(String parcel, String senderId) {
+        QueuedMessage(String parcel, String senderId, int priority) {
             this.parcel = parcel;
             this.senderId = senderId;
+            this.priority = priority;
+        }
+
+        @Override
+        public int compareTo(QueuedMessage other) {
+            // Lower priority number = higher priority (sent first)
+            return Integer.compare(this.priority, other.priority);
         }
     }
 

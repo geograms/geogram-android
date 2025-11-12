@@ -7,5 +7,6 @@ public enum ChatMessageType {
     PING,     // announcing the device
     PUB,      // public key
     LOCAL,    // local Bluetooth message
-    INTERNET  // internet API message
+    INTERNET, // internet API message
+    WIFI      // local WiFi/LAN message
 }

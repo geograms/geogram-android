@@ -58,6 +58,12 @@ public class ChatFragmentBroadcast extends Fragment {
     private Location lastKnownLocation;
     private static final int DEFAULT_RADIUS_KM = 100;
 
+    // Read receipt rate limiting
+    private final java.util.Set<String> sentReadReceipts = new java.util.HashSet<>();
+    private long lastReadReceiptTime = 0;
+    private static final long READ_RECEIPT_THROTTLE_MS = 5000; // Minimum 5 seconds between read receipts
+    private static final int MAX_READ_RECEIPTS_PER_SESSION = 20; // Limit per UI refresh
+
     public boolean canAddMessages() {
         return isAdded()                      // Fragment is attached to Activity
                 && getContext() != null       // Context is not null
@@ -217,18 +223,63 @@ public class ChatFragmentBroadcast extends Fragment {
             // Note: Message will be added to database and UI by event handlers
             // (EventBleBroadcastMessageSent for local, or after API success for internet)
             new Thread(() -> {
-                boolean sentLocal = false;
+                boolean sentWiFi = false;
+                boolean sentBLE = false;
                 boolean sentInternet = false;
                 String errorMessage = null;
+                int wifiDeviceCount = 0;
 
-                // Send via Bluetooth if needed
+                // Send via WiFi and/or Bluetooth if needed (LOCAL communication)
                 if ("Local only".equals(selectedCommunicationMode) || "Everything".equals(selectedCommunicationMode)) {
                     try {
-                        BluetoothSender.getInstance(getContext()).sendMessage(message);
-                        sentLocal = true;
+                        // PRIORITY 1: Send via WiFi to discovered LAN devices
+                        offgrid.geogram.wifi.WiFiMessageSender wifiSender =
+                            offgrid.geogram.wifi.WiFiMessageSender.getInstance(getContext());
+
+                        wifiDeviceCount = wifiSender.getWiFiDeviceCount();
+
+                        if (wifiDeviceCount > 0) {
+                            // WiFi devices available - send ONLY via WiFi, never via BLE
+                            // This prevents duplicate messages on receivers
+                            Log.i(TAG, "WiFi devices available (" + wifiDeviceCount + ") - sending via WiFi ONLY (no BLE)");
+                            java.util.List<String> wifiRecipients = wifiSender.sendBroadcastMessage(message);
+
+                            if (!wifiRecipients.isEmpty()) {
+                                sentWiFi = true;
+                                Log.i(TAG, "✓ Sent via WiFi to " + wifiRecipients.size() + " devices");
+                            } else {
+                                Log.w(TAG, "WiFi send returned empty recipient list (possible network error)");
+                                sentWiFi = false;
+                            }
+
+                            // Add WiFi message to database
+                            ChatMessage wifiMessage = new ChatMessage(
+                                Central.getInstance().getSettings().getCallsign(),
+                                message
+                            );
+                            wifiMessage.setWrittenByMe(true);
+                            wifiMessage.setTimestamp(System.currentTimeMillis());
+                            wifiMessage.setMessageType(ChatMessageType.WIFI);
+                            wifiMessage.addChannel(ChatMessageType.WIFI);
+                            wifiMessage.setDestinationId("ANY");
+                            DatabaseMessages.getInstance().add(wifiMessage);
+                            DatabaseMessages.getInstance().flushNow();
+
+                            // Refresh UI to show WiFi message immediately
+                            requireActivity().runOnUiThread(() -> {
+                                refreshMessagesFromDatabase();
+                            });
+
+                        } else {
+                            // NO WiFi devices - send via BLE instead
+                            Log.i(TAG, "No WiFi devices available - sending via BLE");
+                            BluetoothSender.getInstance(getContext()).sendMessage(message);
+                            sentBLE = true;
+                        }
+
                     } catch (Exception e) {
-                        Log.e(TAG, "Failed to send via Bluetooth", e);
-                        errorMessage = "Bluetooth send failed: " + e.getMessage();
+                        Log.e(TAG, "Failed to send local message", e);
+                        errorMessage = "Local send failed: " + e.getMessage();
                     }
                 }
 
@@ -285,21 +336,34 @@ public class ChatFragmentBroadcast extends Fragment {
                     }
                 }
 
-                final boolean anySent = sentLocal || sentInternet;
+                final boolean anySent = sentWiFi || sentBLE || sentInternet;
+                final boolean finalSentWiFi = sentWiFi;
+                final boolean finalSentBLE = sentBLE;
                 final boolean finalSentInternet = sentInternet;
-                final boolean finalSentLocal = sentLocal;
+                final int finalWiFiCount = wifiDeviceCount;
                 final String finalError = errorMessage;
 
                 requireActivity().runOnUiThread(() -> {
                     // Show success/error message only - UI refresh is handled by event handlers
                     if (anySent) {
-                        if (finalSentInternet && finalSentLocal) {
-                            Toast.makeText(getContext(), "Message sent via Bluetooth and Internet", Toast.LENGTH_SHORT).show();
-                        } else if (finalSentInternet) {
-                            Toast.makeText(getContext(), "Message sent via Internet", Toast.LENGTH_SHORT).show();
-                        } else if (finalSentLocal) {
-                            Toast.makeText(getContext(), "Message sent via Bluetooth", Toast.LENGTH_SHORT).show();
+                        StringBuilder statusMsg = new StringBuilder("Message sent via: ");
+                        boolean first = true;
+
+                        if (finalSentWiFi) {
+                            statusMsg.append("WiFi (").append(finalWiFiCount).append(" devices)");
+                            first = false;
                         }
+                        if (finalSentBLE) {
+                            if (!first) statusMsg.append(", ");
+                            statusMsg.append("BLE");
+                            first = false;
+                        }
+                        if (finalSentInternet) {
+                            if (!first) statusMsg.append(", ");
+                            statusMsg.append("Internet");
+                        }
+
+                        Toast.makeText(getContext(), statusMsg.toString(), Toast.LENGTH_SHORT).show();
                     } else if (finalError != null) {
                         // Send failed - show error
                         Toast.makeText(getContext(), finalError, Toast.LENGTH_LONG).show();
@@ -323,6 +387,8 @@ public class ChatFragmentBroadcast extends Fragment {
         // Stop message polling and unregister listener to avoid memory leaks
         stopInternetMessagePolling();
         handler.removeCallbacksAndMessages(null);
+        // Clear read receipt tracking to prevent memory leaks
+        sentReadReceipts.clear();
         // Removed (legacy) - BroadcastSender.removeMessageUpdateListener();
     }
 
@@ -606,6 +672,29 @@ public class ChatFragmentBroadcast extends Fragment {
             params.setMargins(0, 0, 8, 0);
             internetIndicator.setLayoutParams(params);
             container.addView(internetIndicator);
+        }
+
+        // Check for WiFi channel
+        boolean hasWifi = message.hasChannel(ChatMessageType.WIFI);
+        if (!hasWifi && message.getMessageType() == ChatMessageType.WIFI) {
+            hasWifi = true;
+        }
+
+        // Add WiFi indicator
+        if (hasWifi) {
+            TextView wifiIndicator = new TextView(getContext());
+            wifiIndicator.setText("WIFI");
+            wifiIndicator.setTextSize(10);
+            wifiIndicator.setTextColor(getResources().getColor(android.R.color.white));
+            wifiIndicator.setBackgroundColor(0xFF666666); // Dark grey background
+            wifiIndicator.setPadding(8, 4, 8, 4);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            params.setMargins(0, 0, 8, 0);
+            wifiIndicator.setLayoutParams(params);
+            container.addView(wifiIndicator);
         }
     }
 
@@ -978,6 +1067,7 @@ public class ChatFragmentBroadcast extends Fragment {
 
     /**
      * Send a READ receipt for a message if it was received via Bluetooth and is from someone else
+     * Implements rate limiting to prevent BLE channel flooding
      * @param message The message that was displayed
      */
     private void sendReadReceiptIfNeeded(ChatMessage message) {
@@ -1002,11 +1092,29 @@ public class ChatFragmentBroadcast extends Fragment {
                 return;
             }
 
-            // DEBUG: Log the message details before sending READ receipt
-            android.util.Log.d("ReadReceipts", "Preparing READ receipt - localCallsign: " + localCallsign +
-                    ", message.authorId: " + message.authorId +
-                    ", message.timestamp: " + message.timestamp +
-                    ", message text: " + message.getMessage().substring(0, Math.min(20, message.getMessage().length())));
+            // Create unique key for this read receipt
+            String receiptKey = message.timestamp + ":" + message.authorId;
+
+            // Check if we already sent a read receipt for this message
+            if (sentReadReceipts.contains(receiptKey)) {
+                android.util.Log.d("ReadReceipts", "Already sent read receipt for message: " + receiptKey);
+                return;
+            }
+
+            // Check rate limiting - enforce minimum time between read receipts
+            long now = System.currentTimeMillis();
+            long timeSinceLastReceipt = now - lastReadReceiptTime;
+
+            if (timeSinceLastReceipt < READ_RECEIPT_THROTTLE_MS) {
+                android.util.Log.d("ReadReceipts", "Throttled read receipt (too soon): " + timeSinceLastReceipt + "ms < " + READ_RECEIPT_THROTTLE_MS + "ms");
+                return;
+            }
+
+            // Check if we've sent too many read receipts in this session
+            if (sentReadReceipts.size() >= MAX_READ_RECEIPTS_PER_SESSION) {
+                android.util.Log.d("ReadReceipts", "Max read receipts reached for this session (" + MAX_READ_RECEIPTS_PER_SESSION + ")");
+                return;
+            }
 
             // Send compact READ receipt: /R LAST9DIGITS AUTHOR_ID
             // Format fits in BLE advertising (20 bytes): /R 949441328 X1ADK0
@@ -1015,9 +1123,20 @@ public class ChatFragmentBroadcast extends Fragment {
             String compactTimestamp = timestampStr.length() > 9 ?
                     timestampStr.substring(timestampStr.length() - 9) : timestampStr;
             String readReceipt = "/R " + compactTimestamp + " " + message.authorId;
-            offgrid.geogram.ble.BluetoothSender.getInstance(getContext()).sendMessage(readReceipt);
 
-            android.util.Log.i("ReadReceipts", "SENT compact READ receipt: " + readReceipt +
+            // Mark as sent immediately to prevent duplicates
+            sentReadReceipts.add(receiptKey);
+            lastReadReceiptTime = now;
+
+            // Delay read receipt by 20 seconds to prevent queue flooding
+            // User chat messages take priority over low-priority read receipts
+            handler.postDelayed(() -> {
+                offgrid.geogram.ble.BluetoothSender.getInstance(getContext()).sendMessage(readReceipt);
+                android.util.Log.i("ReadReceipts", "SENT compact READ receipt (after 20s delay): " + readReceipt +
+                        " (full timestamp: " + message.timestamp + ")");
+            }, 20000); // 20 seconds
+
+            android.util.Log.i("ReadReceipts", "QUEUED compact READ receipt for 20s delay: " + readReceipt +
                     " (full timestamp: " + message.timestamp + ")");
 
         } catch (Exception e) {

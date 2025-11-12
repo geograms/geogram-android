@@ -54,6 +54,10 @@ public class DevicesWithinReachFragment extends Fragment {
         btnClearList.setOnClickListener(v -> {
             DeviceManager.getInstance().clear();
             loadDevices();
+            // Update device count badge in MainActivity
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).updateDeviceCount();
+            }
             Toast.makeText(getContext(), "Device list cleared", Toast.LENGTH_SHORT).show();
         });
 
@@ -67,6 +71,10 @@ public class DevicesWithinReachFragment extends Fragment {
                         getActivity().runOnUiThread(() -> {
                             if (isAdded() && getView() != null) {
                                 loadDevices();
+                                // Also update device count badge in MainActivity
+                                if (getActivity() instanceof MainActivity) {
+                                    ((MainActivity) getActivity()).updateDeviceCount();
+                                }
                             }
                         });
                     }
@@ -158,7 +166,12 @@ public class DevicesWithinReachFragment extends Fragment {
 
         public void updateDevices(TreeSet<Device> newDevices) {
             this.devices = new TreeSet<>(newDevices);
-            notifyDataSetChanged();
+            // Notify on main thread to ensure UI updates properly
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> notifyDataSetChanged());
+            } else {
+                notifyDataSetChanged();
+            }
         }
 
         @NonNull
@@ -197,6 +210,7 @@ public class DevicesWithinReachFragment extends Fragment {
             private final TextView deviceType;
             private final TextView deviceLastSeen;
             private final TextView relayBadge;
+            private final android.widget.LinearLayout channelIndicators;
 
             public DeviceViewHolder(@NonNull View itemView) {
                 super(itemView);
@@ -204,6 +218,7 @@ public class DevicesWithinReachFragment extends Fragment {
                 deviceType = itemView.findViewById(R.id.device_type);
                 deviceLastSeen = itemView.findViewById(R.id.device_last_seen);
                 relayBadge = itemView.findViewById(R.id.relay_badge);
+                channelIndicators = itemView.findViewById(R.id.channel_indicators);
             }
 
             public void bind(Device device) {
@@ -260,6 +275,71 @@ public class DevicesWithinReachFragment extends Fragment {
                     deviceName.setTextColor(Color.parseColor("#FFFFFF"));
                     deviceType.setTextColor(Color.parseColor("#AAAAAA"));
                     deviceLastSeen.setTextColor(Color.parseColor("#888888"));
+                }
+
+                // Add channel indicators (BLE, WIFI)
+                channelIndicators.removeAllViews();
+
+                // Check which connection types this device has
+                boolean hasBLE = false;
+                boolean hasWiFi = false;
+
+                for (offgrid.geogram.devices.EventConnected event : device.connectedEvents) {
+                    if (event.connectionType == offgrid.geogram.devices.ConnectionType.BLE) {
+                        hasBLE = true;
+                    } else if (event.connectionType == offgrid.geogram.devices.ConnectionType.WIFI) {
+                        hasWiFi = true;
+                    }
+                }
+
+                // Also check WiFi discovery service for current WiFi availability
+                if (!hasWiFi) {
+                    offgrid.geogram.wifi.WiFiDiscoveryService wifiService =
+                        offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(itemView.getContext());
+                    // Check if device has an IP address in WiFi discovery
+                    if (wifiService.getDeviceIp(device.ID) != null) {
+                        hasWiFi = true;
+                    }
+                }
+
+                // Add BLE badge
+                if (hasBLE) {
+                    TextView bleBadge = new TextView(itemView.getContext());
+                    bleBadge.setText("BLE");
+                    bleBadge.setTextSize(10);
+                    bleBadge.setTextColor(Color.WHITE);
+                    bleBadge.setBackgroundColor(0xFF666666); // Dark grey
+                    bleBadge.setPadding(8, 4, 8, 4);
+                    android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                    );
+                    params.setMargins(0, 0, 8, 0);
+                    bleBadge.setLayoutParams(params);
+                    channelIndicators.addView(bleBadge);
+                }
+
+                // Add WiFi badge
+                if (hasWiFi) {
+                    TextView wifiBadge = new TextView(itemView.getContext());
+                    wifiBadge.setText("WIFI");
+                    wifiBadge.setTextSize(10);
+                    wifiBadge.setTextColor(Color.WHITE);
+                    wifiBadge.setBackgroundColor(0xFF666666); // Dark grey
+                    wifiBadge.setPadding(8, 4, 8, 4);
+                    android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                    );
+                    wifiBadge.setLayoutParams(params);
+                    channelIndicators.addView(wifiBadge);
+                }
+
+                // Show/hide channel indicators based on whether any badges were added
+                if (hasBLE || hasWiFi) {
+                    channelIndicators.setVisibility(View.VISIBLE);
+                } else {
+                    channelIndicators.setVisibility(View.GONE);
                 }
             }
         }
