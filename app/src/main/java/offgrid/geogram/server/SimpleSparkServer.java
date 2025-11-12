@@ -31,8 +31,8 @@ public class SimpleSparkServer implements Runnable {
 
     private static final String TAG_ID = "offgrid-server";
     private static final int SERVER_PORT = 45678;
-    private static final String BUILD_TIMESTAMP = "2025-01-12T06:00:00Z"; // Updated on each build
-    private static final String API_VERSION = "0.5.7"; // Increment on API changes
+    private static final String BUILD_TIMESTAMP = "2025-01-12T07:00:00Z"; // Updated on each build
+    private static final String API_VERSION = "0.5.8"; // Increment on API changes
     private static final Gson gson = new Gson();
     private volatile boolean isRunning = false;
     private android.content.Context context;
@@ -343,14 +343,35 @@ public class SimpleSparkServer implements Runnable {
                     return gson.toJson(createErrorResponse("Recipient and message cannot be empty"));
                 }
 
+                // Get local device callsign
+                String fromCallsign = null;
+                try {
+                    if (Central.getInstance() != null && Central.getInstance().getSettings() != null) {
+                        fromCallsign = Central.getInstance().getSettings().getIdDevice();
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG_ID, "Could not get local callsign: " + e.getMessage());
+                }
+
+                if (fromCallsign == null || fromCallsign.isEmpty()) {
+                    res.status(500);
+                    return gson.toJson(createErrorResponse("Could not determine local device callsign"));
+                }
+
                 // Create relay message
                 RelayMessage relayMsg = new RelayMessage();
+                relayMsg.setFromCallsign(fromCallsign);
                 relayMsg.setToCallsign(recipient);
                 relayMsg.setContent(messageContent);
                 relayMsg.setTimestamp(System.currentTimeMillis() / 1000); // Unix timestamp in seconds
 
+                // Generate message ID if not provided
                 if (messageId != null && !messageId.isEmpty()) {
                     relayMsg.setId(messageId);
+                } else {
+                    // Generate unique ID: SENDER-TIMESTAMP
+                    String generatedId = fromCallsign + "-" + System.currentTimeMillis();
+                    relayMsg.setId(generatedId);
                 }
 
                 // Save to outbox
