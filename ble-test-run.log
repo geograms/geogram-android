@@ -1,0 +1,73 @@
+[0;34m╔═══════════════════════════════════════════════════════╗[0m
+[0;34m║    Multi-Device BLE Stress Test                      ║[0m
+[0;34m╚═══════════════════════════════════════════════════════╝[0m
+
+[1;33mChecking devices...[0m
+[0;32m✓ Device 1 (Samsung SM-G398FN): R58M91ETKFE[0m
+[0;32m✓ Device 2 (TANK2): adb-TANK200000007933-4IW9F8._adb-tls-connect._tcp[0m
+
+[1;33mBuilding APK...[0m
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:dexBuilderDebug UP-TO-DATE
+> Task :app:mergeDebugGlobalSynthetics UP-TO-DATE
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:mergeDebugJavaResource UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeProjectDexDebug UP-TO-DATE
+> Task :app:stripDebugDebugSymbols NO-SOURCE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:packageDebug UP-TO-DATE
+> Task :app:createDebugApkListingFileRedirect UP-TO-DATE
+> Task :app:assembleDebug UP-TO-DATE
+
+BUILD SUCCESSFUL in 607ms
+59 actionable tasks: 59 up-to-date
+[0;32m✓ Build complete[0m
+
+[1;33mInstalling on Device 1 (Sender)...[0m
+Success
+Success
+[1;33mInstalling on Device 2 (Receiver)...[0m
+Success
+Success
+[0;32m✓ Installation complete[0m
+
+[1;33mGranting permissions...[0m
+[0;32m✓ Permissions granted[0m
+
+[0;34mLogs will be saved to:[0m
+  Receiver: ./ble-test-logs/receiver_20251111_093349.log
+  Sender: ./ble-test-logs/sender_20251111_093349.log
+
+[0;34m╔═══════════════════════════════════════════════════════╗[0m
+[0;34m║    Starting Tests                                     ║[0m
+[0;34m╚═══════════════════════════════════════════════════════╝[0m
+
+[1;33m[RECEIVER] Starting on Device 2...[0m
+[1;33m[SENDER] Starting on Device 1...[0m
+
+[0;34mMonitoring test execution (press Ctrl+C to stop monitoring)...[0m
+[0;34mTests will continue running in background[0m
+
+[RECEIVER] --------- beginning of main
+[RECEIVER] 11-11 09:35:58.699  2387  2431 I BleReceiverStressTest: === BLE RECEIVER STRESS TEST STARTING ===
+[RECEIVER] 11-11 09:35:58.699  2387  2431 I BleReceiverStressTest: Device: TANK2
+[RECEIVER] 11-11 09:35:58.699  2387  2431 I BleReceiverStressTest: Listening for BLE messages...
+[RECEIVER] 11-11 09:35:58.699  2387  2431 I BleReceiverStressTest: Note: Message reception stats will be tracked via logcat analysis
+[RECEIVER] 11-11 09:35:58.699  2387  2431 I BleReceiverStressTest: === RECEIVER TEST CLEANUP ===
+[RECEIVER] 11-11 09:35:58.727  2387  2431 I BleReceiverStressTest: === BLE RECEIVER STRESS TEST COMPLETE ===
+[RECEIVER] 11-11 09:35:58.741  2387  2431 I BleReceiverStressTest: === BLE RECEIVER STRESS TEST STARTING ===
+[RECEIVER] 11-11 09:35:58.741  2387  2431 I BleReceiverStressTest: Device: TANK2
+[RECEIVER] 11-11 09:35:58.741  2387  2431 I BleReceiverStressTest: Listening for BLE messages...
+[RECEIVER] 11-11 09:35:58.741  2387  2431 I BleReceiverStressTest: Note: Message reception stats will be tracked via logcat analysis
+[RECEIVER] 11-11 09:35:58.741  2387  2431 I BleReceiverStressTest: === RECEIVING ALL TEST MESSAGES ===
+[RECEIVER] 11-11 09:35:58.741  2387  2431 I BleReceiverStressTest: Waiting for messages from sender...
+[RECEIVER] 11-11 09:35:58.741  2387  2431 I BleReceiverStressTest: Check logcat with tag 'EventBleMessageReceived' for actual message reception
+[RECEIVER] 11-11 09:35:58.741  2387  2431 I BleReceiverStressTest: Listening for 120 seconds...
+[SENDER] --------- beginning of main
+[SENDER] --------- beginning of system

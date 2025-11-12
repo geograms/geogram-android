@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:padding="12dp">
+
+    <!-- Priority column -->
+    <TextView
+        android:id="@+id/text_priority"
+        android:layout_width="60dp"
+        android:layout_height="wrap_content"
+        android:text="URGENT"
+        android:textColor="#FF5252"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:padding="4dp" />
+
+    <!-- Date column -->
+    <TextView
+        android:id="@+id/text_date"
+        android:layout_width="100dp"
+        android:layout_height="wrap_content"
+        android:text="Nov 10 14:30"
+        android:textColor="@color/white"
+        android:textSize="12sp"
+        android:padding="4dp" />
+
+    <!-- Sender column -->
+    <TextView
+        android:id="@+id/text_sender"
+        android:layout_width="80dp"
+        android:layout_height="wrap_content"
+        android:text="CR7BBQ"
+        android:textColor="@color/white"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:padding="4dp"
+        android:ellipsize="end"
+        android:maxLines="1" />
+
+    <!-- Destination column -->
+    <TextView
+        android:id="@+id/text_destination"
+        android:layout_width="80dp"
+        android:layout_height="wrap_content"
+        android:text="W6XYZ"
+        android:textColor="@color/white"
+        android:textSize="12sp"
+        android:padding="4dp"
+        android:ellipsize="end"
+        android:maxLines="1" />
+
+    <!-- Subject column (expandable) -->
+    <TextView
+        android:id="@+id/text_subject"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="Subject text here..."
+        android:textColor="@color/white"
+        android:textSize="12sp"
+        android:padding="4dp"
+        android:ellipsize="end"
+        android:maxLines="1" />
+
+</LinearLayout>

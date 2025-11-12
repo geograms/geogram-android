@@ -1,0 +1,11 @@
+android.util.AndroidException: INSTRUMENTATION_FAILED: off.grid.geogram.test/androidx.test.runner.AndroidJUnitRunner
+	at com.android.commands.am.Instrument.run(Instrument.java:519)
+	at com.android.commands.am.Am.runInstrument(Am.java:202)
+	at com.android.commands.am.Am.onRun(Am.java:80)
+	at com.android.internal.os.BaseCommand.run(BaseCommand.java:60)
+	at com.android.commands.am.Am.main(Am.java:50)
+	at com.android.internal.os.RuntimeInit.nativeFinishInit(Native Method)
+	at com.android.internal.os.RuntimeInit.main(RuntimeInit.java:409)
+INSTRUMENTATION_STATUS: Error=Unable to find instrumentation info for: ComponentInfo{off.grid.geogram.test/androidx.test.runner.AndroidJUnitRunner}
+INSTRUMENTATION_STATUS: id=ActivityManagerService
+INSTRUMENTATION_STATUS_CODE: -1

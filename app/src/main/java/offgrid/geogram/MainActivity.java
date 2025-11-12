@@ -86,6 +86,9 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         sInstance = new WeakReference<>(this); // publish current instance
 
+        // Initialize file logging for debugging
+        Log.initFileLogging(this);
+
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
 
         if (PermissionsHelper.hasAllPermissions(this)) {
@@ -151,33 +154,53 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showPermissionRequiredDialog() {
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Permissions Required")
                 .setMessage("Geogram requires Bluetooth and Location permissions to function. The app cannot proceed without these permissions.")
                 .setCancelable(false)
-                .setPositiveButton("Grant Permissions", (dialog, which) -> {
+                .setPositiveButton("Grant Permissions", (d, which) -> {
                     PermissionsHelper.requestPermissionsIfNecessary(this);
                 })
-                .setNegativeButton("Exit", (dialog, which) -> {
+                .setNegativeButton("Exit", (d, which) -> {
                     finish();
                 })
                 .show();
+
+        // Set button text colors to white for better readability
+        android.widget.Button positiveButton = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE);
+        android.widget.Button negativeButton = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE);
+        if (positiveButton != null) {
+            positiveButton.setTextColor(getResources().getColor(R.color.white, null));
+        }
+        if (negativeButton != null) {
+            negativeButton.setTextColor(getResources().getColor(R.color.white, null));
+        }
     }
 
     private void showPermissionDeniedDialog() {
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Permissions Denied")
                 .setMessage("Some permissions are permanently denied. Please enable Bluetooth and Location permissions in App Settings for Geogram to work.")
                 .setCancelable(false)
-                .setPositiveButton("Open Settings", (dialog, which) -> {
+                .setPositiveButton("Open Settings", (d, which) -> {
                     Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
                     intent.setData(android.net.Uri.fromParts("package", getPackageName(), null));
                     startActivity(intent);
                 })
-                .setNegativeButton("Exit", (dialog, which) -> {
+                .setNegativeButton("Exit", (d, which) -> {
                     finish();
                 })
                 .show();
+
+        // Set button text colors to white for better readability
+        android.widget.Button positiveButton = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE);
+        android.widget.Button negativeButton = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE);
+        if (positiveButton != null) {
+            positiveButton.setTextColor(getResources().getColor(R.color.white, null));
+        }
+        if (negativeButton != null) {
+            negativeButton.setTextColor(getResources().getColor(R.color.white, null));
+        }
     }
 
     private void initializeApp() {
@@ -188,6 +211,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
         Log.i(TAG, "Initializing the app...");
+
+        // Initialize DeviceManager with context for relay sync
+        DeviceManager.getInstance().initialize(this);
 
         beacons = findViewById(R.id.lv_beacons);
 
@@ -310,8 +336,9 @@ public class MainActivity extends AppCompatActivity {
 
             if (item.getItemId() == R.id.nav_settings) {
                 transaction.replace(R.id.fragment_container, SettingsFragment.getInstance()).addToBackStack(null);
-            } else if (item.getItemId() == R.id.nav_relay) {
-                transaction.replace(R.id.fragment_container, new RelayFragment()).addToBackStack(null);
+            // Relay menu removed - relay accessible via main action bar relay button
+            // } else if (item.getItemId() == R.id.nav_relay) {
+            //     transaction.replace(R.id.fragment_container, new RelayFragment()).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_debug) {
                 transaction.replace(R.id.fragment_container, new DebugFragment()).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_about) {

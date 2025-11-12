@@ -205,7 +205,6 @@ public class ChatFragmentDevice extends Fragment {
 
         // add the other details
         TextView textBoxUpper = userMessageView.findViewById(R.id.upper_text);
-        TextView textBoxLower = userMessageView.findViewById(R.id.lower_text);
 
         long timeStamp = message.getTimestamp();
         String textLower = DateUtils.convertTimestampForChatMessage(timeStamp);
@@ -218,9 +217,8 @@ public class ChatFragmentDevice extends Fragment {
             textLower += "✔";
         }
 
-
-        textBoxUpper.setText("");
-        textBoxLower.setText(textLower);
+        // Show "Me" + timestamp + checkmarks in upper text
+        textBoxUpper.setText("Me - " + textLower);
 
         chatMessageContainer.addView(userMessageView);
         chatScrollView.post(() -> chatScrollView.fullScroll(View.FOCUS_DOWN));
@@ -247,14 +245,12 @@ public class ChatFragmentDevice extends Fragment {
 
         // Get the objects
         TextView textBoxUpper = receivedMessageView.findViewById(R.id.message_boxUpper);
-        TextView textBoxLower = receivedMessageView.findViewById(R.id.message_boxLower);
-
 
         // Add the timestamp
         long timeStamp = message.getTimestamp();
         String dateText = DateUtils.convertTimestampForChatMessage(timeStamp);
-        textBoxUpper.setText("");
-        textBoxLower.setText(dateText);
+        // Show sender ID + timestamp in upper text
+        textBoxUpper.setText(message.getAuthorId() + " - " + dateText);
         // Set the sender's name
 //        if (nickname.isEmpty() && message.getAuthorId() != null) {
 //            textBoxLower.setText(message.getAuthorId());

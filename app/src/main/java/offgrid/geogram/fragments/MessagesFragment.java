@@ -1,11 +1,14 @@
 package offgrid.geogram.fragments;
 
+import androidx.appcompat.app.AlertDialog;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -16,6 +19,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import org.json.JSONException;
 
 import java.io.IOException;
@@ -25,9 +30,11 @@ import java.util.List;
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.api.GeogramMessagesAPI;
+import offgrid.geogram.api.ProfileAPI;
 import offgrid.geogram.apps.messages.Conversation;
 import offgrid.geogram.apps.messages.ConversationAdapter;
-import offgrid.geogram.apps.messages.ConversationChatFragment;
+import offgrid.geogram.contacts.ContactFolderManager;
+import offgrid.geogram.contacts.ContactProfile;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.database.DatabaseConversations;
@@ -41,10 +48,12 @@ public class MessagesFragment extends Fragment {
     private SwipeRefreshLayout swipeRefreshLayout;
     private RecyclerView conversationsRecyclerView;
     private TextView emptyState;
+    private FloatingActionButton fabAddContact;
     private ConversationAdapter adapter;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private static final long AUTO_REFRESH_INTERVAL_MS = 30000; // 30 seconds
     private Runnable autoRefreshRunnable;
+    private ContactFolderManager folderManager;
 
     @Nullable
     @Override
@@ -52,10 +61,14 @@ public class MessagesFragment extends Fragment {
         // Inflate the layout for this fragment
         View view = inflater.inflate(R.layout.fragment_messages, container, false);
 
+        // Initialize folder manager
+        folderManager = new ContactFolderManager(requireContext());
+
         // Initialize views
         swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
         conversationsRecyclerView = view.findViewById(R.id.conversations_recycler_view);
         emptyState = view.findViewById(R.id.empty_state);
+        fabAddContact = view.findViewById(R.id.fab_add_contact);
 
         // Setup RecyclerView
         conversationsRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -65,6 +78,9 @@ public class MessagesFragment extends Fragment {
         // Setup swipe refresh
         swipeRefreshLayout.setOnRefreshListener(this::loadConversations);
 
+        // Setup FAB
+        fabAddContact.setOnClickListener(v -> showAddContactDialog());
+
         // Load conversations initially
         loadConversations();
 
@@ -72,15 +88,159 @@ public class MessagesFragment extends Fragment {
     }
 
     private void onConversationClick(Conversation conversation) {
-        // Navigate to conversation chat
+        // Navigate to contact detail (folder view)
         if (getActivity() != null) {
-            ConversationChatFragment fragment = ConversationChatFragment.newInstance(conversation.getPeerId());
+            ContactDetailFragment fragment = ContactDetailFragment.newInstance(conversation.getPeerId());
             getActivity().getSupportFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, fragment)
                     .addToBackStack(null)
                     .commit();
         }
+    }
+
+    /**
+     * Show dialog to add a new contact by callsign.
+     */
+    private void showAddContactDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Add Contact");
+        builder.setMessage("Enter the callsign of the contact you want to add:");
+
+        // Input field
+        final EditText input = new EditText(requireContext());
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+        input.setHint("e.g., CR7BBQ");
+
+        // Force uppercase and only allow valid callsign characters (A-Z, 0-9, -)
+        input.setFilters(new android.text.InputFilter[] {
+            new android.text.InputFilter.AllCaps(),
+            new android.text.InputFilter.LengthFilter(9),
+            (source, start, end, dest, dstart, dend) -> {
+                // Only allow A-Z, 0-9, and dash
+                for (int i = start; i < end; i++) {
+                    char c = source.charAt(i);
+                    if (!Character.isLetterOrDigit(c) && c != '-') {
+                        return "";
+                    }
+                }
+                return null;
+            }
+        });
+
+        builder.setView(input);
+
+        // Add button
+        builder.setPositiveButton("Add", (dialog, which) -> {
+            String callsign = input.getText().toString().trim().toUpperCase();
+
+            if (callsign.isEmpty()) {
+                Toast.makeText(requireContext(), "Please enter a callsign", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            if (!ContactFolderManager.isValidCallsign(callsign)) {
+                Toast.makeText(requireContext(), "Invalid callsign format", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Fetch profile from server
+            fetchAndAddContact(callsign);
+        });
+
+        // Cancel button
+        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+
+        AlertDialog dialog = builder.show();
+
+        // Set button text colors explicitly to white for better readability
+        android.widget.Button positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        android.widget.Button negativeButton = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+        if (positiveButton != null) {
+            positiveButton.setTextColor(getResources().getColor(R.color.white, null));
+        }
+        if (negativeButton != null) {
+            negativeButton.setTextColor(getResources().getColor(R.color.white, null));
+        }
+    }
+
+    /**
+     * Fetch profile from server and add as contact.
+     * If profile is not found on server, creates a basic profile locally.
+     */
+    private void fetchAndAddContact(String callsign) {
+        // Show progress
+        Toast.makeText(requireContext(), "Fetching profile for " + callsign + "...", Toast.LENGTH_SHORT).show();
+
+        new Thread(() -> {
+            try {
+                // Try to fetch profile from server
+                ContactProfile profile = ProfileAPI.fetchProfile(callsign);
+                final boolean foundOnServer = (profile != null);
+
+                // If not found on server, create a basic profile
+                if (profile == null) {
+                    Log.d(TAG, "Profile not found on server for " + callsign + ", creating basic profile");
+                    profile = new ContactProfile();
+                    profile.setCallsign(callsign);
+                    profile.setFirstTimeSeen(System.currentTimeMillis());
+                    profile.setLastUpdated(System.currentTimeMillis());
+                }
+
+                final ContactProfile finalProfile = profile;
+
+                handler.post(() -> {
+                    // Create contact folder structure
+                    boolean created = folderManager.ensureContactStructure(callsign);
+
+                    if (!created) {
+                        Toast.makeText(requireContext(),
+                            "Failed to create contact folder",
+                            Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    // Save profile
+                    boolean saved = folderManager.saveProfile(callsign, finalProfile);
+
+                    if (!saved) {
+                        Toast.makeText(requireContext(),
+                            "Failed to save profile",
+                            Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    // Show appropriate message
+                    String message;
+                    if (foundOnServer) {
+                        message = "Added contact: " + callsign + " (from server)";
+                    } else {
+                        message = "Added contact: " + callsign + " (not on server)";
+                    }
+
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                    Log.d(TAG, message);
+
+                    // Navigate to contact detail
+                    if (getActivity() != null) {
+                        ContactDetailFragment fragment = ContactDetailFragment.newInstance(callsign);
+                        getActivity().getSupportFragmentManager()
+                            .beginTransaction()
+                            .replace(R.id.fragment_container, fragment)
+                            .addToBackStack(null)
+                            .commit();
+                    }
+                });
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error adding contact: " + e.getMessage());
+                handler.post(() -> {
+                    Toast.makeText(requireContext(),
+                        "Error adding contact: " + e.getMessage(),
+                        Toast.LENGTH_LONG).show();
+                });
+            }
+        }).start();
     }
 
     private void loadConversations() {

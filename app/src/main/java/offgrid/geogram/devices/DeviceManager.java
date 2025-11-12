@@ -116,9 +116,18 @@ public class DeviceManager {
         return new TreeSet<>(devicesSpotted);
     }
 
-    /** Clear all spotted devices. */
+    /** Clear all spotted devices from memory and database. */
     public synchronized void clear() {
+        // Clear in-memory list
         devicesSpotted.clear();
+
+        // Clear database (devices and pings)
+        DatabaseDevices.get().deleteAllDevices();
+
+        // Reset loaded flag so devices are only added back when actually spotted
+        isLoadedFromDatabase = false;
+
+        Log.i(TAG, "Cleared all devices from memory and database");
     }
 
     public synchronized void addNewLocationEvent(String callsign, DeviceType deviceType, EventConnected event){

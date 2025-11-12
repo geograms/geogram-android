@@ -64,6 +64,12 @@
         <item>Everything</item>
     </string-array>
 
+    <string-array name="relay_priority_levels">
+        <item>Urgent</item>
+        <item>Normal</item>
+        <item>Low</item>
+    </string-array>
+
     <string name="about_text">
     Our goal is to build an inexpensive communication network between a region of people that do not
     necessarily have access to Internet. This can happen because of mountain regions, because

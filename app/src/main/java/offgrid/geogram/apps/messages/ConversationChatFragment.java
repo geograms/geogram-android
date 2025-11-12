@@ -41,9 +41,11 @@ public class ConversationChatFragment extends Fragment {
 
     private static final String TAG = "ConversationChatFragment";
     private static final String ARG_PEER_ID = "peer_id";
+    private static final String ARG_EMBEDDED = "embedded";
     private static final long POLL_INTERVAL_MS = 30000; // 30 seconds
 
     private String peerId;
+    private boolean embedded = false;
     private LinearLayout chatMessageContainer;
     private ScrollView chatScrollView;
     private TextView conversationHeader;
@@ -60,9 +62,14 @@ public class ConversationChatFragment extends Fragment {
     private int nextColorIndex = 0;
 
     public static ConversationChatFragment newInstance(String peerId) {
+        return newInstance(peerId, false);
+    }
+
+    public static ConversationChatFragment newInstance(String peerId, boolean embedded) {
         ConversationChatFragment fragment = new ConversationChatFragment();
         Bundle args = new Bundle();
         args.putString(ARG_PEER_ID, peerId);
+        args.putBoolean(ARG_EMBEDDED, embedded);
         fragment.setArguments(args);
         return fragment;
     }
@@ -72,8 +79,9 @@ public class ConversationChatFragment extends Fragment {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
             peerId = getArguments().getString(ARG_PEER_ID);
+            embedded = getArguments().getBoolean(ARG_EMBEDDED, false);
         }
-        Log.d(TAG, "onCreate: Created ConversationChatFragment for peer: " + peerId);
+        Log.d(TAG, "onCreate: Created ConversationChatFragment for peer: " + peerId + ", embedded: " + embedded);
     }
 
     @Nullable
@@ -89,15 +97,25 @@ public class ConversationChatFragment extends Fragment {
         ImageButton btnSend = view.findViewById(R.id.btn_send);
         ImageButton btnBack = view.findViewById(R.id.btn_back);
 
-        // Set conversation header
-        conversationHeader.setText(peerId);
-
-        // Setup back button
-        btnBack.setOnClickListener(v -> {
-            if (getActivity() != null) {
-                getActivity().getSupportFragmentManager().popBackStack();
+        // Hide header when embedded in ContactDetailFragment
+        if (embedded) {
+            View headerLayout = view.findViewById(R.id.conversation_header).getParent() instanceof View
+                ? (View) view.findViewById(R.id.conversation_header).getParent()
+                : null;
+            if (headerLayout != null) {
+                headerLayout.setVisibility(View.GONE);
             }
-        });
+        } else {
+            // Set conversation header
+            conversationHeader.setText(peerId);
+
+            // Setup back button
+            btnBack.setOnClickListener(v -> {
+                if (getActivity() != null) {
+                    getActivity().getSupportFragmentManager().popBackStack();
+                }
+            });
+        }
 
         // Setup send button
         btnSend.setOnClickListener(v -> {

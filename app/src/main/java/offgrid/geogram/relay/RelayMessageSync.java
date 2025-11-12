@@ -1,7 +1,6 @@
 package offgrid.geogram.relay;
 
 import android.content.Context;
-import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,6 +11,8 @@ import java.util.Set;
 
 import offgrid.geogram.ble.BluetoothMessage;
 import offgrid.geogram.ble.BluetoothSender;
+import offgrid.geogram.core.Central;
+import offgrid.geogram.core.Log;
 
 /**
  * Handles relay message synchronization over BLE.
@@ -81,7 +82,19 @@ public class RelayMessageSync {
             return;
         }
 
-        Log.d(TAG, "Starting sync with " + remoteDeviceId);
+        // Verify GATT connection exists before attempting sync
+        // Relay sync now uses GATT for high-bandwidth, reliable transfer
+        if (!bluetoothSender.hasActiveConnection(remoteDeviceId)) {
+            Log.w(TAG, "No active GATT connection to " + remoteDeviceId + ", skipping sync");
+            Log.w(TAG, "Active connections: " + bluetoothSender.getActiveConnectionCount());
+            return;
+        }
+
+        Log.i(TAG, "=== RELAY SYNC STARTED ===");
+        Log.i(TAG, "Local device: " + getDeviceId());
+        Log.i(TAG, "Remote device: " + remoteDeviceId);
+        Log.i(TAG, "Auto-accept: " + settings.isAutoAcceptEnabled());
+        Log.i(TAG, "Using GATT connection for high-bandwidth sync");
 
         // Get or create sync session
         SyncSession session = getOrCreateSession(remoteDeviceId);
@@ -98,8 +111,12 @@ public class RelayMessageSync {
         // Get messages from outbox (messages to be relayed)
         List<String> outboxIds = storage.listMessages("outbox");
 
+        Log.i(TAG, "Sending inventory to " + remoteDeviceId);
+        Log.i(TAG, "Outbox contains " + outboxIds.size() + " messages");
+
         if (outboxIds.isEmpty()) {
-            Log.d(TAG, "No messages in outbox to sync");
+            Log.d(TAG, "No messages in outbox - sending empty inventory");
+            sendBluetoothMessage(remoteDeviceId, CMD_INVENTORY);
             return;
         }
 
@@ -114,9 +131,11 @@ public class RelayMessageSync {
             inv.append(inventoryIds.get(i));
         }
 
+        Log.i(TAG, "Inventory content: " + inv.toString().substring(0, Math.min(100, inv.length())) + "...");
+
         // Send via BLE
         sendBluetoothMessage(remoteDeviceId, inv.toString());
-        Log.d(TAG, "Sent inventory with " + inventoryIds.size() + " messages");
+        Log.i(TAG, "✓ Sent inventory with " + inventoryIds.size() + " messages");
     }
 
     /**
@@ -127,6 +146,7 @@ public class RelayMessageSync {
      */
     public void handleIncomingMessage(BluetoothMessage message) {
         if (!settings.isRelayEnabled()) {
+            Log.d(TAG, "Relay disabled - ignoring incoming message");
             return;
         }
 
@@ -136,6 +156,14 @@ public class RelayMessageSync {
         }
 
         String sender = message.getIdFromSender();
+        String msgType = (content.startsWith(CMD_INVENTORY) ? "INVENTORY" :
+                         content.startsWith(CMD_REQUEST) ? "REQUEST" :
+                         content.startsWith(CMD_MESSAGE) ? "MESSAGE" : "UNKNOWN");
+
+        Log.i(TAG, "=== RELAY MESSAGE RECEIVED ===");
+        Log.i(TAG, "From: " + sender);
+        Log.i(TAG, "Type: " + msgType);
+        Log.i(TAG, "Content length: " + content.length() + " bytes");
 
         // Parse relay protocol commands
         if (content.startsWith(CMD_INVENTORY)) {
@@ -144,6 +172,8 @@ public class RelayMessageSync {
             handleRequest(sender, content.substring(CMD_REQUEST.length()));
         } else if (content.startsWith(CMD_MESSAGE)) {
             handleRelayMessage(sender, content.substring(CMD_MESSAGE.length()));
+        } else {
+            Log.w(TAG, "Unknown relay protocol message");
         }
     }
 
@@ -152,10 +182,11 @@ public class RelayMessageSync {
      * Performs gap analysis and requests missing messages.
      */
     private void handleInventory(String remoteDeviceId, String inventoryData) {
-        Log.d(TAG, "Received inventory from " + remoteDeviceId);
+        Log.i(TAG, "--- Processing Inventory ---");
+        Log.i(TAG, "From: " + remoteDeviceId);
 
         // Parse inventory
-        String[] remoteIds = inventoryData.split(",");
+        String[] remoteIds = inventoryData.trim().isEmpty() ? new String[0] : inventoryData.split(",");
         Set<String> remoteInventory = new HashSet<>();
         for (String id : remoteIds) {
             if (!id.trim().isEmpty()) {
@@ -163,14 +194,17 @@ public class RelayMessageSync {
             }
         }
 
+        Log.i(TAG, "Remote has " + remoteInventory.size() + " messages");
+
         if (remoteInventory.isEmpty()) {
-            Log.d(TAG, "Empty inventory received");
+            Log.d(TAG, "Empty inventory received - remote has no messages");
             return;
         }
 
         // Get our inbox messages
         List<String> inboxIds = storage.listMessages("inbox");
         Set<String> localInventory = new HashSet<>(inboxIds);
+        Log.i(TAG, "Local inbox has " + localInventory.size() + " messages");
 
         // Gap analysis - find messages we don't have
         List<String> missingMessages = new ArrayList<>();
@@ -180,15 +214,16 @@ public class RelayMessageSync {
             }
         }
 
+        Log.i(TAG, "Missing " + missingMessages.size() + " messages from remote");
+
         if (missingMessages.isEmpty()) {
-            Log.d(TAG, "No missing messages from " + remoteDeviceId);
+            Log.d(TAG, "No missing messages to request");
             return;
         }
 
-        Log.d(TAG, "Found " + missingMessages.size() + " missing messages");
-
         // Request missing messages (batch limited)
         int requestCount = Math.min(missingMessages.size(), MAX_REQUEST_BATCH);
+        Log.i(TAG, "Requesting " + requestCount + " messages");
         for (int i = 0; i < requestCount; i++) {
             requestMessage(remoteDeviceId, missingMessages.get(i));
         }
@@ -205,7 +240,7 @@ public class RelayMessageSync {
     private void requestMessage(String remoteDeviceId, String messageId) {
         String request = CMD_REQUEST + messageId;
         sendBluetoothMessage(remoteDeviceId, request);
-        Log.d(TAG, "Requested message " + messageId + " from " + remoteDeviceId);
+        Log.i(TAG, "→ Requested message: " + messageId);
     }
 
     /**
@@ -213,22 +248,27 @@ public class RelayMessageSync {
      * Sends the requested message if available in outbox.
      */
     private void handleRequest(String remoteDeviceId, String messageId) {
-        Log.d(TAG, "Received request for message " + messageId + " from " + remoteDeviceId);
+        Log.i(TAG, "--- Processing Request ---");
+        Log.i(TAG, "From: " + remoteDeviceId);
+        Log.i(TAG, "Requested message ID: " + messageId);
 
         // Load message from outbox
         RelayMessage message = storage.getMessage(messageId, "outbox");
         if (message == null) {
-            Log.w(TAG, "Requested message " + messageId + " not found in outbox");
+            Log.w(TAG, "✗ Requested message not found in outbox: " + messageId);
             return;
         }
 
+        Log.i(TAG, "Found message - from: " + message.getFromCallsign() + " to: " + message.getToCallsign());
+
         // Check if message should be sent based on settings
         if (!message.shouldAccept(settings)) {
-            Log.d(TAG, "Message " + messageId + " rejected by relay settings");
+            Log.w(TAG, "✗ Message rejected by relay settings");
             return;
         }
 
         // Send message
+        Log.i(TAG, "→ Sending message to " + remoteDeviceId);
         sendRelayMessage(remoteDeviceId, message);
     }
 
@@ -236,15 +276,20 @@ public class RelayMessageSync {
      * Send relay message to remote device.
      */
     private void sendRelayMessage(String remoteDeviceId, RelayMessage message) {
+        Log.i(TAG, "--- Sending Relay Message ---");
+        Log.i(TAG, "Message ID: " + message.getId());
+        Log.i(TAG, "To device: " + remoteDeviceId);
+
         // Serialize to markdown
         String markdown = message.toMarkdown();
+        Log.i(TAG, "Markdown size: " + markdown.length() + " bytes");
 
         // Add relay command prefix
         String content = CMD_MESSAGE + markdown;
 
         // Send via BLE
         sendBluetoothMessage(remoteDeviceId, content);
-        Log.d(TAG, "Sent relay message " + message.getId() + " to " + remoteDeviceId);
+        Log.i(TAG, "✓ Sent relay message to " + remoteDeviceId);
 
         // Mark as recently processed
         addToRecentlyProcessed(message.getId());
@@ -255,6 +300,7 @@ public class RelayMessageSync {
 
         // Move to sent folder
         storage.moveMessage(message.getId(), "outbox", "sent");
+        Log.i(TAG, "✓ Message moved to sent folder");
     }
 
     /**
@@ -262,31 +308,39 @@ public class RelayMessageSync {
      * Saves to inbox if accepted by settings.
      */
     private void handleRelayMessage(String remoteDeviceId, String markdown) {
-        Log.d(TAG, "Received relay message from " + remoteDeviceId);
+        Log.i(TAG, "--- Processing Relay Message ---");
+        Log.i(TAG, "From: " + remoteDeviceId);
+        Log.i(TAG, "Content size: " + markdown.length() + " bytes");
 
         // Parse markdown
         RelayMessage message = RelayMessage.parseMarkdown(markdown);
         if (message == null) {
-            Log.e(TAG, "Failed to parse relay message");
+            Log.e(TAG, "✗ Failed to parse relay message markdown");
             return;
         }
 
+        Log.i(TAG, "Parsed message ID: " + message.getId());
+        Log.i(TAG, "Message from: " + message.getFromCallsign() + " to: " + message.getToCallsign());
+
         // Check if already processed
         if (isRecentlyProcessed(message.getId())) {
-            Log.d(TAG, "Message " + message.getId() + " already processed");
+            Log.d(TAG, "Message " + message.getId() + " already processed (skipping)");
             return;
         }
 
         // Check if we already have this message
         if (storage.getMessage(message.getId()) != null) {
-            Log.d(TAG, "Message " + message.getId() + " already in storage");
+            Log.d(TAG, "Message " + message.getId() + " already in storage (skipping)");
             addToRecentlyProcessed(message.getId());
             return;
         }
 
         // Check acceptance based on settings
-        if (!message.shouldAccept(settings)) {
-            Log.d(TAG, "Message " + message.getId() + " rejected by relay settings");
+        boolean shouldAccept = message.shouldAccept(settings);
+        Log.i(TAG, "Should accept: " + shouldAccept + " (auto-accept: " + settings.isAutoAcceptEnabled() + ")");
+
+        if (!shouldAccept) {
+            Log.w(TAG, "✗ Message rejected by relay settings");
             return;
         }
 
@@ -298,7 +352,7 @@ public class RelayMessageSync {
         // Save to inbox
         boolean saved = storage.saveMessage(message, "inbox");
         if (saved) {
-            Log.d(TAG, "Saved relay message " + message.getId() + " to inbox");
+            Log.i(TAG, "✓ Message saved to inbox successfully");
             addToRecentlyProcessed(message.getId());
 
             // Remove from session pending requests
@@ -306,9 +360,10 @@ public class RelayMessageSync {
             if (session != null) {
                 session.pendingRequests.remove(message.getId());
                 session.messagesReceived++;
+                Log.i(TAG, "Session stats - Received: " + session.messagesReceived + ", Sent: " + session.messagesSent);
             }
         } else {
-            Log.e(TAG, "Failed to save message " + message.getId());
+            Log.e(TAG, "✗ Failed to save message to inbox");
         }
     }
 
@@ -317,22 +372,29 @@ public class RelayMessageSync {
      */
     private void sendBluetoothMessage(String destination, String content) {
         try {
+            String msgType = content.startsWith(CMD_INVENTORY) ? "INV" :
+                           content.startsWith(CMD_REQUEST) ? "REQ" :
+                           content.startsWith(CMD_MESSAGE) ? "MSG" : "???";
+            Log.d(TAG, "Sending " + msgType + " via BLE (" + content.length() + " bytes) to " + destination);
+
             // Create BluetoothMessage
+            // Use GATT connection for relay sync (higher bandwidth, reliable delivery)
+            // Relay messages are sent directly to the target device via GATT when available
             BluetoothMessage bleMessage = new BluetoothMessage(
                     getDeviceId(),
-                    destination,
+                    destination,  // Use actual destination for GATT routing
                     content,
-                    content.length() <= 18 // Single message if <= 18 chars
+                    false  // Never use single-message mode for relay - always use GATT for reliability
             );
 
-            // Send each parcel via BluetoothSender
+            // Send BluetoothMessage object (which contains all parcels)
             String[] parcels = bleMessage.getMessageParcels();
-            for (String parcel : parcels) {
-                bluetoothSender.sendMessage(parcel);
-            }
+            Log.d(TAG, "BLE message split into " + parcels.length + " parcel(s)");
+            bluetoothSender.sendMessage(bleMessage);
+            Log.d(TAG, "✓ BLE message queued for transmission");
         } catch (Exception e) {
             // Handle gracefully - may fail in test environment
-            Log.d(TAG, "Failed to send BLE message: " + e.getMessage());
+            Log.e(TAG, "✗ Failed to send BLE message: " + e.getMessage(), e);
         }
     }
 
@@ -340,8 +402,17 @@ public class RelayMessageSync {
      * Get device ID for this relay node.
      */
     private String getDeviceId() {
-        // TODO: Get actual device callsign from settings
-        return "LOCAL-RELAY";
+        try {
+            if (Central.getInstance() != null && Central.getInstance().getSettings() != null) {
+                String callsign = Central.getInstance().getSettings().getIdDevice();
+                if (callsign != null && !callsign.isEmpty()) {
+                    return callsign;
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting device ID: " + e.getMessage());
+        }
+        return "UNKNOWN";
     }
 
     /**

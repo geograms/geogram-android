@@ -16,6 +16,10 @@ import java.util.Random;
 import offgrid.geogram.util.ASCII;
 import offgrid.geogram.util.NicknameGenerator;
 
+/**
+ * @deprecated Use ConfigManager instead. This class is kept for backward compatibility.
+ */
+@Deprecated
 public class SettingsLoader {
 
     private static final String SETTINGS_FILE_NAME = "settings.json";
@@ -27,39 +31,10 @@ public class SettingsLoader {
     };
 
     public static SettingsUser loadSettings(Context context) {
-        Gson gson = new GsonBuilder().excludeFieldsWithoutExposeAnnotation().create();
-        File settingsFile = new File(context.getFilesDir(), SETTINGS_FILE_NAME);
-
-        Log.i("SettingsLoader", "Settings file location: " + settingsFile.getAbsolutePath());
-
-        if (settingsFile.exists()) {
-            try (FileReader reader = new FileReader(settingsFile)) {
-                SettingsUser settings = gson.fromJson(reader, SettingsUser.class);
-                if(settings.getNickname() == null || settings.getNickname().isEmpty()){
-                    throw new IllegalArgumentException("Nickname cannot be empty");
-                }
-                // Validate identity fields
-                if(settings.getNpub() == null || settings.getNpub().isEmpty() ||
-                   settings.getNsec() == null || settings.getNsec().isEmpty() ||
-                   settings.getCallsign() == null || settings.getCallsign().isEmpty()){
-                    Log.w("SettingsLoader", "Settings missing identity fields, regenerating identity.");
-                    // Generate new identity for existing settings
-                    IdentityHelper.NostrIdentity identity = IdentityHelper.generateNewIdentity();
-                    settings.setNpub(identity.npub);
-                    settings.setNsec(identity.nsec);
-                    settings.setCallsign(identity.callsign);
-                    saveSettings(context, settings);
-                }
-                Log.i("SettingsLoader", "Settings loaded successfully.");
-                return settings;
-            } catch (Exception e) {
-                Log.e("SettingsLoader", "Failed to read settings file, creating default settings.", e);
-                return createDefaultSettings(context);
-            }
-        } else {
-            Log.i("SettingsLoader", "Settings file not found, creating default settings.");
-            return createDefaultSettings(context);
-        }
+        // Use ConfigManager for new implementation
+        ConfigManager configManager = ConfigManager.getInstance(context);
+        configManager.initialize();
+        return configManager.getSettingsUser();
     }
 
     public static SettingsUser createDefaultSettings(Context context) {
@@ -133,15 +108,26 @@ public class SettingsLoader {
     }
 
     public static void saveSettings(Context context, SettingsUser settings) {
-        Gson gson = new GsonBuilder().excludeFieldsWithoutExposeAnnotation().create();
-        File settingsFile = new File(context.getFilesDir(), SETTINGS_FILE_NAME);
-
-        try (FileWriter writer = new FileWriter(settingsFile)) {
-            gson.toJson(settings, writer);
-            writer.flush(); // Ensure data is written to disk
-            Log.i("SettingsLoader", "Settings saved successfully to: " + settingsFile.getAbsolutePath());
-        } catch (IOException e) {
-            Log.e("SettingsLoader", "Error saving settings file", e);
-        }
+        // Use ConfigManager for new implementation
+        ConfigManager configManager = ConfigManager.getInstance(context);
+        configManager.updateConfig(config -> {
+            AppConfig newConfig = AppConfig.fromSettingsUser(settings);
+            // Copy all fields from newConfig to config
+            if (newConfig.getCallsign() != null) config.setCallsign(newConfig.getCallsign());
+            if (newConfig.getNickname() != null) config.setNickname(newConfig.getNickname());
+            if (newConfig.getIntro() != null) config.setIntro(newConfig.getIntro());
+            if (newConfig.getPreferredColor() != null) config.setPreferredColor(newConfig.getPreferredColor());
+            if (newConfig.getEmoticon() != null) config.setEmoticon(newConfig.getEmoticon());
+            if (newConfig.getNpub() != null) config.setNpub(newConfig.getNpub());
+            if (newConfig.getNsec() != null) config.setNsec(newConfig.getNsec());
+            if (newConfig.getBeaconNickname() != null) config.setBeaconNickname(newConfig.getBeaconNickname());
+            if (newConfig.getBeaconType() != null) config.setBeaconType(newConfig.getBeaconType());
+            if (newConfig.getIdGroup() != null) config.setIdGroup(newConfig.getIdGroup());
+            config.setInvisibleMode(newConfig.isInvisibleMode());
+            config.setChatCommunicationMode(newConfig.getChatCommunicationMode());
+            config.setChatRadiusKm(newConfig.getChatRadiusKm());
+            config.setHttpApiEnabled(newConfig.isHttpApiEnabled());
+        });
+        Log.i("SettingsLoader", "Settings saved successfully via ConfigManager");
     }
 }

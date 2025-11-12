@@ -264,6 +264,8 @@ public class ChatFragmentBroadcast extends Fragment {
                                     internetMessage.setWrittenByMe(true);
                                     internetMessage.setTimestamp(System.currentTimeMillis());
                                     internetMessage.setMessageType(ChatMessageType.INTERNET);
+                                    // Set destinationId to match BLE messages for proper deduplication
+                                    internetMessage.setDestinationId("ANY");
                                     DatabaseMessages.getInstance().add(internetMessage);
                                 } else {
                                     Log.e(TAG, "Server returned failure response");
@@ -289,14 +291,7 @@ public class ChatFragmentBroadcast extends Fragment {
                 final String finalError = errorMessage;
 
                 requireActivity().runOnUiThread(() -> {
-                    // Refresh UI to show sent messages
-                    // Only refresh for internet messages - BLE messages are refreshed by event handlers
-                    if (finalSentInternet && canAddMessages()) {
-                        eraseMessagesFromWindow();
-                        updateMessages();
-                    }
-
-                    // Show success message
+                    // Show success/error message only - UI refresh is handled by event handlers
                     if (anySent) {
                         if (finalSentInternet && finalSentLocal) {
                             Toast.makeText(getContext(), "Message sent via Bluetooth and Internet", Toast.LENGTH_SHORT).show();
@@ -419,21 +414,30 @@ public class ChatFragmentBroadcast extends Fragment {
             return true; // Show all if mode not set
         }
 
-        ChatMessageType type = message.getMessageType();
+        // Check channels set for multi-channel support
+        boolean hasLocal = message.hasChannel(ChatMessageType.LOCAL);
+        boolean hasInternet = message.hasChannel(ChatMessageType.INTERNET);
 
-        // Old messages without a type set (DATA, TEXT, CHAT, etc.) should be treated as LOCAL
-        // since they came from Bluetooth before we added internet functionality
-        if (type != ChatMessageType.LOCAL && type != ChatMessageType.INTERNET) {
-            type = ChatMessageType.LOCAL;
+        // Fallback for legacy messages without channels
+        if (!hasLocal && !hasInternet) {
+            ChatMessageType type = message.getMessageType();
+            if (type == ChatMessageType.LOCAL) {
+                hasLocal = true;
+            } else if (type == ChatMessageType.INTERNET) {
+                hasInternet = true;
+            } else {
+                // Old messages without a type set should be treated as LOCAL
+                hasLocal = true;
+            }
         }
 
         switch (selectedCommunicationMode) {
             case "Local only":
-                return type == ChatMessageType.LOCAL;
+                return hasLocal;
             case "Internet only":
-                return type == ChatMessageType.INTERNET;
+                return hasInternet;
             case "Everything":
-                return type == ChatMessageType.LOCAL || type == ChatMessageType.INTERNET;
+                return hasLocal || hasInternet;
             default:
                 return true; // Show all by default
         }
@@ -452,12 +456,15 @@ public class ChatFragmentBroadcast extends Fragment {
 
         // add the other details
         TextView textBoxUpper = userMessageView.findViewById(R.id.upper_text);
-        TextView textBoxLower = userMessageView.findViewById(R.id.lower_text);
 
         long timeStamp = message.getTimestamp();
         String dateText = DateUtils.convertTimestampForChatMessage(timeStamp);
-        textBoxUpper.setText("");
-        textBoxLower.setText(dateText);
+        // Show "Me" + timestamp in upper text
+        textBoxUpper.setText("Me - " + dateText);
+
+        // Add channel indicators
+        LinearLayout channelIndicators = userMessageView.findViewById(R.id.channel_indicators);
+        addChannelIndicators(channelIndicators, message);
 
         try{
             chatMessageContainer.addView(userMessageView);
@@ -478,7 +485,6 @@ public class ChatFragmentBroadcast extends Fragment {
 
         // Get the objects
         TextView textBoxUpper = receivedMessageView.findViewById(R.id.message_boxUpper);
-        TextView textBoxLower = receivedMessageView.findViewById(R.id.message_boxLower);
 
         // Removed (legacy) - BioProfile was part of old Google Play Services code
         // BioProfile profile = null; //BioDatabase.get(message.getAuthorId(), this.getContext());
@@ -487,12 +493,14 @@ public class ChatFragmentBroadcast extends Fragment {
         // Add the timestamp
         long timeStamp = message.getTimestamp();
         String dateText = DateUtils.convertTimestampForChatMessage(timeStamp);
-        textBoxUpper.setText("");
 
-        // Set the sender's name with origin label
-        String origin = getMessageOriginLabel(message);
-        String idText = nickname + " " + origin + "    " + dateText;
-        textBoxLower.setText(idText);
+        // Set the sender's name and timestamp in upper text
+        String idText = nickname + " - " + dateText;
+        textBoxUpper.setText(idText);
+
+        // Add channel indicators
+        LinearLayout channelIndicators = receivedMessageView.findViewById(R.id.channel_indicators);
+        addChannelIndicators(channelIndicators, message);
 
         // Set the message content
         String text = message.getMessage();
@@ -514,29 +522,58 @@ public class ChatFragmentBroadcast extends Fragment {
     }
 
     /**
-     * Get the origin label for a message
-     * @param message The message
-     * @return "(internet)", "(bluetooth)", or "(bluetooth + internet)" based on message channels
+     * Add channel indicator badges to show which channels the message was sent through
+     * @param container The LinearLayout to add indicators to
+     * @param message The message to check channels for
      */
-    private String getMessageOriginLabel(ChatMessage message) {
+    private void addChannelIndicators(LinearLayout container, ChatMessage message) {
+        container.removeAllViews(); // Clear any existing indicators
+
         boolean hasLocal = message.hasChannel(ChatMessageType.LOCAL);
         boolean hasInternet = message.hasChannel(ChatMessageType.INTERNET);
 
-        // Handle multi-channel messages
-        if (hasLocal && hasInternet) {
-            return "(bluetooth + internet)";
-        } else if (hasInternet) {
-            return "(internet)";
-        } else if (hasLocal) {
-            return "(bluetooth)";
+        // Fallback for legacy messages without channels set
+        if (!hasLocal && !hasInternet) {
+            ChatMessageType type = message.getMessageType();
+            if (type == ChatMessageType.LOCAL) {
+                hasLocal = true;
+            } else if (type == ChatMessageType.INTERNET) {
+                hasInternet = true;
+            }
         }
 
-        // Fallback to old behavior for legacy messages
-        ChatMessageType type = message.getMessageType();
-        if (type == ChatMessageType.INTERNET) {
-            return "(internet)";
-        } else {
-            return "(bluetooth)";
+        // Add Bluetooth indicator
+        if (hasLocal) {
+            TextView bleIndicator = new TextView(getContext());
+            bleIndicator.setText("BLE");
+            bleIndicator.setTextSize(10);
+            bleIndicator.setTextColor(getResources().getColor(android.R.color.white));
+            bleIndicator.setBackgroundColor(0xFF666666); // Dark grey background
+            bleIndicator.setPadding(8, 4, 8, 4);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            params.setMargins(0, 0, 8, 0);
+            bleIndicator.setLayoutParams(params);
+            container.addView(bleIndicator);
+        }
+
+        // Add Internet indicator
+        if (hasInternet) {
+            TextView internetIndicator = new TextView(getContext());
+            internetIndicator.setText("NET");
+            internetIndicator.setTextSize(10);
+            internetIndicator.setTextColor(getResources().getColor(android.R.color.white));
+            internetIndicator.setBackgroundColor(0xFF666666); // Dark grey background
+            internetIndicator.setPadding(8, 4, 8, 4);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            params.setMargins(0, 0, 8, 0);
+            internetIndicator.setLayoutParams(params);
+            container.addView(internetIndicator);
         }
     }
 

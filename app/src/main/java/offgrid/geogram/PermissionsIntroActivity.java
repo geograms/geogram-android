@@ -1,15 +1,19 @@
 package offgrid.geogram;
 
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.text.Html;
+import android.text.Spanned;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
+
+import offgrid.geogram.settings.ConfigManager;
 
 /**
  * First-run permissions introduction screen.
@@ -27,8 +31,6 @@ import androidx.appcompat.app.AppCompatDelegate;
 public class PermissionsIntroActivity extends AppCompatActivity {
 
     private static final String TAG = "PermissionsIntroActivity";
-    private static final String PREFS_NAME = "GeogramPrefs";
-    private static final String KEY_FIRST_RUN = "isFirstRun";
 
     // Documentation URL in the central repository
     private static final String PERMISSIONS_DOCS_URL =
@@ -52,6 +54,25 @@ public class PermissionsIntroActivity extends AppCompatActivity {
         Button acceptButton = findViewById(R.id.acceptButton);
         Button declineButton = findViewById(R.id.declineButton);
         TextView learnMoreLink = findViewById(R.id.learnMoreLink);
+
+        // Set permission text with HTML formatting (title bold, description regular)
+        TextView bluetoothPermText = findViewById(R.id.bluetoothPermText);
+        TextView locationPermText = findViewById(R.id.locationPermText);
+        TextView batteryPermText = findViewById(R.id.batteryPermText);
+        TextView internetPermText = findViewById(R.id.internetPermText);
+
+        setPermissionText(bluetoothPermText,
+            getString(R.string.perm_bluetooth_title),
+            getString(R.string.perm_bluetooth_description));
+        setPermissionText(locationPermText,
+            getString(R.string.perm_location_title),
+            getString(R.string.perm_location_description));
+        setPermissionText(batteryPermText,
+            getString(R.string.perm_battery_title),
+            getString(R.string.perm_battery_description));
+        setPermissionText(internetPermText,
+            getString(R.string.perm_internet_title),
+            getString(R.string.perm_internet_description));
 
         // Accept button - mark first run complete and proceed to main activity
         acceptButton.setOnClickListener(v -> {
@@ -79,10 +100,8 @@ public class PermissionsIntroActivity extends AppCompatActivity {
      * Subsequent app launches will skip this activity.
      */
     private void markFirstRunComplete() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-        editor.putBoolean(KEY_FIRST_RUN, false);
-        editor.apply();
+        ConfigManager configManager = ConfigManager.getInstance(this);
+        configManager.updateConfig(config -> config.setFirstRun(false));
     }
 
     /**
@@ -91,8 +110,8 @@ public class PermissionsIntroActivity extends AppCompatActivity {
      * @return true if first run, false otherwise
      */
     public static boolean isFirstRun(android.content.Context context) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        return prefs.getBoolean(KEY_FIRST_RUN, true);
+        ConfigManager configManager = ConfigManager.getInstance(context);
+        return configManager.isFirstRun();
     }
 
     /**
@@ -102,5 +121,20 @@ public class PermissionsIntroActivity extends AppCompatActivity {
         Intent intent = new Intent(this, MainActivity.class);
         startActivity(intent);
         finish();
+    }
+
+    /**
+     * Helper method to set permission text with HTML formatting.
+     * Title is bold, followed by the description in regular text.
+     */
+    private void setPermissionText(TextView textView, String title, String description) {
+        String htmlText = "<b>" + title + "</b> " + description;
+        Spanned spanned;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            spanned = Html.fromHtml(htmlText, Html.FROM_HTML_MODE_LEGACY);
+        } else {
+            spanned = Html.fromHtml(htmlText);
+        }
+        textView.setText(spanned);
     }
 }

@@ -38,7 +38,10 @@ public class EventBleBroadcastMessageSent extends EventAction {
         DatabaseMessages.getInstance().add(chatMessage);
         // flush immediately to disk
         DatabaseMessages.getInstance().flushNow();
-        // UI update is handled by ChatFragmentBroadcast.updateMessages() to prevent duplicates
-        // Central.getInstance().broadcastChatFragment.addMessage(chatMessage);
+
+        // Trigger UI refresh to show the sent message
+        if (Central.getInstance() != null && Central.getInstance().broadcastChatFragment != null) {
+            Central.getInstance().broadcastChatFragment.refreshMessagesFromDatabase();
+        }
     }
 }

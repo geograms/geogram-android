@@ -1,7 +1,7 @@
 package offgrid.geogram.relay;
 
 import android.content.Context;
-import android.util.Log;
+import offgrid.geogram.core.Log;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -142,16 +142,35 @@ public class RelayStorage {
      */
     public RelayMessage getMessage(String messageId, String folder) {
         if (messageId == null) {
+            Log.d(TAG, "getMessage: messageId is null");
             return null;
         }
 
         File targetDir = getDirectoryForFolder(folder);
         if (targetDir == null) {
+            Log.d(TAG, "getMessage: targetDir is null for folder: " + folder);
             return null;
         }
 
+        Log.d(TAG, "getMessage: Looking for " + messageId + " in folder: " + folder);
+        Log.d(TAG, "getMessage: Target directory: " + targetDir.getAbsolutePath());
+        Log.d(TAG, "getMessage: Directory exists: " + targetDir.exists());
+
         File messageFile = new File(targetDir, messageId + ".md");
+        Log.d(TAG, "getMessage: Full file path: " + messageFile.getAbsolutePath());
+        Log.d(TAG, "getMessage: File exists: " + messageFile.exists());
+
         if (!messageFile.exists()) {
+            // List all files in directory for debugging
+            File[] files = targetDir.listFiles();
+            if (files != null && files.length > 0) {
+                Log.d(TAG, "getMessage: Directory contains " + files.length + " files:");
+                for (File f : files) {
+                    Log.d(TAG, "  - " + f.getName());
+                }
+            } else {
+                Log.d(TAG, "getMessage: Directory is empty or null");
+            }
             return null;
         }
 
@@ -166,7 +185,17 @@ public class RelayStorage {
             }
 
             String markdown = new String(bytes);
-            return RelayMessage.parseMarkdown(markdown);
+
+            // Create debug log file
+            File debugLogFile = new File(relayDir, "parse_debug.log");
+
+            RelayMessage message = RelayMessage.parseMarkdown(markdown, debugLogFile);
+            if (message != null) {
+                Log.d(TAG, "✓ Successfully loaded message: " + messageId);
+            } else {
+                Log.w(TAG, "✗ Failed to parse message: " + messageId);
+            }
+            return message;
 
         } catch (IOException e) {
             Log.e(TAG, "Error loading message: " + e.getMessage());

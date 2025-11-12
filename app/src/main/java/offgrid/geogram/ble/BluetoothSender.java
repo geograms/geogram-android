@@ -82,6 +82,10 @@ public class BluetoothSender {
     private final Map<String, BluetoothGatt> connectingDevices = new ConcurrentHashMap<>();  // Devices in process of connecting
     private final Map<String, PendingAck> pendingAcks = new ConcurrentHashMap<>();
 
+    // Callsign-to-MAC address mapping for relay sync lookup
+    // Key: callsign (e.g., "X1ADK0"), Value: MAC address (e.g., "6C:12:48:4A:72:C7")
+    private final Map<String, String> callsignToMacMap = new ConcurrentHashMap<>();
+
     // Self-advertising for presence announcement
     private String selfMessage = null;
     private AdvertiseCallback advertiseCallback;
@@ -574,6 +578,10 @@ public class BluetoothSender {
                 String parcel = new String(value, StandardCharsets.UTF_8);
                 Log.i(TAG, "Received parcel via GATT from " + device.getAddress() + ": " + parcel);
 
+                // Extract callsign from parcel and update mapping for relay sync lookup
+                // Parcel format: >+CALLSIGN@GEOCODE#MODEL or >CALLSIGN@GEOCODE#MODEL
+                extractAndMapCallsign(parcel, device.getAddress());
+
                 // Process parcel (fire event for BluetoothListener to handle)
                 BluetoothListener.getInstance(context).handleGattParcel(parcel, device.getAddress());
 
@@ -746,6 +754,11 @@ public class BluetoothSender {
                 Log.i(TAG, "Disconnected from GATT server: " + address);
                 activeConnections.remove(address);
                 connectingDevices.remove(address);  // Also remove from connecting list
+
+                // Clean up callsign-to-MAC mapping for this MAC address
+                // (Android randomizes MACs, so old mappings become stale)
+                callsignToMacMap.entrySet().removeIf(entry -> entry.getValue().equals(address));
+
                 gatt.close();
             }
         }
@@ -849,6 +862,90 @@ public class BluetoothSender {
             }
         }
     };
+
+    // Connection tracking methods
+
+    /**
+     * Check if there is an active GATT connection to a specific device.
+     * @param deviceAddress MAC address or callsign of the device
+     * @return true if active GATT connection exists
+     */
+    public boolean hasActiveConnection(String deviceAddress) {
+        if (deviceAddress == null) return false;
+
+        // Check if it's a direct MAC address match
+        if (activeConnections.containsKey(deviceAddress)) {
+            return true;
+        }
+
+        // Check if it's a callsign - look up the MAC address
+        String macAddress = callsignToMacMap.get(deviceAddress);
+        if (macAddress != null && activeConnections.containsKey(macAddress)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get all devices with active GATT connections.
+     * @return Set of device addresses (MAC addresses or callsigns)
+     */
+    public java.util.Set<String> getActiveConnectionAddresses() {
+        return new java.util.HashSet<>(activeConnections.keySet());
+    }
+
+    /**
+     * Get the number of active GATT connections.
+     * @return count of active connections
+     */
+    public int getActiveConnectionCount() {
+        return activeConnections.size();
+    }
+
+    /**
+     * Extract callsign from a GATT parcel and update the callsign-to-MAC mapping.
+     * This enables relay sync to find GATT connections by callsign.
+     *
+     * Handles both beacon formats:
+     * - With location: >+CALLSIGN@GEOCODE#MODEL (e.g., >+X1ADK0@RY1A-IUZU#APP-0.4.0)
+     * - Without location: >+CALLSIGN#MODEL (e.g., >+X1ADK0#APP-0.4.0)
+     *
+     * @param parcel Message parcel from GATT
+     * @param macAddress MAC address of the device that sent this parcel
+     */
+    private void extractAndMapCallsign(String parcel, String macAddress) {
+        try {
+            // Remove leading '>' if present
+            String content = parcel.startsWith(">") ? parcel.substring(1) : parcel;
+
+            // Remove leading '+' if present (location beacon indicator)
+            content = content.startsWith("+") ? content.substring(1) : content;
+
+            // Extract callsign - handle both formats:
+            // With location: "X1ADK0@RY1A-IUZU#APP-0.4.0" - extract before '@'
+            // Without location: "X1ADK0#APP-0.4.0" - extract before '#'
+            int atIndex = content.indexOf('@');
+            int hashIndex = content.indexOf('#');
+
+            String callsign = null;
+            if (atIndex > 0) {
+                // Beacon has location - extract before '@'
+                callsign = content.substring(0, atIndex);
+            } else if (hashIndex > 0) {
+                // Beacon without location - extract before '#'
+                callsign = content.substring(0, hashIndex);
+            }
+
+            if (callsign != null && !callsign.isEmpty()) {
+                // Update mapping
+                callsignToMacMap.put(callsign, macAddress);
+                Log.d(TAG, "Mapped callsign " + callsign + " to MAC " + macAddress);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to extract callsign from parcel: " + parcel + " - " + e.getMessage());
+        }
+    }
 
     // Helper classes
     private static class QueuedMessage {

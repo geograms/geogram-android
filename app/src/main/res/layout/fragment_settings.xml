@@ -33,6 +33,7 @@
                     android:background="@android:color/transparent"
                     android:contentDescription="Back"
                     android:src="@drawable/ic_back"
+            android:tint="@color/white"
                     app:tint="@color/white" />
 
                 <!-- Title -->
@@ -97,7 +98,9 @@
                 android:inputType="none"
                 android:focusable="false"
                 android:cursorVisible="false"
-                android:backgroundTint="@color/material_dynamic_neutral40"
+                android:textColor="@color/white"
+                android:textColorHint="@color/gray"
+                android:backgroundTint="@color/dark_gray"
                 android:padding="8dp"
                 android:layout_marginStart="16dp"
                 android:layout_marginEnd="16dp" />
@@ -110,7 +113,9 @@
                 android:hint="Intro (200 letters max)"
                 android:maxLength="200"
                 android:inputType="textMultiLine"
-                android:backgroundTint="@color/material_dynamic_neutral40"
+                android:textColor="@color/white"
+                android:textColorHint="@color/gray"
+                android:backgroundTint="@color/dark_gray"
                 android:padding="8dp"
                 android:layout_marginTop="8dp"
                 android:scrollHorizontally="false"
@@ -141,8 +146,85 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:entries="@array/color_options"
-                    android:backgroundTint="@color/material_dynamic_neutral40"
+                    android:backgroundTint="@color/dark_gray"
                     android:padding="8dp" />
+            </LinearLayout>
+
+            <!-- HTTP API Settings -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="HTTP API Server"
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                android:paddingTop="16dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Enable HTTP API"
+                    android:textColor="@color/white"
+                    android:textSize="16sp" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switch_http_api"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp">
+
+                <TextView
+                    android:id="@+id/text_http_api_url"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Server: Not available"
+                    android:textColor="@color/gray"
+                    android:textSize="14sp"
+                    android:fontFamily="monospace" />
+
+                <ImageButton
+                    android:id="@+id/btn_copy_http_url"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:contentDescription="Copy URL"
+                    android:src="@drawable/ic_copy"
+                    app:tint="@color/white"
+                    android:background="@android:color/transparent"
+                    android:padding="4dp"
+                    android:layout_marginStart="8dp" />
+
+                <ImageButton
+                    android:id="@+id/btn_share_http_url"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:contentDescription="Share URL"
+                    android:src="@drawable/ic_share"
+                    app:tint="@color/white"
+                    android:background="@android:color/transparent"
+                    android:padding="4dp"
+                    android:layout_marginStart="4dp" />
             </LinearLayout>
 
             <!-- NOSTR Identity -->
@@ -171,7 +253,9 @@
                     android:layout_weight="1"
                     android:hint="NSEC"
                     android:inputType="text"
-                    android:backgroundTint="@color/material_dynamic_neutral40"
+                    android:textColor="@color/white"
+                    android:textColorHint="@color/gray"
+                    android:backgroundTint="@color/dark_gray"
                     android:padding="8dp" />
 
                 <ImageButton
@@ -200,7 +284,9 @@
                     android:layout_weight="1"
                     android:hint="NPUB"
                     android:inputType="none"
-                    android:backgroundTint="@color/material_dynamic_neutral40"
+                    android:textColor="@color/white"
+                    android:textColorHint="@color/gray"
+                    android:backgroundTint="@color/dark_gray"
                     android:padding="8dp"
                     android:focusable="false"
                     android:cursorVisible="false" />
@@ -222,7 +308,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Reset Identity (Generate New Keys)"
-                android:backgroundTint="@color/material_dynamic_secondary40"
+                android:backgroundTint="@color/red"
                 android:textColor="@color/white"
                 android:layout_marginTop="16dp"
                 android:layout_marginStart="16dp"
@@ -242,5 +328,6 @@
         android:layout_margin="16dp"
         android:contentDescription="Save"
         android:src="@drawable/ic_save"
-        app:backgroundTint="@color/material_dynamic_neutral40" />
+        app:tint="@color/white"
+        app:backgroundTint="@color/gray" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

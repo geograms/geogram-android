@@ -2,6 +2,7 @@ package offgrid.geogram.apps.loops;
 
 import android.util.Log;
 
+import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -20,7 +21,7 @@ import offgrid.geogram.util.LocationHelper;
 */
 public final class PingDevice {
     private static final String TAG = "PingDevice";
-    private static final long REFRESH_INTERVAL_SECONDS = 60L;
+    private static final long REFRESH_INTERVAL_SECONDS = 10L;
 
     // --- Singleton (Initialization-on-demand holder) ---
     private PingDevice() {}
@@ -104,6 +105,13 @@ public final class PingDevice {
             return;
         }
 
+        // Add random delay (0-500ms) to avoid BLE collisions when multiple devices ping
+        try {
+            Thread.sleep(new Random().nextInt(500));
+        } catch (InterruptedException e) {
+            // Ignore interruption
+        }
+
         // get the basic info
         String callsign = Central.getInstance().getSettings().getIdDevice();
         String coordinates = null;
@@ -124,9 +132,22 @@ public final class PingDevice {
             coordinates = "@" + coordinates;
         }
 
-        String message = "+" + callsign + coordinates;
+        // Include device model code and version: +CALLSIGN@COORDS#APP-0.4.0
+        String deviceModelCode = "APP-0.4.0";  // Device code: APP = Android Phone
+        String message = "+" + callsign + coordinates + "#" + deviceModelCode;
+
+        // BLE advertising has 31-byte limit. With overhead, we have ~20 bytes for data.
+        // If message is too large, remove location to fit in advertising packet
+        final int BLE_ADVERTISING_MAX_PAYLOAD = 20;
+        if (message.length() > BLE_ADVERTISING_MAX_PAYLOAD && !coordinates.isEmpty()) {
+            // Remove location info and try again
+            String messageWithoutLocation = "+" + callsign + "#" + deviceModelCode;
+            Log.i(TAG, "Message too large (" + message.length() + " bytes), removing location: " + message + " -> " + messageWithoutLocation);
+            message = messageWithoutLocation;
+        }
+
         // ... send a broadcast ping through network / BLE / APRS, etc.
-        Log.i(TAG, message);
+        Log.i(TAG, "Broadcasting: " + message);
         BluetoothSender.getInstance(null).sendMessage(message);
     }
 }

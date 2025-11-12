@@ -1,29 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/dark_gray_background"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:background="@color/dark_gray_background">
 
-    <!-- Device List -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/devices_recycler_view"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"/>
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp">
 
-    <!-- Empty State Message -->
-    <TextView
-        android:id="@+id/empty_message"
+        <!-- Device List -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/devices_recycler_view"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:paddingBottom="72dp"
+            android:clipToPadding="false"/>
+
+        <!-- Empty State Message -->
+        <TextView
+            android:id="@+id/empty_message"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="No devices detected nearby"
+            android:textColor="@color/white"
+            android:textSize="16sp"
+            android:visibility="gone"/>
+
+    </LinearLayout>
+
+    <!-- Bottom Button Bar -->
+    <com.google.android.material.bottomappbar.BottomAppBar
+        android:id="@+id/bottom_app_bar"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:text="No devices detected nearby"
-        android:textColor="@color/white"
-        android:textSize="16sp"
-        android:visibility="gone"/>
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        app:backgroundTint="@color/dark_gray"
+        app:fabAlignmentMode="end">
 
-</LinearLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
+            <Button
+                android:id="@+id/btn_clear_list"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Clear List"
+                android:textColor="@color/white"
+                android:backgroundTint="@color/red"
+                style="@style/Widget.AppCompat.Button.Colored" />
+
+        </LinearLayout>
+    </com.google.android.material.bottomappbar.BottomAppBar>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

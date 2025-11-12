@@ -239,19 +239,26 @@ public final class DatabaseMessages {
             if (!wasAdded) {
                 // Message already exists - check if we need to add a new channel
                 ChatMessage existing = findMessageByKey(key);
+                Log.d(TAG, "DUPLICATE DETECTED - Key: '" + key + "', New channel: " + msg.messageType +
+                      ", Existing found: " + (existing != null) +
+                      ", TreeSet size: " + messages.size());
+
                 if (existing != null && msg.messageType != null && msg.messageType != ChatMessageType.DATA) {
                     if (!existing.hasChannel(msg.messageType)) {
                         existing.addChannel(msg.messageType);
                         Log.d(TAG, "CHANNEL ADDED - Key: '" + key + "', Added channel: " + msg.messageType +
-                              ", Total channels: " + existing.channels.size());
+                              ", Total channels: " + existing.channels + ", TreeSet size: " + messages.size());
                         pending.addLast(existing); // queue for disk update
                         return true; // Channel was added
+                    } else {
+                        Log.d(TAG, "CHANNEL ALREADY EXISTS - Key: '" + key + "', Channel: " + msg.messageType +
+                              ", Existing channels: " + existing.channels);
                     }
                 }
 
                 Log.d(TAG, "DUPLICATE BLOCKED - Key: '" + key + "', Message: '" +
                       (msg.message != null && msg.message.length() > 20 ? msg.message.substring(0, 20) + "..." : msg.message) +
-                      "' from '" + msg.authorId + "'");
+                      "' from '" + msg.authorId + "', TreeSet size: " + messages.size());
                 return false; // duplicate
             }
 
@@ -348,9 +355,10 @@ public final class DatabaseMessages {
 
     /** Build a dedupe key (authorId|timestamp|message). */
     private static String keyOf(ChatMessage m) {
-        String a = m.authorId == null ? "" : m.authorId;
-        String dest = m.destinationId == null ? "" : m.destinationId;
-        String msg = m.getMessage() == null ? "" : m.getMessage();
+        // Normalize all parts to handle whitespace and casing differences
+        String a = m.authorId == null ? "" : m.authorId.trim();
+        String dest = m.destinationId == null ? "" : m.destinationId.trim();
+        String msg = m.getMessage() == null ? "" : m.getMessage().trim();
         // Don't use timestamp in key - it changes on every parse
         // Use destinationId + authorId + message content for stable deduplication
         return dest + "|" + a + "|" + msg;

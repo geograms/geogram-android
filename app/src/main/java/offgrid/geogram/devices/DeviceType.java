@@ -81,23 +81,23 @@ public enum DeviceType {
     @Override
     public String toString() {
         switch (this) {
-            case PRIMARY_STATION: return "Primary Station (-0)";
-            case ADDITIONAL_STATION_1: return "Additional Station 1 (-1)";
-            case ADDITIONAL_STATION_2: return "Additional Station 2 (-2)";
-            case ADDITIONAL_STATION_3: return "Additional Station 3 (-3)";
-            case ADDITIONAL_STATION_4: return "Additional Station 4 (-4)";
-            case OTHER_NETWORKS: return "Other Networks (-5)";
-            case SPECIAL_ACTIVITY: return "Special Activity (-6)";
-            case HT_PORTABLE: return "HT / Portable (-7)";
-            case BOATS_RVS: return "Boats / RVs (-8)";
-            case PRIMARY_MOBILE: return "Primary Mobile (-9)";
-            case INTERNET_IGATE: return "Internet / IGate (-10)";
-            case BALLOONS_AIRCRAFT: return "Balloons / Aircraft (-11)";
-            case ONE_WAY_TRACKERS: return "One-Way Trackers (-12)";
-            case WEATHER_STATION: return "Weather Station (-13)";
-            case TRUCKERS: return "Truckers (-14)";
-            case ADDITIONAL_STATION_15: return "Additional Station 15 (-15)";
-            case UNSPECIFIED: return "Unspecified";
+            case PRIMARY_STATION: return "Primary Station";
+            case ADDITIONAL_STATION_1: return "Additional Station";
+            case ADDITIONAL_STATION_2: return "Additional Station";
+            case ADDITIONAL_STATION_3: return "Additional Station";
+            case ADDITIONAL_STATION_4: return "Additional Station";
+            case OTHER_NETWORKS: return "Other Network";
+            case SPECIAL_ACTIVITY: return "Special Activity";
+            case HT_PORTABLE: return "Handheld Radio";
+            case BOATS_RVS: return "Boat / RV";
+            case PRIMARY_MOBILE: return "Mobile Station";
+            case INTERNET_IGATE: return "Internet Relay";
+            case BALLOONS_AIRCRAFT: return "Balloon / Aircraft";
+            case ONE_WAY_TRACKERS: return "Tracker";
+            case WEATHER_STATION: return "Weather Station";
+            case TRUCKERS: return "Trucker";
+            case ADDITIONAL_STATION_15: return "Additional Station";
+            case UNSPECIFIED: return "Unknown Device";
             default: return super.toString();
         }
     }

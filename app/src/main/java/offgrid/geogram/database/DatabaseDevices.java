@@ -175,6 +175,24 @@ public final class DatabaseDevices {
         });
     }
 
+    /** Delete all devices and pings from the database. */
+    public void deleteAllDevices() {
+        ensureInit();
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                // Clear pending pings queue
+                pendingPings.clear();
+                // Delete all pings from database
+                pingDao.deleteAllPings();
+                // Delete all devices from database
+                deviceDao.deleteAllDevices();
+                Log.i(TAG, "Cleared all devices and pings from database");
+            } catch (Exception e) {
+                Log.e(TAG, "Error clearing all devices", e);
+            }
+        });
+    }
+
     // ------------------- Ping Operations -------------------
 
     /**
@@ -319,6 +337,9 @@ public final class DatabaseDevices {
         @Query("DELETE FROM devices WHERE callsign = :callsign")
         void deleteByCallsign(String callsign);
 
+        @Query("DELETE FROM devices")
+        void deleteAllDevices();
+
         @Query("SELECT COUNT(*) FROM devices")
         long countAll();
     }
@@ -343,6 +364,9 @@ public final class DatabaseDevices {
 
         @Query("DELETE FROM device_pings WHERE callsign = :callsign")
         void deleteByCallsign(String callsign);
+
+        @Query("DELETE FROM device_pings")
+        void deleteAllPings();
     }
 
     // ------------------- Database -------------------

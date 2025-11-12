@@ -1,36 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.swiperefreshlayout.widget.SwipeRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/swipe_refresh_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/dark_gray_background">
 
-    <LinearLayout
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh_layout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:layout_height="match_parent">
 
-        <!-- Empty State -->
-        <TextView
-            android:id="@+id/empty_state"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="No conversations yet.\nPull down to refresh."
-            android:textColor="@color/white"
-            android:textSize="16sp"
-            android:gravity="center"
-            android:padding="32dp"
-            android:visibility="gone" />
-
-        <!-- Conversation List -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/conversations_recycler_view"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="16dp"
-            android:clipToPadding="false" />
+            android:orientation="vertical">
 
-    </LinearLayout>
+            <!-- Empty State -->
+            <TextView
+                android:id="@+id/empty_state"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="No conversations yet.\nPull down to refresh."
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="32dp"
+                android:visibility="gone" />
 
-</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+            <!-- Conversation List -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/conversations_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="16dp"
+                android:clipToPadding="false" />
+
+        </LinearLayout>
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <!-- Floating Action Button -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_add_contact"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:src="@drawable/ic_add"
+        android:contentDescription="Add Contact"
+        app:backgroundTint="@color/white"
+        app:tint="@color/dark_gray_background" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

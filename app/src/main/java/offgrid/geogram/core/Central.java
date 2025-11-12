@@ -13,6 +13,7 @@ import offgrid.geogram.apps.chat.ChatFragmentBroadcast;
 // Removed Google Play Services dependency
 // import offgrid.geogram.old.old.WiFi_control;
 import offgrid.geogram.server.SimpleSparkServer;
+import offgrid.geogram.settings.ConfigManager;
 import offgrid.geogram.settings.SettingsLoader;
 import offgrid.geogram.settings.SettingsUser;
 
@@ -105,7 +106,10 @@ public class Central {
 
     public void loadSettings(Context context) {
         try {
-            settings = SettingsLoader.loadSettings(context);
+            // Initialize ConfigManager - it handles migration automatically
+            ConfigManager configManager = ConfigManager.getInstance(context);
+            configManager.initialize();
+            settings = configManager.getSettingsUser();
             // setup other variables
         } catch (Exception e) {
             log("SettingsLoader", "Failed to load settings. Creating default settings with identity.");

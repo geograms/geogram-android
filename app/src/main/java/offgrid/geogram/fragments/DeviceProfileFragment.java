@@ -4,8 +4,10 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -18,6 +20,7 @@ import java.util.Locale;
 
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
+import offgrid.geogram.apps.chat.ChatFragmentDevice;
 import offgrid.geogram.devices.Device;
 import offgrid.geogram.devices.DeviceManager;
 
@@ -106,6 +109,25 @@ public class DeviceProfileFragment extends Fragment {
             lastSeenView.setText("Last seen: Unknown");
             connectionCountView.setText("Times detected: 0 (message contact only)");
         }
+
+        // Initialize messaging buttons
+        Button btnSendMessage = view.findViewById(R.id.btn_send_message);
+        Button btnOpenChat = view.findViewById(R.id.btn_open_chat);
+
+        // Both buttons open the chat interface
+        View.OnClickListener openChatListener = v -> {
+            if (getActivity() != null) {
+                ChatFragmentDevice chatFragment = ChatFragmentDevice.newInstance(deviceId);
+                getActivity().getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, chatFragment)
+                        .addToBackStack(null)
+                        .commit();
+            }
+        };
+
+        btnSendMessage.setOnClickListener(openChatListener);
+        btnOpenChat.setOnClickListener(openChatListener);
 
         return view;
     }

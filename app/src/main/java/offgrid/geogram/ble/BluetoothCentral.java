@@ -33,7 +33,12 @@ public class BluetoothCentral {
     public static final int advertiseDurationMillis = 1000;
     public static int
             selfIntervalSeconds = 60,
-            maxSizeOfMessages = 18;
+            maxSizeOfMessages = 40; // Increased to accommodate device model in ping messages
+
+    // Time-sliced interleaving: send 3 parcels, then listen for 5 seconds
+    public static final int parcelsBeforeListening = 3;
+    public static final int listeningWindowMillis = 5000;
+    public static final int selfAdvertiseThrottleThreshold = 5; // Skip self-advertise if queue >= 5 parcels
 
     private static final String TAG = "BluetoothCentral";
 
@@ -43,6 +48,17 @@ public class BluetoothCentral {
     // public EddystoneBeacon_unused eddystoneBeacon;
 
     public static String EDDYSTONE_SERVICE_ID = "0000FEAA-0000-1000-8000-00805F9B34FB";
+
+    // GATT Service UUIDs for bidirectional messaging
+    public static final String GATT_SERVICE_UUID = "0000FEA0-0000-1000-8000-00805F9B34FB";
+    public static final String GATT_CHARACTERISTIC_TX_UUID = "0000FEA1-0000-1000-8000-00805F9B34FB";  // Write, Notify - Send parcels
+    public static final String GATT_CHARACTERISTIC_RX_UUID = "0000FEA2-0000-1000-8000-00805F9B34FB";  // Write, Notify - Receive parcels
+    public static final String GATT_CHARACTERISTIC_CONTROL_UUID = "0000FEA3-0000-1000-8000-00805F9B34FB";  // Write, Read, Notify - ACK/NACK
+
+    // GATT Connection settings
+    public static final int MAX_GATT_CONNECTIONS = 7;  // Maximum simultaneous connections
+    public static final int GATT_ACK_TIMEOUT_MS = 2000;  // Wait 2 seconds for ACK before retry
+    public static final int GATT_MTU_SIZE = 512;  // Request 512-byte MTU for large parcels
 
     private BluetoothCentral(Context context) {
         this.context = context.getApplicationContext();

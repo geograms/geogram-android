@@ -1,76 +1,72 @@
 package offgrid.geogram.relay;
 
 import android.content.Context;
-import android.content.SharedPreferences;
+
+import offgrid.geogram.settings.ConfigManager;
 
 /**
  * Relay settings manager.
  *
- * Manages persistent settings for the relay system using SharedPreferences.
+ * Now uses ConfigManager for centralized configuration management.
+ * SharedPreferences have been migrated to config.json.
  */
 public class RelaySettings {
 
-    private static final String PREFS_NAME = "relay_settings";
-    private static final String KEY_ENABLED = "relay_enabled";
-    private static final String KEY_DISK_SPACE_MB = "disk_space_mb";
-    private static final String KEY_AUTO_ACCEPT = "auto_accept";
-    private static final String KEY_MESSAGE_TYPES = "message_types";
-
     private Context context;
-    private SharedPreferences prefs;
+    private ConfigManager configManager;
 
     public RelaySettings(Context context) {
         this.context = context;
-        this.prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        this.configManager = ConfigManager.getInstance(context);
     }
 
     /**
      * Check if relay is enabled.
      */
     public boolean isRelayEnabled() {
-        return prefs.getBoolean(KEY_ENABLED, false);
+        return configManager.isRelayEnabled();
     }
 
     /**
      * Enable or disable relay.
      */
     public void setRelayEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_ENABLED, enabled).apply();
+        configManager.updateConfig(config -> config.setRelayEnabled(enabled));
     }
 
     /**
      * Get disk space limit in MB.
      */
     public int getDiskSpaceLimitMB() {
-        return prefs.getInt(KEY_DISK_SPACE_MB, 1024); // Default 1GB
+        return configManager.getRelayDiskSpaceMB();
     }
 
     /**
      * Set disk space limit in MB.
      */
     public void setDiskSpaceLimitMB(int mb) {
-        prefs.edit().putInt(KEY_DISK_SPACE_MB, mb).apply();
+        configManager.updateConfig(config -> config.setRelayDiskSpaceMB(mb));
     }
 
     /**
      * Get disk space limit in bytes.
      */
     public long getDiskSpaceLimitBytes() {
-        return getDiskSpaceLimitMB() * 1024L * 1024L;
+        return configManager.getRelayDiskSpaceBytes();
     }
 
     /**
      * Check if auto-accept is enabled.
      */
     public boolean isAutoAcceptEnabled() {
-        return prefs.getBoolean(KEY_AUTO_ACCEPT, false);
+        return configManager.isRelayAutoAccept();
     }
 
     /**
      * Enable or disable auto-accept.
      */
     public void setAutoAcceptEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_AUTO_ACCEPT, enabled).apply();
+        configManager.updateConfig(config -> config.setRelayAutoAccept(enabled));
     }
 
     /**
@@ -79,7 +75,7 @@ public class RelaySettings {
      * @return "text_only", "text_and_images", or "everything"
      */
     public String getAcceptedMessageTypes() {
-        return prefs.getString(KEY_MESSAGE_TYPES, "text_only");
+        return configManager.getRelayMessageTypes();
     }
 
     /**
@@ -88,6 +84,6 @@ public class RelaySettings {
      * @param types "text_only", "text_and_images", or "everything"
      */
     public void setAcceptedMessageTypes(String types) {
-        prefs.edit().putString(KEY_MESSAGE_TYPES, types).apply();
+        configManager.updateConfig(config -> config.setRelayMessageTypes(types));
     }
 }

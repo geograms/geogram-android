@@ -51,9 +51,15 @@ public class BackgroundService extends Service {
             log(TAG, "Missing runtime permissions — Bluetooth and Wi-Fi will not start.");
         }
 
-        // Start background web server
-        server = new SimpleSparkServer();
-        new Thread(server).start();
+        // Start background web server if enabled in settings
+        if (Central.getInstance().getSettings() != null &&
+            Central.getInstance().getSettings().isHttpApiEnabled()) {
+            server = new SimpleSparkServer(this.getApplicationContext());
+            new Thread(server).start();
+            log(TAG, "HTTP API server started");
+        } else {
+            log(TAG, "HTTP API server disabled in settings");
+        }
 
         // Start Bluetooth stack if allowed
         if (hasPermissions) {

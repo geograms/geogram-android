@@ -9,14 +9,38 @@
     android:clickable="true"
     android:focusable="true">
 
-    <TextView
-        android:id="@+id/device_name"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Device Name"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:textStyle="bold" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/device_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Device Name"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/relay_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="RELAY"
+            android:textColor="#00FF00"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:background="@color/dark_gray"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:layout_marginStart="8dp"
+            android:visibility="gone" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/device_type"

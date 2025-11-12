@@ -10,12 +10,45 @@ public class Device implements Comparable<Device> {
     public final String ID;
     public final DeviceType deviceType;
 
+    // Device model code and version (e.g., APP-0.4.0)
+    private DeviceModel deviceModel = null;
+    private String deviceVersion = null;
+
     // when was this device located before?
     public final TreeSet<EventConnected> connectedEvents = new TreeSet<>();
 
     public Device(String ID, DeviceType deviceType) {
         this.ID = Objects.requireNonNull(ID, "ID");
         this.deviceType = Objects.requireNonNull(deviceType, "deviceType");
+    }
+
+    /** Get the device model enum, or null if not set. */
+    public DeviceModel getDeviceModel() {
+        return deviceModel;
+    }
+
+    /** Get the device version string, or null if not set. */
+    public String getDeviceVersion() {
+        return deviceVersion;
+    }
+
+    /**
+     * Set device model from device string (e.g., "APP-0.4.0").
+     * Parses the code and version automatically.
+     */
+    public void setDeviceModelFromString(String deviceString) {
+        if (deviceString != null && !deviceString.isEmpty()) {
+            this.deviceModel = DeviceModel.fromDeviceString(deviceString);
+            this.deviceVersion = DeviceModel.extractVersion(deviceString);
+        }
+    }
+
+    /** Get display name: device model with version if available, otherwise device type. */
+    public String getDisplayName() {
+        if (deviceModel != null) {
+            return deviceModel.getDisplayNameWithVersion(deviceVersion);
+        }
+        return deviceType.toString();
     }
 
     /** Latest (most recent) timestamp across all locations, or Long.MIN_VALUE if none. */
@@ -81,7 +114,12 @@ public class Device implements Comparable<Device> {
             // For ping-only events (null geocode), just update timestamp on matching connection type
             if (event.geocode == null && connectedEvent.geocode == null) {
                 if (!connectedEvent.containsTimeStamp(event.latestTimestamp())) {
+                    // CRITICAL FIX: Remove event from TreeSet before updating timestamp
+                    // TreeSets don't automatically re-sort when element's comparison value changes
+                    connectedEvents.remove(connectedEvent);
                     connectedEvent.addTimestamp(event.latestTimestamp());
+                    // Re-add to TreeSet to trigger re-sorting by updated timestamp
+                    connectedEvents.add(connectedEvent);
                 }
                 return;
             }
@@ -90,7 +128,12 @@ public class Device implements Comparable<Device> {
             if (event.geocode != null && connectedEvent.geocode != null
                     && event.geocode.equalsIgnoreCase(connectedEvent.geocode)) {
                 if (!connectedEvent.containsTimeStamp(event.latestTimestamp())) {
+                    // CRITICAL FIX: Remove event from TreeSet before updating timestamp
+                    // TreeSets don't automatically re-sort when element's comparison value changes
+                    connectedEvents.remove(connectedEvent);
                     connectedEvent.addTimestamp(event.latestTimestamp());
+                    // Re-add to TreeSet to trigger re-sorting by updated timestamp
+                    connectedEvents.add(connectedEvent);
                 }
                 return;
             }

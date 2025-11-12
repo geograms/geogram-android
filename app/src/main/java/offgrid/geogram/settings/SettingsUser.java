@@ -55,6 +55,10 @@ public class SettingsUser {
     @Expose
     private int chatRadiusKm = 100; // Default 100 km
 
+    // HTTP API settings
+    @Expose
+    private boolean httpApiEnabled = true; // Default enabled for testing
+
     // Getters and Setters with Validation
     public boolean isInvisibleMode() {
         return invisibleMode;
@@ -229,7 +233,13 @@ public class SettingsUser {
         }
     }
 
+    public boolean isHttpApiEnabled() {
+        return httpApiEnabled;
+    }
 
+    public void setHttpApiEnabled(boolean httpApiEnabled) {
+        this.httpApiEnabled = httpApiEnabled;
+    }
 
     // Pretty Printing with Gson
     @NonNull

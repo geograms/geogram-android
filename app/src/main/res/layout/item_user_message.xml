@@ -8,12 +8,12 @@
     android:paddingStart="50dp"
     android:layout_marginBottom="8dp">
 
-    <!-- Upper Text -->
+    <!-- Sender ID + Timestamp -->
     <TextView
         android:id="@+id/upper_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="23-12-31"
+        android:text="Me - 12:34 PM"
         android:textColor="#757575"
         android:textSize="12sp"
         android:gravity="end"
@@ -29,14 +29,12 @@
         android:textColor="#FFFFFF"
         android:textSize="16sp" />
 
-    <!-- Lower Text -->
-    <TextView
-        android:id="@+id/lower_text"
+    <!-- Channel Indicators -->
+    <LinearLayout
+        android:id="@+id/channel_indicators"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Seen by: 1"
-        android:textColor="#757575"
-        android:textSize="12sp"
+        android:orientation="horizontal"
         android:gravity="end"
         android:layout_marginTop="4dp" />
 </LinearLayout>

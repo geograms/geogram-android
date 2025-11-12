@@ -1,13 +1,20 @@
 package offgrid.geogram.relay;
 
-import android.util.Log;
+import offgrid.geogram.core.Log;
 
 import org.json.JSONArray;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,7 +48,12 @@ public class RelayMessage {
     private String fromCallsign;
     private String toCallsign;
     private long timestamp;         // Unix timestamp (seconds)
+    private String subject;         // Optional subject/title (like email)
     private String content;         // Message body
+
+    // Threading fields (for email-style conversations)
+    private String threadId;        // ID of the first message in the thread
+    private String inReplyTo;       // ID of the message being replied to
 
     // Message fields
     private String type;            // private, broadcast, emergency, etc.
@@ -87,7 +99,21 @@ public class RelayMessage {
      * @return Parsed RelayMessage object, or null if parsing fails
      */
     public static RelayMessage parseMarkdown(String markdown) {
+        return parseMarkdown(markdown, null);
+    }
+
+    /**
+     * Parse a relay message from markdown format with debug logging.
+     *
+     * @param markdown Markdown-formatted relay message
+     * @param debugFile Optional file to write debug logs to
+     * @return Parsed RelayMessage object, or null if parsing fails
+     */
+    public static RelayMessage parseMarkdown(String markdown, File debugFile) {
         if (markdown == null || markdown.trim().isEmpty()) {
+            if (debugFile != null) {
+                writeDebugLog(debugFile, "parseMarkdown: markdown is null or empty");
+            }
             return null;
         }
 
@@ -95,14 +121,40 @@ public class RelayMessage {
             RelayMessage message = new RelayMessage();
             String[] lines = markdown.split("\n");
 
+            if (debugFile != null) {
+                writeDebugLog(debugFile, "parseMarkdown: Total lines: " + lines.length);
+                writeDebugLog(debugFile, "parseMarkdown: First line: [" + lines[0] + "]");
+                writeDebugLog(debugFile, "parseMarkdown: First line (trimmed): [" + lines[0].trim() + "]");
+                writeDebugLog(debugFile, "parseMarkdown: First line length: " + lines[0].length());
+            }
+
+            Log.d(TAG, "parseMarkdown: Total lines: " + lines.length);
+            Log.d(TAG, "parseMarkdown: First line: [" + lines[0] + "]");
+            Log.d(TAG, "parseMarkdown: First line (trimmed): [" + lines[0].trim() + "]");
+            Log.d(TAG, "parseMarkdown: First line length: " + lines[0].length());
+
             // Parse header (> YYYY-MM-DD HH:MM_SS -- SENDER-CALLSIGN)
             Pattern headerPattern = Pattern.compile("^>\\s+(\\d{4}-\\d{2}-\\d{2})\\s+(\\d{2}):(\\d{2})_(\\d{2})\\s+--\\s+(.+)$");
             Matcher headerMatcher = headerPattern.matcher(lines[0].trim());
 
             if (!headerMatcher.matches()) {
+                if (debugFile != null) {
+                    writeDebugLog(debugFile, "ERROR: Invalid message header: " + lines[0]);
+                    writeDebugLog(debugFile, "ERROR: Expected format: > YYYY-MM-DD HH:MM_SS -- CALLSIGN");
+                    writeDebugLog(debugFile, "ERROR: Pattern: ^>\\s+(\\d{4}-\\d{2}-\\d{2})\\s+(\\d{2}):(\\d{2})_(\\d{2})\\s+--\\s+(.+)$");
+                }
+
                 Log.e(TAG, "Invalid message header: " + lines[0]);
+                Log.e(TAG, "Expected format: > YYYY-MM-DD HH:MM_SS -- CALLSIGN");
+                Log.e(TAG, "Pattern: ^>\\s+(\\d{4}-\\d{2}-\\d{2})\\s+(\\d{2}):(\\d{2})_(\\d{2})\\s+--\\s+(.+)$");
                 return null;
             }
+
+            if (debugFile != null) {
+                writeDebugLog(debugFile, "parseMarkdown: Header matched successfully");
+            }
+
+            Log.d(TAG, "parseMarkdown: Header matched successfully");
 
             String date = headerMatcher.group(1);
             String hour = headerMatcher.group(2);
@@ -175,10 +227,19 @@ public class RelayMessage {
             int m = Integer.parseInt(minute);
             int s = Integer.parseInt(second);
 
-            // Convert to Unix timestamp (simplified - using approx calculation)
-            // In production, use java.time.Instant or Calendar
-            long epochDays = (year - 1970) * 365L + (month - 1) * 30L + day;
-            return epochDays * 86400L + h * 3600L + m * 60L + s;
+            // Use Calendar for proper timestamp conversion
+            Calendar calendar = Calendar.getInstance();
+            calendar.set(Calendar.YEAR, year);
+            calendar.set(Calendar.MONTH, month - 1); // Calendar months are 0-based
+            calendar.set(Calendar.DAY_OF_MONTH, day);
+            calendar.set(Calendar.HOUR_OF_DAY, h);
+            calendar.set(Calendar.MINUTE, m);
+            calendar.set(Calendar.SECOND, s);
+            calendar.set(Calendar.MILLISECOND, 0);
+
+            long timestamp = calendar.getTimeInMillis() / 1000;
+            Log.d(TAG, "parseTimestamp: " + date + " " + h + ":" + m + ":" + s + " -> " + timestamp);
+            return timestamp;
         } catch (Exception e) {
             Log.e(TAG, "Error parsing timestamp: " + e.getMessage());
             return System.currentTimeMillis() / 1000;
@@ -195,6 +256,15 @@ public class RelayMessage {
                 break;
             case "id":
                 this.id = value;
+                break;
+            case "subject":
+                this.subject = value;
+                break;
+            case "thread-id":
+                this.threadId = value;
+                break;
+            case "in-reply-to":
+                this.inReplyTo = value;
                 break;
             case "type":
                 this.type = value;
@@ -254,6 +324,19 @@ public class RelayMessage {
         // Metadata fields
         sb.append("--> to: ").append(toCallsign).append("\n");
         sb.append("--> id: ").append(id).append("\n");
+
+        if (subject != null && !subject.trim().isEmpty()) {
+            sb.append("--> subject: ").append(subject).append("\n");
+        }
+
+        if (threadId != null && !threadId.trim().isEmpty()) {
+            sb.append("--> thread-id: ").append(threadId).append("\n");
+        }
+
+        if (inReplyTo != null && !inReplyTo.trim().isEmpty()) {
+            sb.append("--> in-reply-to: ").append(inReplyTo).append("\n");
+        }
+
         sb.append("--> type: ").append(type).append("\n");
         sb.append("--> priority: ").append(priority).append("\n");
         sb.append("--> ttl: ").append(ttl).append("\n");
@@ -385,13 +468,16 @@ public class RelayMessage {
     public boolean shouldAccept(RelaySettings settings) {
         // Check if already expired
         if (isExpired()) {
+            Log.d(TAG, "shouldAccept: Message expired (timestamp=" + timestamp + ", ttl=" + ttl + ", now=" + (System.currentTimeMillis()/1000) + ")");
             return false;
         }
 
         // Check message type filtering
         String acceptedTypes = settings.getAcceptedMessageTypes();
+        Log.d(TAG, "shouldAccept: Accepted types=" + acceptedTypes + ", attachments=" + attachments.size());
 
         if (acceptedTypes.equals("text_only") && !attachments.isEmpty()) {
+            Log.d(TAG, "shouldAccept: Rejected - text_only policy but has " + attachments.size() + " attachments");
             return false; // Reject messages with attachments
         }
 
@@ -399,6 +485,7 @@ public class RelayMessage {
             // Check if all attachments are images
             for (RelayAttachment att : attachments) {
                 if (!att.getMimeType().startsWith("image/")) {
+                    Log.d(TAG, "shouldAccept: Rejected - non-image attachment: " + att.getMimeType());
                     return false;
                 }
             }
@@ -407,8 +494,11 @@ public class RelayMessage {
         // Check total size against limits
         long totalSize = getTotalSize();
         long maxSize = 1048576; // 1 MB default
+        Log.d(TAG, "shouldAccept: Size check - total=" + totalSize + ", max=" + maxSize);
 
-        return totalSize <= maxSize;
+        boolean accepted = totalSize <= maxSize;
+        Log.d(TAG, "shouldAccept: Final result=" + accepted);
+        return accepted;
     }
 
     /**
@@ -420,6 +510,84 @@ public class RelayMessage {
             size += att.getSize();
         }
         return size;
+    }
+
+    /**
+     * Parse all messages from a thread file (email-style conversation).
+     * Returns a list of messages in chronological order.
+     */
+    public static List<RelayMessage> parseThread(String markdown) {
+        List<RelayMessage> messages = new ArrayList<>();
+
+        if (markdown == null || markdown.trim().isEmpty()) {
+            return messages;
+        }
+
+        // Split by message headers (lines starting with ">")
+        String[] lines = markdown.split("\n");
+        List<Integer> headerIndices = new ArrayList<>();
+
+        for (int i = 0; i < lines.length; i++) {
+            if (lines[i].trim().startsWith(">") && lines[i].contains("--")) {
+                headerIndices.add(i);
+            }
+        }
+
+        // Parse each message segment
+        for (int i = 0; i < headerIndices.size(); i++) {
+            int startIndex = headerIndices.get(i);
+            int endIndex = (i + 1 < headerIndices.size()) ? headerIndices.get(i + 1) : lines.length;
+
+            // Extract message segment
+            StringBuilder messageMarkdown = new StringBuilder();
+            for (int j = startIndex; j < endIndex; j++) {
+                messageMarkdown.append(lines[j]);
+                if (j < endIndex - 1) {
+                    messageMarkdown.append("\n");
+                }
+            }
+
+            // Parse individual message
+            RelayMessage message = parseMarkdown(messageMarkdown.toString().trim());
+            if (message != null) {
+                messages.add(message);
+            }
+        }
+
+        return messages;
+    }
+
+    /**
+     * Append a reply message to an existing thread file.
+     * This keeps the conversation together like email threads.
+     */
+    public static boolean appendReplyToFile(java.io.File threadFile, RelayMessage replyMessage) {
+        try {
+            // Read existing content
+            String existingContent = new String(
+                java.nio.file.Files.readAllBytes(threadFile.toPath()),
+                java.nio.charset.StandardCharsets.UTF_8
+            );
+
+            // Append the reply with a separator
+            StringBuilder updatedContent = new StringBuilder(existingContent.trim());
+            updatedContent.append("\n\n");
+            updatedContent.append("---\n\n");  // Visual separator between messages
+            updatedContent.append(replyMessage.toMarkdown());
+
+            // Write back to file
+            java.nio.file.Files.write(
+                threadFile.toPath(),
+                updatedContent.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)
+            );
+
+            Log.d(TAG, "Appended reply to thread file: " + threadFile.getName());
+            return true;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error appending reply to file: " + e.getMessage());
+            return false;
+        }
     }
 
     // Getters and setters
@@ -454,6 +622,30 @@ public class RelayMessage {
 
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public String getSubject() {
+        return subject;
+    }
+
+    public void setSubject(String subject) {
+        this.subject = subject;
+    }
+
+    public String getThreadId() {
+        return threadId;
+    }
+
+    public void setThreadId(String threadId) {
+        this.threadId = threadId;
+    }
+
+    public String getInReplyTo() {
+        return inReplyTo;
+    }
+
+    public void setInReplyTo(String inReplyTo) {
+        this.inReplyTo = inReplyTo;
     }
 
     public String getContent() {
@@ -571,5 +763,22 @@ public class RelayMessage {
 
     public String getCustomField(String key) {
         return this.customFields.get(key);
+    }
+
+    /**
+     * Write debug log to file for easier debugging.
+     * Logs are written to /data/data/offgrid.geogram.geogram/files/relay/parse_debug.log
+     */
+    private static void writeDebugLog(File debugFile, String message) {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
+            String timestamp = sdf.format(new Date());
+
+            FileWriter writer = new FileWriter(debugFile, true); // append mode
+            writer.write(timestamp + " | " + message + "\n");
+            writer.close();
+        } catch (IOException e) {
+            // Silently fail - don't want debug logging to break functionality
+        }
     }
 }

@@ -27,6 +27,7 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="Back"
                 android:src="@drawable/ic_back"
+            android:tint="@color/white"
                 app:tint="@color/white" />
 
             <!-- Title -->

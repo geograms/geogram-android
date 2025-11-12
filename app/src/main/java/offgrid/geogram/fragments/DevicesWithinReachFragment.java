@@ -5,7 +5,9 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -22,6 +24,7 @@ import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.devices.Device;
 import offgrid.geogram.devices.DeviceManager;
+import offgrid.geogram.devices.DeviceType;
 import offgrid.geogram.events.EventAction;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
@@ -45,6 +48,14 @@ public class DevicesWithinReachFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
         emptyMessage = view.findViewById(R.id.empty_message);
+
+        // Initialize Clear List button
+        Button btnClearList = view.findViewById(R.id.btn_clear_list);
+        btnClearList.setOnClickListener(v -> {
+            DeviceManager.getInstance().clear();
+            loadDevices();
+            Toast.makeText(getContext(), "Device list cleared", Toast.LENGTH_SHORT).show();
+        });
 
         // Create event listener for device updates (only if not already created)
         if (deviceUpdateListener == null) {
@@ -185,17 +196,27 @@ public class DevicesWithinReachFragment extends Fragment {
             private final TextView deviceName;
             private final TextView deviceType;
             private final TextView deviceLastSeen;
+            private final TextView relayBadge;
 
             public DeviceViewHolder(@NonNull View itemView) {
                 super(itemView);
                 deviceName = itemView.findViewById(R.id.device_name);
                 deviceType = itemView.findViewById(R.id.device_type);
                 deviceLastSeen = itemView.findViewById(R.id.device_last_seen);
+                relayBadge = itemView.findViewById(R.id.relay_badge);
             }
 
             public void bind(Device device) {
                 deviceName.setText(device.ID);
-                deviceType.setText(device.deviceType.name());
+                // Display custom device model if available, otherwise show device type
+                deviceType.setText(device.getDisplayName());
+
+                // Show relay badge for IGate devices
+                if (device.deviceType == DeviceType.INTERNET_IGATE) {
+                    relayBadge.setVisibility(View.VISIBLE);
+                } else {
+                    relayBadge.setVisibility(View.GONE);
+                }
 
                 // Format the last seen time
                 long timestamp = device.latestTimestamp();

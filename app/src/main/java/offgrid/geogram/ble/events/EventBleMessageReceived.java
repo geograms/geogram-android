@@ -89,12 +89,23 @@ public class EventBleMessageReceived extends EventAction {
 
         // the message is complete, do the rest
 
-        // is this a broadcast message?
-        if(msg.getIdDestination().equalsIgnoreCase("ANY")){
-            // Check if this is a relay command (INV:, REQ:, MSG:)
-            String content = msg.getMessage();
-            if (content != null && (content.startsWith("INV:") || content.startsWith("REQ:") || content.startsWith("MSG:"))) {
-                // This is a relay message, forward to RelayMessageSync
+        // Get local device ID for message filtering
+        String localId = null;
+        try {
+            if (Central.getInstance() != null && Central.getInstance().getSettings() != null) {
+                localId = Central.getInstance().getSettings().getIdDevice();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not get local device ID: " + e.getMessage());
+        }
+
+        // Check if this is a relay command (INV:, REQ:, MSG:)
+        String content = msg.getMessage();
+        if (content != null && (content.startsWith("INV:") || content.startsWith("REQ:") || content.startsWith("MSG:"))) {
+            // Process relay messages sent via broadcast OR targeted to this device via GATT
+            if (msg.getIdDestination().equalsIgnoreCase("ANY") ||
+                (localId != null && msg.getIdDestination().equalsIgnoreCase(localId))) {
+                // This is a relay message for us, forward to RelayMessageSync
                 try {
                     if (Central.getInstance() != null && Central.getInstance().broadcastChatFragment != null) {
                         RelayMessageSync relaySync = RelayMessageSync.getInstance(Central.getInstance().broadcastChatFragment.getContext());
@@ -107,10 +118,13 @@ public class EventBleMessageReceived extends EventAction {
                 // Don't process relay messages as regular chat messages
                 Log.i(TAG, "-->> Message completed: " + msg.getOutput());
                 return;
-            } else {
-                // Regular broadcast message
-                handleBroadcastMessage(msg);
             }
+        }
+
+        // is this a broadcast message?
+        if(msg.getIdDestination().equalsIgnoreCase("ANY")){
+            // Regular broadcast message
+            handleBroadcastMessage(msg);
         }
 
         Log.i(TAG, "-->> Message completed: " + msg.getOutput());

@@ -1,6 +1,6 @@
 package offgrid.geogram.fragments;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -21,8 +21,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
+import offgrid.geogram.contacts.ContactFolderManager;
 import offgrid.geogram.relay.RelaySettings;
 import offgrid.geogram.relay.RelayStorage;
 
@@ -42,6 +47,7 @@ public class RelayFragment extends Fragment {
 
     private RelaySettings settings;
     private RelayStorage storage;
+    private ContactFolderManager folderManager;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable updateStatusRunnable = this::updateStatus;
@@ -60,6 +66,7 @@ public class RelayFragment extends Fragment {
         // Initialize storage and settings
         settings = new RelaySettings(requireContext());
         storage = new RelayStorage(requireContext());
+        folderManager = new ContactFolderManager(requireContext());
 
         // Back button functionality
         ImageButton btnBack = view.findViewById(R.id.btn_back);
@@ -85,15 +92,9 @@ public class RelayFragment extends Fragment {
         // Action buttons
         Button btnViewMessages = view.findViewById(R.id.btn_view_messages);
         Button btnClearSent = view.findViewById(R.id.btn_clear_sent);
-        Button btnTestInbox = view.findViewById(R.id.btn_test_inbox);
-        Button btnTestOutbox = view.findViewById(R.id.btn_test_outbox);
-        Button btnTestMultiple = view.findViewById(R.id.btn_test_multiple);
 
         btnViewMessages.setOnClickListener(v -> showMessagesDialog());
         btnClearSent.setOnClickListener(v -> clearSentMessages());
-        btnTestInbox.setOnClickListener(v -> createTestMessage("inbox"));
-        btnTestOutbox.setOnClickListener(v -> createTestMessage("outbox"));
-        btnTestMultiple.setOnClickListener(v -> createMultipleTestMessages());
 
         // Load current settings
         loadSettings();
@@ -228,17 +229,17 @@ public class RelayFragment extends Fragment {
 
     private void updateStatus() {
         try {
-            // Get message counts
-            int inboxCount = storage.getMessageCount("inbox");
-            int outboxCount = storage.getMessageCount("outbox");
-            int sentCount = storage.getMessageCount("sent");
+            // Get message counts from both global relay folder and contact-specific folders
+            int inboxCount = storage.getMessageCount("inbox") + getContactRelayMessageCount("inbox");
+            int outboxCount = storage.getMessageCount("outbox") + getContactRelayMessageCount("outbox");
+            int sentCount = storage.getMessageCount("sent") + getContactRelayMessageCount("sent");
 
             textInboxCount.setText(String.valueOf(inboxCount));
             textOutboxCount.setText(String.valueOf(outboxCount));
             textSentCount.setText(String.valueOf(sentCount));
 
-            // Get storage used
-            long storageBytes = storage.getTotalStorageUsed();
+            // Get storage used (both global and contact-specific)
+            long storageBytes = storage.getTotalStorageUsed() + getContactRelayStorageUsed();
             String storageText = formatStorageSize(storageBytes);
             textStorageUsed.setText(storageText);
 
@@ -251,6 +252,99 @@ public class RelayFragment extends Fragment {
             textSentCount.setText("?");
             textStorageUsed.setText("? MB");
         }
+    }
+
+    /**
+     * Count relay messages in all contact folders for a specific folder type.
+     */
+    private int getContactRelayMessageCount(String folderType) {
+        int count = 0;
+        try {
+            File contactsDir = folderManager.getContactsDir();
+            if (!contactsDir.exists() || !contactsDir.isDirectory()) {
+                return 0;
+            }
+
+            File[] contactFolders = contactsDir.listFiles(File::isDirectory);
+            if (contactFolders == null) {
+                return 0;
+            }
+
+            for (File contactFolder : contactFolders) {
+                String callsign = contactFolder.getName();
+                File relayFolder;
+
+                if ("inbox".equalsIgnoreCase(folderType)) {
+                    relayFolder = folderManager.getRelayInboxDir(callsign);
+                } else if ("outbox".equalsIgnoreCase(folderType)) {
+                    relayFolder = folderManager.getRelayOutboxDir(callsign);
+                } else if ("sent".equalsIgnoreCase(folderType)) {
+                    relayFolder = folderManager.getRelaySentDir(callsign);
+                } else {
+                    continue;
+                }
+
+                if (relayFolder.exists() && relayFolder.isDirectory()) {
+                    File[] messages = relayFolder.listFiles((dir, name) -> name.endsWith(".md"));
+                    if (messages != null) {
+                        count += messages.length;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Ignore errors, return what we have
+        }
+        return count;
+    }
+
+    /**
+     * Calculate total storage used by all contact relay messages.
+     */
+    private long getContactRelayStorageUsed() {
+        long totalBytes = 0;
+        try {
+            File contactsDir = folderManager.getContactsDir();
+            if (!contactsDir.exists() || !contactsDir.isDirectory()) {
+                return 0;
+            }
+
+            File[] contactFolders = contactsDir.listFiles(File::isDirectory);
+            if (contactFolders == null) {
+                return 0;
+            }
+
+            for (File contactFolder : contactFolders) {
+                String callsign = contactFolder.getName();
+                File relayDir = folderManager.getRelayDir(callsign);
+
+                if (relayDir.exists() && relayDir.isDirectory()) {
+                    totalBytes += calculateDirectorySize(relayDir);
+                }
+            }
+        } catch (Exception e) {
+            // Ignore errors, return what we have
+        }
+        return totalBytes;
+    }
+
+    /**
+     * Calculate total size of all files in a directory recursively.
+     */
+    private long calculateDirectorySize(File directory) {
+        long size = 0;
+        if (directory.exists() && directory.isDirectory()) {
+            File[] files = directory.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isFile()) {
+                        size += file.length();
+                    } else if (file.isDirectory()) {
+                        size += calculateDirectorySize(file);
+                    }
+                }
+            }
+        }
+        return size;
     }
 
     private String formatStorageSize(long bytes) {
@@ -273,31 +367,265 @@ public class RelayFragment extends Fragment {
 
     private void showMessagesDialog() {
         try {
-            int inboxCount = storage.getMessageCount("inbox");
-            int outboxCount = storage.getMessageCount("outbox");
-            int sentCount = storage.getMessageCount("sent");
+            // Show selection dialog for which folder to view
+            String[] folders = {"Inbox", "Outbox", "Sent"};
 
-            String message = "Relay Messages:\n\n" +
-                    "Inbox: " + inboxCount + " messages\n" +
-                    "Outbox: " + outboxCount + " messages\n" +
-                    "Sent: " + sentCount + " messages\n\n" +
-                    "Total Storage: " + formatStorageSize(storage.getTotalStorageUsed());
-
-            new AlertDialog.Builder(requireContext())
-                    .setTitle("Relay Messages")
-                    .setMessage(message)
-                    .setPositiveButton("OK", null)
+            AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                    .setTitle("View Relay Messages")
+                    .setItems(folders, (d, which) -> {
+                        String folderType = folders[which].toLowerCase();
+                        openMessagesGrid(folderType);
+                    })
+                    .setNegativeButton("Cancel", null)
                     .show();
+
+            // Set button text color explicitly
+            android.widget.Button negativeButton = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+            if (negativeButton != null) {
+                negativeButton.setTextColor(getResources().getColor(R.color.white, null));
+            }
         } catch (Exception e) {
             Toast.makeText(requireContext(), "Error loading messages", Toast.LENGTH_SHORT).show();
         }
     }
 
+    /**
+     * Open the messages grid view for a specific folder type.
+     */
+    private void openMessagesGrid(String folderType) {
+        RelayMessagesGridFragment fragment = RelayMessagesGridFragment.newInstance(folderType);
+
+        if (getActivity() != null) {
+            androidx.fragment.app.FragmentTransaction transaction =
+                    getActivity().getSupportFragmentManager().beginTransaction();
+            transaction.replace(R.id.fragment_container, fragment);
+            transaction.addToBackStack(null);
+            transaction.commit();
+        }
+    }
+
+    /**
+     * Show list of messages from a specific folder (inbox, outbox, or sent).
+     * Includes messages from both global relay folder and all contact-specific folders.
+     */
+    private void showMessagesList(String folderType) {
+        try {
+            // Collect all messages from both global and contact folders
+            List<RelayMessageItem> messages = new ArrayList<>();
+
+            // Load from global relay folder
+            File globalFolder = getGlobalRelayFolder(folderType);
+            loadMessagesFromFolder(globalFolder, null, messages);
+
+            // Load from all contact folders
+            File contactsDir = folderManager.getContactsDir();
+            if (contactsDir.exists() && contactsDir.isDirectory()) {
+                File[] contactFolders = contactsDir.listFiles(File::isDirectory);
+                if (contactFolders != null) {
+                    for (File contactFolder : contactFolders) {
+                        String callsign = contactFolder.getName();
+                        File relayFolder;
+
+                        if ("inbox".equalsIgnoreCase(folderType)) {
+                            relayFolder = folderManager.getRelayInboxDir(callsign);
+                        } else if ("outbox".equalsIgnoreCase(folderType)) {
+                            relayFolder = folderManager.getRelayOutboxDir(callsign);
+                        } else {
+                            relayFolder = folderManager.getRelaySentDir(callsign);
+                        }
+
+                        loadMessagesFromFolder(relayFolder, callsign, messages);
+                    }
+                }
+            }
+
+            // Sort by timestamp (newest first)
+            messages.sort((m1, m2) -> Long.compare(m2.timestamp, m1.timestamp));
+
+            if (messages.isEmpty()) {
+                Toast.makeText(requireContext(),
+                    "No messages in " + folderType,
+                    Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Create display strings for the list
+            String[] displayItems = new String[messages.size()];
+            for (int i = 0; i < messages.size(); i++) {
+                RelayMessageItem item = messages.get(i);
+                String timeStr = new java.text.SimpleDateFormat("MMM dd HH:mm", java.util.Locale.US)
+                    .format(new java.util.Date(item.timestamp * 1000));
+
+                String preview = item.subject != null && !item.subject.isEmpty()
+                    ? item.subject
+                    : item.content;
+
+                if (preview.length() > 40) {
+                    preview = preview.substring(0, 40) + "...";
+                }
+
+                String location = item.contactCallsign != null
+                    ? " [" + item.contactCallsign + "]"
+                    : " [Global]";
+
+                displayItems[i] = timeStr + " - " + preview + location;
+            }
+
+            // Show list dialog
+            AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                    .setTitle(capitalize(folderType) + " Messages (" + messages.size() + ")")
+                    .setItems(displayItems, (d, which) -> {
+                        RelayMessageItem selected = messages.get(which);
+                        showMessageDetails(selected);
+                    })
+                    .setNegativeButton("Close", null)
+                    .show();
+
+            // Set button text color explicitly
+            android.widget.Button negativeButton = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+            if (negativeButton != null) {
+                negativeButton.setTextColor(getResources().getColor(R.color.white, null));
+            }
+
+        } catch (Exception e) {
+            Toast.makeText(requireContext(),
+                "Error loading messages: " + e.getMessage(),
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * Load messages from a specific folder into the list.
+     */
+    private void loadMessagesFromFolder(File folder, String contactCallsign, List<RelayMessageItem> messages) {
+        if (!folder.exists() || !folder.isDirectory()) {
+            return;
+        }
+
+        File[] messageFiles = folder.listFiles((dir, name) -> name.endsWith(".md"));
+        if (messageFiles == null) {
+            return;
+        }
+
+        for (File file : messageFiles) {
+            try {
+                String markdown = new String(java.nio.file.Files.readAllBytes(file.toPath()),
+                    java.nio.charset.StandardCharsets.UTF_8);
+                offgrid.geogram.relay.RelayMessage message =
+                    offgrid.geogram.relay.RelayMessage.parseMarkdown(markdown);
+
+                if (message != null) {
+                    RelayMessageItem item = new RelayMessageItem();
+                    item.message = message;
+                    item.file = file;
+                    item.contactCallsign = contactCallsign;
+                    item.timestamp = message.getTimestamp();
+                    item.subject = message.getSubject();
+                    item.content = message.getContent();
+                    messages.add(item);
+                }
+            } catch (Exception e) {
+                // Skip files that can't be parsed
+            }
+        }
+    }
+
+    /**
+     * Get the global relay folder for a specific type.
+     */
+    private File getGlobalRelayFolder(String folderType) {
+        File relayDir = new File(requireContext().getFilesDir(), "relay");
+        return new File(relayDir, folderType);
+    }
+
+    /**
+     * Show detailed view of a relay message.
+     */
+    private void showMessageDetails(RelayMessageItem item) {
+        try {
+            offgrid.geogram.relay.RelayMessage message = item.message;
+
+            StringBuilder details = new StringBuilder();
+
+            // Subject
+            if (message.getSubject() != null && !message.getSubject().isEmpty()) {
+                details.append("Subject: ").append(message.getSubject()).append("\n\n");
+            }
+
+            // From/To
+            details.append("From: ").append(message.getFromCallsign()).append("\n");
+            if (message.getToCallsign() != null) {
+                details.append("To: ").append(message.getToCallsign()).append("\n");
+            }
+
+            // Timestamp
+            String timeStr = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                .format(new java.util.Date(message.getTimestamp() * 1000));
+            details.append("Time: ").append(timeStr).append("\n");
+
+            // Priority
+            if (message.getPriority() != null) {
+                details.append("Priority: ").append(message.getPriority()).append("\n");
+            }
+
+            // Location
+            String location = item.contactCallsign != null
+                ? "Contact folder: " + item.contactCallsign
+                : "Global relay folder";
+            details.append("Location: ").append(location).append("\n\n");
+
+            // Content
+            details.append("Message:\n").append(message.getContent());
+
+            AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                    .setTitle("Message Details")
+                    .setMessage(details.toString())
+                    .setPositiveButton("OK", null)
+                    .show();
+
+            // Set button text color explicitly
+            android.widget.Button positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            if (positiveButton != null) {
+                positiveButton.setTextColor(getResources().getColor(R.color.white, null));
+            }
+
+        } catch (Exception e) {
+            Toast.makeText(requireContext(),
+                "Error showing message: " + e.getMessage(),
+                Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * Capitalize first letter of a string.
+     */
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
+    }
+
+    /**
+     * Helper class to hold message info for the list.
+     */
+    private static class RelayMessageItem {
+        offgrid.geogram.relay.RelayMessage message;
+        File file;
+        String contactCallsign;  // null if from global folder
+        long timestamp;
+        String subject;
+        String content;
+    }
+
+    /**
+     * Clear all sent messages with confirmation dialog.
+     */
     private void clearSentMessages() {
-        new AlertDialog.Builder(requireContext())
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
                 .setTitle("Clear Sent Messages")
                 .setMessage("Are you sure you want to clear all sent messages? This cannot be undone.")
-                .setPositiveButton("Clear", (dialog, which) -> {
+                .setPositiveButton("Clear", (d, which) -> {
                     try {
                         int cleared = storage.clearFolder("sent");
                         Toast.makeText(requireContext(),
@@ -312,111 +640,15 @@ public class RelayFragment extends Fragment {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
-    }
 
-    private void createTestMessage(String folder) {
-        try {
-            // Generate unique message ID
-            long timestamp = System.currentTimeMillis();
-            String messageId = "TEST-" + timestamp;
-
-            // Create test message
-            offgrid.geogram.relay.RelayMessage message = new offgrid.geogram.relay.RelayMessage();
-            message.setId(messageId);
-            message.setFromCallsign("TEST-K5ABC");
-            message.setToCallsign("DEST-W6XYZ");
-            message.setContent("Test relay message created at " +
-                new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
-                    .format(new java.util.Date(timestamp)));
-            message.setType("private");
-            message.setPriority("normal");
-            message.setTtl(604800); // 7 days
-            message.setTimestamp(timestamp / 1000);
-
-            // Save to specified folder
-            boolean saved = storage.saveMessage(message, folder);
-
-            if (saved) {
-                Toast.makeText(requireContext(),
-                    "Test message added to " + folder,
-                    Toast.LENGTH_SHORT).show();
-                updateStatus();
-            } else {
-                Toast.makeText(requireContext(),
-                    "Failed to save test message",
-                    Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            Toast.makeText(requireContext(),
-                "Error creating test message: " + e.getMessage(),
-                Toast.LENGTH_SHORT).show();
+        // Set button text colors explicitly
+        android.widget.Button positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        android.widget.Button negativeButton = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+        if (positiveButton != null) {
+            positiveButton.setTextColor(getResources().getColor(R.color.white, null));
         }
-    }
-
-    private void createMultipleTestMessages() {
-        try {
-            int created = 0;
-
-            // Create 2 messages in inbox
-            for (int i = 0; i < 2; i++) {
-                long timestamp = System.currentTimeMillis() + i;
-                String messageId = "TEST-IN-" + timestamp;
-
-                offgrid.geogram.relay.RelayMessage message = new offgrid.geogram.relay.RelayMessage();
-                message.setId(messageId);
-                message.setFromCallsign("REMOTE-K" + (5000 + i));
-                message.setToCallsign("LOCAL-W6ABC");
-                message.setContent("Incoming test message #" + (i + 1));
-                message.setType("private");
-                message.setPriority(i == 0 ? "urgent" : "normal");
-                message.setTtl(604800);
-                message.setTimestamp(timestamp / 1000);
-
-                if (storage.saveMessage(message, "inbox")) {
-                    created++;
-                }
-            }
-
-            // Create 3 messages in outbox
-            for (int i = 0; i < 3; i++) {
-                long timestamp = System.currentTimeMillis() + 100 + i;
-                String messageId = "TEST-OUT-" + timestamp;
-
-                offgrid.geogram.relay.RelayMessage message = new offgrid.geogram.relay.RelayMessage();
-                message.setId(messageId);
-                message.setFromCallsign("LOCAL-K5XYZ");
-                message.setToCallsign("REMOTE-W" + (6000 + i));
-                message.setContent("Outgoing test message #" + (i + 1) + " ready to relay");
-                message.setType("private");
-                message.setPriority("normal");
-                message.setTtl(604800);
-                message.setTimestamp(timestamp / 1000);
-
-                // Optionally add an attachment to one message
-                if (i == 1) {
-                    offgrid.geogram.relay.RelayAttachment attachment =
-                        new offgrid.geogram.relay.RelayAttachment();
-                    attachment.setMimeType("image/jpeg");
-                    attachment.setFilename("test.jpg");
-                    attachment.setData(new byte[]{1, 2, 3, 4, 5, 6, 7, 8});
-                    attachment.calculateChecksum();
-                    message.addAttachment(attachment);
-                }
-
-                if (storage.saveMessage(message, "outbox")) {
-                    created++;
-                }
-            }
-
-            Toast.makeText(requireContext(),
-                "Created " + created + " test messages (2 inbox, 3 outbox)",
-                Toast.LENGTH_LONG).show();
-            updateStatus();
-
-        } catch (Exception e) {
-            Toast.makeText(requireContext(),
-                "Error creating test messages: " + e.getMessage(),
-                Toast.LENGTH_SHORT).show();
+        if (negativeButton != null) {
+            negativeButton.setTextColor(getResources().getColor(R.color.white, null));
         }
     }
 
