@@ -378,21 +378,21 @@ public class RelayMessage {
 
     /**
      * Format timestamp as YYYY-MM-DD HH:MM_SS.
+     * Uses Calendar for proper date/time conversion including leap years and variable month lengths.
      */
     private String formatTimestamp(long unixTimestamp) {
-        // Simplified conversion
-        // In production, use java.time.Instant or SimpleDateFormat
-        long days = unixTimestamp / 86400;
-        long remainingSeconds = unixTimestamp % 86400;
-        int hours = (int) (remainingSeconds / 3600);
-        int minutes = (int) ((remainingSeconds % 3600) / 60);
-        int seconds = (int) (remainingSeconds % 60);
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(unixTimestamp * 1000); // Convert seconds to milliseconds
 
-        int year = 1970 + (int) (days / 365);
-        int month = ((int) (days % 365) / 30) + 1;
-        int day = ((int) (days % 365) % 30) + 1;
+        int year = calendar.get(Calendar.YEAR);
+        int month = calendar.get(Calendar.MONTH) + 1; // Calendar.MONTH is 0-based
+        int day = calendar.get(Calendar.DAY_OF_MONTH);
+        int hours = calendar.get(Calendar.HOUR_OF_DAY);
+        int minutes = calendar.get(Calendar.MINUTE);
+        int seconds = calendar.get(Calendar.SECOND);
 
-        return String.format("%04d-%02d-%02d %02d:%02d_%02d", year, month, day, hours, minutes, seconds);
+        return String.format(Locale.US, "%04d-%02d-%02d %02d:%02d_%02d",
+                             year, month, day, hours, minutes, seconds);
     }
 
     /**

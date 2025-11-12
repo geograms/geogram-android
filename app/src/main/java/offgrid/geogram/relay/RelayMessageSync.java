@@ -58,9 +58,9 @@ public class RelayMessageSync {
 
     private RelayMessageSync(Context context) {
         this.context = context.getApplicationContext();
-        this.storage = new RelayStorage(context);
-        this.settings = new RelaySettings(context);
-        this.bluetoothSender = BluetoothSender.getInstance(context);
+        this.storage = new RelayStorage(this.context); // Use application context
+        this.settings = new RelaySettings(this.context); // Use application context
+        this.bluetoothSender = BluetoothSender.getInstance(this.context); // Use application context
     }
 
     public static synchronized RelayMessageSync getInstance(Context context) {

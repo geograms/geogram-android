@@ -242,6 +242,7 @@ public class BluetoothSender {
             if (!isDuplicate) {
                 messageQueue.offer(queuedMsg);
                 addedCount++;
+                Log.d(TAG, "→ Queued parcel #" + addedCount + ": " + parcel.substring(0, Math.min(30, parcel.length())) + "... Queue size: " + messageQueue.size());
             }
         }
 
@@ -261,6 +262,8 @@ public class BluetoothSender {
 
         final QueuedMessage queuedMsg = messageQueue.peek();
         if (queuedMsg == null) return;
+
+        Log.d(TAG, "← Sending parcel (queue size: " + messageQueue.size() + ", isSending: " + isSending + "): " + queuedMsg.parcel.substring(0, Math.min(30, queuedMsg.parcel.length())));
 
         if (!hasAdvertisePermission()) {
             Log.i(TAG, "Missing BLUETOOTH permissions. Cannot send.");
@@ -301,6 +304,7 @@ public class BluetoothSender {
 
                 // Write parcel to RX characteristic
                 rxChar.setValue(queuedMsg.parcel.getBytes(StandardCharsets.UTF_8));
+                Log.d(TAG, "⚡ Attempting GATT write to " + deviceAddress + " (" + queuedMsg.parcel.length() + " bytes): " + queuedMsg.parcel.substring(0, Math.min(20, queuedMsg.parcel.length())));
                 boolean writeResult = gatt.writeCharacteristic(rxChar);
 
                 if (writeResult) {
@@ -310,20 +314,21 @@ public class BluetoothSender {
                     String ackKey = deviceAddress + ":" + queuedMsg.parcel.substring(0, Math.min(5, queuedMsg.parcel.length()));
                     PendingAck pendingAck = new PendingAck(queuedMsg, System.currentTimeMillis());
                     pendingAcks.put(ackKey, pendingAck);
+                    Log.d(TAG, "⏱ Waiting for ACK: " + ackKey + " (pending ACKs: " + pendingAcks.size() + ")");
 
                     // Schedule ACK timeout
                     handler.postDelayed(() -> {
                         if (pendingAcks.containsKey(ackKey)) {
-                            Log.w(TAG, "ACK timeout for " + ackKey + ", retrying...");
+                            Log.w(TAG, "⏰ ACK TIMEOUT for " + ackKey + " after " + GATT_ACK_TIMEOUT_MS + "ms - will retry (queue size: " + messageQueue.size() + ")");
                             pendingAcks.remove(ackKey);
                             isSending = false;
                             tryToSendNext(); // Retry
                         }
                     }, GATT_ACK_TIMEOUT_MS);
 
-                    Log.i(TAG, "Sent parcel via GATT to " + deviceAddress + ": " + queuedMsg.parcel.substring(0, Math.min(20, queuedMsg.parcel.length())) + "...");
+                    Log.i(TAG, "✓ GATT write queued to " + deviceAddress + ": " + queuedMsg.parcel.substring(0, Math.min(20, queuedMsg.parcel.length())) + "...");
                 } else {
-                    Log.w(TAG, "Failed to write to GATT characteristic on " + deviceAddress);
+                    Log.w(TAG, "✗ GATT write FAILED to " + deviceAddress);
                 }
 
             } catch (Exception e) {
@@ -576,7 +581,7 @@ public class BluetoothSender {
             if (uuid.equalsIgnoreCase(GATT_CHARACTERISTIC_RX_UUID)) {
                 // Received message parcel from peer
                 String parcel = new String(value, StandardCharsets.UTF_8);
-                Log.i(TAG, "Received parcel via GATT from " + device.getAddress() + ": " + parcel);
+                Log.i(TAG, "📥 Received parcel via GATT from " + device.getAddress() + " (" + parcel.length() + " bytes): " + parcel.substring(0, Math.min(20, parcel.length())));
 
                 // Extract callsign from parcel and update mapping for relay sync lookup
                 // Parcel format: >+CALLSIGN@GEOCODE#MODEL or >CALLSIGN@GEOCODE#MODEL
@@ -589,13 +594,14 @@ public class BluetoothSender {
                 if (responseNeeded) {
                     try {
                         gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
-                        Log.d(TAG, "Sent GATT response for parcel: " + parcel.substring(0, Math.min(10, parcel.length())));
+                        Log.d(TAG, "✓ Sent GATT protocol response");
                     } catch (SecurityException e) {
                         Log.e(TAG, "SecurityException sending GATT response: " + e.getMessage());
                     }
                 }
 
                 // Send application-level ACK via CONTROL characteristic
+                Log.d(TAG, "📤 Sending ACK for parcel: " + parcel.substring(0, Math.min(10, parcel.length())));
                 sendAckToDevice(device.getAddress(), parcel);
 
             } else if (uuid.equalsIgnoreCase(GATT_CHARACTERISTIC_CONTROL_UUID)) {
@@ -641,17 +647,37 @@ public class BluetoothSender {
         if (control.startsWith("ACK:")) {
             String ackKey = deviceAddress + ":" + control.substring(4);
             if (pendingAcks.containsKey(ackKey)) {
-                Log.i(TAG, "Received ACK from " + deviceAddress + " for " + ackKey);
+                Log.i(TAG, "✓ Received ACK from " + deviceAddress + " for " + ackKey + " (pending: " + pendingAcks.size() + ", queue: " + messageQueue.size() + ")");
                 pendingAcks.remove(ackKey);
 
-                // Remove from queue and send next
-                messageQueue.poll();
-                isSending = false;
-                handler.post(() -> tryToSendNext());
+                // Extract parcel prefix from ackKey (e.g., ">ZA0:" from "7E:76:02:29:6B:B9:>ZA0:")
+                String parcelPrefix = control.substring(4); // e.g., ">ZA0:"
+
+                // Check if any other devices are still waiting for ACKs for this same parcel
+                boolean otherDevicesWaiting = false;
+                for (String key : pendingAcks.keySet()) {
+                    if (key.endsWith(parcelPrefix)) {
+                        otherDevicesWaiting = true;
+                        Log.d(TAG, "⏳ Still waiting for ACK from other device: " + key);
+                        break;
+                    }
+                }
+
+                // Only remove from queue when ALL devices have ACKed this parcel
+                if (!otherDevicesWaiting) {
+                    QueuedMessage completed = messageQueue.poll();
+                    Log.d(TAG, "← Completed parcel, removed from queue. New queue size: " + messageQueue.size());
+                    isSending = false;
+                    handler.post(() -> tryToSendNext());
+                } else {
+                    Log.d(TAG, "← Parcel ACKed by " + deviceAddress + ", but waiting for other devices before removing from queue");
+                }
+            } else {
+                Log.d(TAG, "⚠ Received unexpected ACK (already processed?): " + ackKey);
             }
         } else if (control.startsWith("NACK:")) {
             String nackKey = deviceAddress + ":" + control.substring(5);
-            Log.w(TAG, "Received NACK from " + deviceAddress + " for " + nackKey + ", will retry");
+            Log.w(TAG, "✗ Received NACK from " + deviceAddress + " for " + nackKey + ", will retry");
             // ACK timeout will handle retry
         }
     }
@@ -694,9 +720,9 @@ public class BluetoothSender {
             boolean notifyResult = gattServer.notifyCharacteristicChanged(device, controlChar, false);
 
             if (notifyResult) {
-                Log.i(TAG, "Sent ACK notification to " + deviceAddress + " for parcel: " + parcelPrefix);
+                Log.i(TAG, "✓ Sent ACK notification to " + deviceAddress + " for parcel: " + parcelPrefix);
             } else {
-                Log.w(TAG, "Failed to send ACK notification to " + deviceAddress + " (client may not be subscribed)");
+                Log.w(TAG, "✗ FAILED to send ACK notification to " + deviceAddress + " (client may not be subscribed or notification failed)");
             }
 
         } catch (SecurityException e) {

@@ -13,8 +13,8 @@ android {
         applicationId = "offgrid.geogram"
         minSdk = 29
         targetSdk = 34
-        versionCode = 17
-        versionName = "0.5.17"
+        versionCode = 18
+        versionName = "0.5.18"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         applicationIdSuffix = "geogram"

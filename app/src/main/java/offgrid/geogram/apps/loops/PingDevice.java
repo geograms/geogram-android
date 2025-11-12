@@ -132,8 +132,8 @@ public final class PingDevice {
             coordinates = "@" + coordinates;
         }
 
-        // Include device model code and version: +CALLSIGN@COORDS#APP-0.5.17
-        String deviceModelCode = "APP-0.5.17";  // Device code: APP = Android Phone
+        // Include device model code and version: +CALLSIGN@COORDS#APP-0.5.18
+        String deviceModelCode = "APP-0.5.18";  // Device code: APP = Android Phone
         String message = "+" + callsign + coordinates + "#" + deviceModelCode;
 
         // BLE advertising has 31-byte limit. With overhead, we have ~20 bytes for data.

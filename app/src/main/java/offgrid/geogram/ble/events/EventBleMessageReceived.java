@@ -2,6 +2,7 @@ package offgrid.geogram.ble.events;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.TreeSet;
 
 import offgrid.geogram.apps.chat.ChatMessage;
@@ -25,6 +26,11 @@ public class EventBleMessageReceived extends EventAction {
 
     HashMap<String, BluetoothMessage> messages = new HashMap<>();
     private static final String TAG = "EventBleMessageReceived";
+
+    // Throttling for missing parcel requests
+    private static final long PARCEL_REQUEST_THROTTLE_MS = 3000; // Wait 3 seconds before requesting
+    private HashMap<String, Long> lastRequestTime = new HashMap<>(); // messageId -> timestamp
+    private HashMap<String, HashSet<String>> requestedParcels = new HashMap<>(); // messageId -> Set<parcelId>
 
     public EventBleMessageReceived(String id) {
         super(id);
@@ -133,22 +139,51 @@ public class EventBleMessageReceived extends EventAction {
 
     /**
      * Long messages will lose packages. This is the place to ask for missing packages.
+     * Uses throttling and deduplication to avoid flooding the BLE channel with duplicate requests.
      */
     private void shouldWeAskForMissingPackages(BluetoothMessage msg) {
         ArrayList<String> missingParcels = msg.getMissingParcels();
         if(missingParcels.isEmpty()){
+            // Message complete - cleanup tracking
+            lastRequestTime.remove(msg.getId());
+            requestedParcels.remove(msg.getId());
             return;
         }
 
-        // Send NACK request for each missing parcel
-        for(String missingParcelId : missingParcels) {
-            String nackMessage = "/repeat " + missingParcelId;
-            BluetoothSender.getInstance(null).sendMessage(nackMessage);
-            Log.i(TAG, "Requesting missing parcel: " + missingParcelId);
+        String messageId = msg.getId();
+        long now = System.currentTimeMillis();
+
+        // Throttle: Check if we requested recently for this message
+        Long lastRequest = lastRequestTime.get(messageId);
+        if(lastRequest != null && (now - lastRequest) < PARCEL_REQUEST_THROTTLE_MS){
+            // Too soon, wait for throttle period to elapse
+            return;
         }
 
-        // messages are sent in sequence. If there is a missing sequence, ask for it
-        Log.i(TAG, msg.getId() + " is missing packages: " + missingParcels.size());
+        // Get or create the set of already-requested parcels for this message
+        HashSet<String> alreadyRequested = requestedParcels.get(messageId);
+        if(alreadyRequested == null){
+            alreadyRequested = new HashSet<>();
+            requestedParcels.put(messageId, alreadyRequested);
+        }
+
+        // Only request parcels we haven't requested yet
+        int newRequestCount = 0;
+        for(String missingParcelId : missingParcels) {
+            if(!alreadyRequested.contains(missingParcelId)){
+                String nackMessage = "/repeat " + missingParcelId;
+                BluetoothSender.getInstance(null).sendMessage(nackMessage);
+                alreadyRequested.add(missingParcelId);
+                newRequestCount++;
+                Log.i(TAG, "Requesting missing parcel: " + missingParcelId);
+            }
+        }
+
+        if(newRequestCount > 0){
+            // Update last request time only if we actually sent requests
+            lastRequestTime.put(messageId, now);
+            Log.i(TAG, msg.getId() + " requested " + newRequestCount + " new missing parcels (total missing: " + missingParcels.size() + ")");
+        }
     }
 
 

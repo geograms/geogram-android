@@ -1,6 +1,7 @@
 package offgrid.geogram.fragments;
 
 import androidx.appcompat.app.AlertDialog;
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -83,8 +84,10 @@ public class RelayMessagesListFragment extends Fragment {
             callsign = getArguments().getString(ARG_CALLSIGN);
         }
 
-        folderManager = new ContactFolderManager(requireContext());
-        relayStorage = new RelayStorage(requireContext());
+        // Use application context for storage to ensure consistency across components
+        Context appContext = requireContext().getApplicationContext();
+        folderManager = new ContactFolderManager(appContext);
+        relayStorage = new RelayStorage(appContext);
     }
 
     @Nullable
@@ -381,20 +384,33 @@ public class RelayMessagesListFragment extends Fragment {
                 message.setTtl(604800); // 7 days
                 message.setTimestamp(timestamp / 1000);
 
-                // Save to contact's relay outbox
-                File outboxDir = folderManager.getRelayOutboxDir(toCallsign);
-                File messageFile = new File(outboxDir, messageId + ".md");
+                // Save to GLOBAL relay outbox (not contact-specific folder)
+                // This is required for relay sync to find and transmit the message
+                boolean saved = relayStorage.saveMessage(message, "outbox");
 
-                // Ensure directory exists
-                if (!outboxDir.exists()) {
-                    outboxDir.mkdirs();
+                if (!saved) {
+                    handler.post(() -> {
+                        Toast.makeText(requireContext(),
+                            "Failed to save message to outbox",
+                            Toast.LENGTH_SHORT).show();
+                    });
+                    return;
                 }
 
-                // Write message
-                java.nio.file.Files.write(
-                    messageFile.toPath(),
-                    message.toMarkdown().getBytes(java.nio.charset.StandardCharsets.UTF_8)
-                );
+                // ALSO save to contact's folder for UI display
+                try {
+                    File outboxDir = folderManager.getRelayOutboxDir(toCallsign);
+                    if (!outboxDir.exists()) {
+                        outboxDir.mkdirs();
+                    }
+                    File messageFile = new File(outboxDir, messageId + ".md");
+                    java.nio.file.Files.write(
+                        messageFile.toPath(),
+                        message.toMarkdown().getBytes(java.nio.charset.StandardCharsets.UTF_8)
+                    );
+                } catch (Exception e) {
+                    Log.w(TAG, "Failed to save to contact folder (non-critical): " + e.getMessage());
+                }
 
                 handler.post(() -> {
                     Toast.makeText(requireContext(),
@@ -404,7 +420,7 @@ public class RelayMessagesListFragment extends Fragment {
                     // Reload messages to show the new one
                     loadMessages();
 
-                    Log.d(TAG, "Created relay message: " + messageId + " to " + toCallsign);
+                    Log.i(TAG, "Created relay message: " + messageId + " to " + toCallsign + " (saved to global outbox)");
                 });
 
             } catch (Exception e) {
