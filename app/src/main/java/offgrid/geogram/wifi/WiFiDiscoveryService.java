@@ -1,6 +1,7 @@
 package offgrid.geogram.wifi;
 
 import android.content.Context;
+import android.content.Intent;
 import android.net.wifi.WifiManager;
 import android.util.Log;
 
@@ -84,11 +85,15 @@ public class WiFiDiscoveryService {
 
         isRunning = true;
 
-        // Quick ping previously discovered devices first (faster startup)
-        scheduler.execute(this::quickPingPreviousDevices);
+        // IMMEDIATELY quick ping previously discovered devices first (faster startup)
+        // Do this synchronously and with high priority to get WiFi status ASAP
+        Log.i(TAG, "Starting IMMEDIATE quick-ping of cached devices for fast WiFi detection");
+        Thread quickPingThread = new Thread(this::quickPingPreviousDevices, "QuickPing-Priority");
+        quickPingThread.setPriority(Thread.MAX_PRIORITY);
+        quickPingThread.start();
 
-        // Then run full scan
-        scheduler.execute(this::scanNetwork);
+        // Schedule full scan to run after quick ping (finds new devices)
+        scheduler.schedule(this::scanNetwork, 5, TimeUnit.SECONDS);
 
         // Schedule periodic scans every 2 minutes
         scanTask = scheduler.scheduleWithFixedDelay(
@@ -336,6 +341,7 @@ public class WiFiDiscoveryService {
     /**
      * Quick ping previously discovered devices on startup
      * This allows immediate communication without waiting for full scan
+     * OPTIMIZED: Uses parallel checking with reduced timeout for instant WiFi detection
      */
     private void quickPingPreviousDevices() {
         if (discoveredDevices.isEmpty()) {
@@ -343,33 +349,103 @@ public class WiFiDiscoveryService {
             return;
         }
 
-        Log.i(TAG, "Quick-pinging " + discoveredDevices.size() + " previously discovered devices...");
+        Log.i(TAG, "⚡ FAST Quick-ping starting for " + discoveredDevices.size() + " cached devices...");
+        long startTime = System.currentTimeMillis();
 
         // Create snapshot to avoid concurrent modification
         Map<String, String> devicesToCheck = new HashMap<>(discoveredDevices);
 
-        int foundCount = 0;
+        // Use thread pool for PARALLEL checking (much faster than sequential)
+        ExecutorService pingPool = Executors.newFixedThreadPool(Math.min(devicesToCheck.size(), 10));
+        AtomicInteger foundCount = new AtomicInteger(0);
+        AtomicInteger checkedCount = new AtomicInteger(0);
+
         for (Map.Entry<String, String> entry : devicesToCheck.entrySet()) {
             String callsign = entry.getKey();
             String ipAddress = entry.getValue();
 
-            // Quick check if device is still available
-            if (checkGeogramDevice(ipAddress)) {
-                foundCount++;
-                Log.i(TAG, "✓ Previous device still available: " + callsign + " at " + ipAddress);
-            } else {
-                // Device not responding - remove from discovered list
-                synchronized (this) {
-                    discoveredDevices.remove(callsign);
+            pingPool.execute(() -> {
+                // Quick check if device is still available (with FAST timeout)
+                if (checkGeogramDeviceFast(ipAddress)) {
+                    foundCount.incrementAndGet();
+                    Log.i(TAG, "✓ Previous device ONLINE: " + callsign + " at " + ipAddress);
+
+                    // Re-register with DeviceManager to ensure WiFi badge shows immediately
+                    android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+                    mainHandler.post(() -> {
+                        EventConnected event = new EventConnected(ConnectionType.WIFI, null);
+                        DeviceManager.getInstance().addNewLocationEvent(
+                            callsign,
+                            DeviceType.INTERNET_IGATE,
+                            event,
+                            "APP-WIFI"
+                        );
+                    });
+                } else {
+                    // Device not responding - remove from discovered list
+                    synchronized (this) {
+                        discoveredDevices.remove(callsign);
+                    }
+                    Log.d(TAG, "✗ Previous device OFFLINE: " + callsign + " at " + ipAddress);
                 }
-                Log.d(TAG, "✗ Previous device not responding: " + callsign + " at " + ipAddress);
-            }
+                checkedCount.incrementAndGet();
+            });
         }
 
-        Log.i(TAG, "Quick-ping complete: " + foundCount + "/" + devicesToCheck.size() + " devices still available");
+        // Wait for all pings to complete (max 3 seconds for quick-ping)
+        pingPool.shutdown();
+        try {
+            if (!pingPool.awaitTermination(3, TimeUnit.SECONDS)) {
+                Log.w(TAG, "Quick-ping timeout after 3s");
+                pingPool.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            pingPool.shutdownNow();
+        }
+
+        long duration = System.currentTimeMillis() - startTime;
+        Log.i(TAG, "⚡ Quick-ping complete in " + duration + "ms: " + foundCount.get() + "/" +
+              devicesToCheck.size() + " devices online");
 
         // Save updated list
         saveDiscoveredDevices();
+
+        // Notify UI to refresh immediately after quick-ping completes
+        android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        mainHandler.post(() -> {
+            if (context != null) {
+                Intent intent = new Intent("offgrid.geogram.WIFI_DISCOVERY_UPDATE");
+                intent.putExtra("devices_found", foundCount.get());
+                intent.putExtra("quick_ping_complete", true);
+                androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(context)
+                    .sendBroadcast(intent);
+            }
+        });
+    }
+
+    /**
+     * Fast device check with reduced timeout (1 second instead of 2)
+     * Used for quick-ping to get instant WiFi status
+     */
+    private boolean checkGeogramDeviceFast(String ipAddress) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL("http://" + ipAddress + ":" + API_PORT + API_STATUS_ENDPOINT);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(1000); // 1 second for fast ping
+            conn.setReadTimeout(1000);
+
+            int responseCode = conn.getResponseCode();
+            return responseCode == 200;
+
+        } catch (IOException e) {
+            return false;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
     }
 
     /**

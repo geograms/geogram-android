@@ -112,6 +112,17 @@
                     android:visibility="visible" />
             </FrameLayout>
 
+            <!-- Collections Button -->
+            <ImageButton
+                android:id="@+id/btn_collections"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="Collections"
+                android:src="@drawable/ic_collections"
+                app:tint="@color/white" />
+
             <!-- Spacer for Title -->
             <View
                 android:layout_width="0dp"

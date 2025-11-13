@@ -48,6 +48,7 @@ import offgrid.geogram.devices.EventDeviceUpdated;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
 import offgrid.geogram.fragments.AboutFragment;
+import offgrid.geogram.fragments.CollectionsFragment;
 import offgrid.geogram.fragments.DebugFragment;
 import offgrid.geogram.fragments.DevicesFragment;
 import offgrid.geogram.fragments.DevicesWithinReachFragment;
@@ -358,6 +359,15 @@ public class MainActivity extends AppCompatActivity {
             FragmentManager fragmentManager = getSupportFragmentManager();
             FragmentTransaction transaction = fragmentManager.beginTransaction();
             transaction.replace(R.id.fragment_container, new RelayFragment()).addToBackStack(null);
+            transaction.commit();
+        });
+
+        // Collections button
+        ImageButton btnCollections = findViewById(R.id.btn_collections);
+        btnCollections.setOnClickListener(v -> {
+            FragmentManager fragmentManager = getSupportFragmentManager();
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.replace(R.id.fragment_container, new CollectionsFragment()).addToBackStack(null);
             transaction.commit();
         });
 

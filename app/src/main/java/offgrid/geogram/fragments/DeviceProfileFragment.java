@@ -6,6 +6,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -13,6 +14,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.Date;
@@ -129,7 +137,104 @@ public class DeviceProfileFragment extends Fragment {
         btnSendMessage.setOnClickListener(openChatListener);
         btnOpenChat.setOnClickListener(openChatListener);
 
+        // Setup Collections card
+        setupCollectionsCard(view, deviceId, device);
+
         return view;
+    }
+
+    private void setupCollectionsCard(View view, String deviceId, Device device) {
+        LinearLayout collectionsCard = view.findViewById(R.id.collections_card);
+        TextView collectionsCount = view.findViewById(R.id.tv_collections_count);
+        TextView collectionsInfo = view.findViewById(R.id.tv_collections_info);
+
+        // Check if device has WiFi connection
+        offgrid.geogram.wifi.WiFiDiscoveryService wifiService =
+                offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(getContext());
+        String deviceIp = wifiService.getDeviceIp(deviceId);
+
+        if (deviceIp != null && !deviceIp.isEmpty()) {
+            // Device has WiFi - show collections card and fetch count
+            collectionsCard.setVisibility(View.VISIBLE);
+            collectionsCount.setText("Loading...");
+
+            // Fetch collections count in background thread
+            new Thread(() -> {
+                try {
+                    String apiUrl = "http://" + deviceIp + ":45678/api/collections/count";
+                    URL url = new URL(apiUrl);
+                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("GET");
+                    conn.setConnectTimeout(5000); // 5 second timeout
+                    conn.setReadTimeout(5000);
+
+                    int responseCode = conn.getResponseCode();
+                    if (responseCode == HttpURLConnection.HTTP_OK) {
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                        StringBuilder response = new StringBuilder();
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            response.append(line);
+                        }
+                        reader.close();
+
+                        // Parse JSON response
+                        JsonObject jsonResponse = JsonParser.parseString(response.toString()).getAsJsonObject();
+                        int count = jsonResponse.get("count").getAsInt();
+
+                        // Update UI on main thread
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                if (count > 0) {
+                                    collectionsCount.setText(count + " collection" + (count != 1 ? "s" : ""));
+                                    collectionsInfo.setText("Tap to browse collections");
+
+                                    // Set click listener to open collections browser
+                                    collectionsCard.setOnClickListener(v -> {
+                                        if (getActivity() != null) {
+                                            RemoteCollectionsFragment fragment =
+                                                    RemoteCollectionsFragment.newInstance(deviceId, deviceIp);
+                                            getActivity().getSupportFragmentManager()
+                                                    .beginTransaction()
+                                                    .replace(R.id.fragment_container, fragment)
+                                                    .addToBackStack(null)
+                                                    .commit();
+                                        }
+                                    });
+                                } else {
+                                    collectionsCount.setText("No public collections");
+                                    collectionsInfo.setText("This device has no public collections");
+                                    collectionsCard.setClickable(false);
+                                }
+                            });
+                        }
+                    } else {
+                        // API call failed
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                collectionsCount.setText("Unable to fetch collections");
+                                collectionsInfo.setText("Device may not support collections");
+                                collectionsCard.setClickable(false);
+                            });
+                        }
+                    }
+
+                    conn.disconnect();
+                } catch (Exception e) {
+                    android.util.Log.e("DeviceProfile", "Error fetching collections count: " + e.getMessage());
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            collectionsCount.setText("Connection error");
+                            collectionsInfo.setText("Could not connect to device");
+                            collectionsCard.setClickable(false);
+                        });
+                    }
+                }
+            }).start();
+        } else {
+            // No WiFi connection - hide collections card
+            collectionsCard.setVisibility(View.GONE);
+        }
     }
 
     @Override

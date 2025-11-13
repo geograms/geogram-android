@@ -17,15 +17,23 @@ import offgrid.geogram.apps.chat.ChatMessage;
 import offgrid.geogram.devices.DeviceManager;
 import offgrid.geogram.devices.Device;
 import offgrid.geogram.devices.EventConnected;
+import offgrid.geogram.models.Collection;
+import offgrid.geogram.models.CollectionFile;
+import offgrid.geogram.models.CollectionSecurity;
+import offgrid.geogram.util.CollectionLoader;
 // Removed (legacy Google Play Services code) - import offgrid.geogram.old.wifi.comm.WiFiReceiver;
 // Removed (legacy Google Play Services code) - import offgrid.geogram.old.wifi.messages.Message;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import java.io.ByteArrayOutputStream;
 
 public class SimpleSparkServer implements Runnable {
 
@@ -110,6 +118,15 @@ public class SimpleSparkServer implements Runnable {
                     "<li>GET /api/groups/:callsign/messages - Get messages for a group/conversation</li>" +
                     "<li>POST /api/groups/:callsign/messages - Send message to a group</li>" +
                     "<li>GET /api/groups/:callsign/info - Get group/conversation info</li>" +
+                    "</ul>" +
+                    "<h3>Collections</h3>" +
+                    "<ul>" +
+                    "<li>GET /api/collections - List all public collections</li>" +
+                    "<li>GET /api/collections/count - Get count of public collections</li>" +
+                    "<li>GET /api/collections/:npub - Get collection metadata</li>" +
+                    "<li>GET /api/collections/:npub/files - Browse collection files</li>" +
+                    "<li>GET /api/collections/:npub/file/* - Download a specific file</li>" +
+                    "<li>GET /api/collections/:npub/thumbnail/* - Get image thumbnail (200x200)</li>" +
                     "</ul>" +
                     "</body>" +
                     "</html>";
@@ -1256,6 +1273,537 @@ public class SimpleSparkServer implements Runnable {
             } catch (Exception e) {
                 Log.e(TAG_ID, "Error retrieving group info: " + e.getMessage());
                 res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // ========== COLLECTIONS ENDPOINTS ==========
+
+        // GET /api/collections - List all public collections
+        get("/api/collections", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                if (context == null) {
+                    res.status(503);
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                // Load all collections
+                List<Collection> allCollections = CollectionLoader.loadCollectionsFromAppStorage(context);
+
+                // Filter to only public collections
+                List<JsonObject> publicCollections = new ArrayList<>();
+                for (Collection collection : allCollections) {
+                    CollectionSecurity security = collection.getSecurity();
+                    if (security != null && security.isPubliclyAccessible()) {
+                        JsonObject collectionJson = new JsonObject();
+                        collectionJson.addProperty("id", collection.getId());
+                        collectionJson.addProperty("title", collection.getTitle());
+                        collectionJson.addProperty("description", collection.getDescription());
+                        collectionJson.addProperty("filesCount", collection.getFilesCount());
+                        collectionJson.addProperty("totalSize", collection.getTotalSize());
+                        collectionJson.addProperty("formattedSize", collection.getFormattedSize());
+                        collectionJson.addProperty("updated", collection.getUpdated());
+                        publicCollections.add(collectionJson);
+                    }
+                }
+
+                // Create response
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.addProperty("count", publicCollections.size());
+                response.add("collections", gson.toJsonTree(publicCollections));
+
+                Log.i(TAG_ID, "API: Returned " + publicCollections.size() + " public collections");
+
+                res.status(200);
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error retrieving collections: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // GET /api/collections/count - Get count of public collections
+        get("/api/collections/count", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                if (context == null) {
+                    res.status(503);
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                // Load all collections
+                List<Collection> allCollections = CollectionLoader.loadCollectionsFromAppStorage(context);
+
+                // Count only public collections
+                int publicCount = 0;
+                for (Collection collection : allCollections) {
+                    CollectionSecurity security = collection.getSecurity();
+                    if (security != null && security.isPubliclyAccessible()) {
+                        publicCount++;
+                    }
+                }
+
+                // Create response
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.addProperty("count", publicCount);
+
+                Log.i(TAG_ID, "API: Returned public collections count: " + publicCount);
+
+                res.status(200);
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error counting collections: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // GET /api/collections/:npub - Get collection metadata
+        get("/api/collections/:npub", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                if (context == null) {
+                    res.status(503);
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                String npub = req.params(":npub");
+                if (npub == null || npub.isEmpty()) {
+                    res.status(400);
+                    return gson.toJson(createErrorResponse("Collection npub is required"));
+                }
+
+                // Load all collections and find the requested one
+                List<Collection> allCollections = CollectionLoader.loadCollectionsFromAppStorage(context);
+                Collection requestedCollection = null;
+
+                for (Collection collection : allCollections) {
+                    if (npub.equals(collection.getId())) {
+                        requestedCollection = collection;
+                        break;
+                    }
+                }
+
+                if (requestedCollection == null) {
+                    res.status(404);
+                    return gson.toJson(createErrorResponse("Collection not found"));
+                }
+
+                // Check if collection is publicly accessible
+                CollectionSecurity security = requestedCollection.getSecurity();
+                if (security == null || !security.isPubliclyAccessible()) {
+                    res.status(403);
+                    return gson.toJson(createErrorResponse("Collection is not publicly accessible"));
+                }
+
+                // Create detailed response
+                JsonObject collectionJson = new JsonObject();
+                collectionJson.addProperty("id", requestedCollection.getId());
+                collectionJson.addProperty("title", requestedCollection.getTitle());
+                collectionJson.addProperty("description", requestedCollection.getDescription());
+                collectionJson.addProperty("filesCount", requestedCollection.getFilesCount());
+                collectionJson.addProperty("totalSize", requestedCollection.getTotalSize());
+                collectionJson.addProperty("formattedSize", requestedCollection.getFormattedSize());
+                collectionJson.addProperty("updated", requestedCollection.getUpdated());
+
+                // Add security/permissions info
+                JsonObject securityJson = new JsonObject();
+                securityJson.addProperty("visibility", security.getVisibility().getValue());
+                securityJson.addProperty("can_comment", security.isCanUsersComment());
+                securityJson.addProperty("can_like", security.isCanUsersLike());
+                securityJson.addProperty("can_dislike", security.isCanUsersDislike());
+                securityJson.addProperty("can_rate", security.isCanUsersRate());
+                collectionJson.add("permissions", securityJson);
+
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.add("collection", collectionJson);
+
+                Log.i(TAG_ID, "API: Returned metadata for collection " + npub);
+
+                res.status(200);
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error retrieving collection metadata: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // GET /api/collections/:npub/files - Browse collection files
+        get("/api/collections/:npub/files", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                if (context == null) {
+                    res.status(503);
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                String npub = req.params(":npub");
+                if (npub == null || npub.isEmpty()) {
+                    res.status(400);
+                    return gson.toJson(createErrorResponse("Collection npub is required"));
+                }
+
+                // Get optional path parameter for browsing subdirectories
+                String path = req.queryParams("path");
+                if (path == null) {
+                    path = "";
+                }
+
+                // Load collection
+                List<Collection> allCollections = CollectionLoader.loadCollectionsFromAppStorage(context);
+                Collection requestedCollection = null;
+
+                for (Collection collection : allCollections) {
+                    if (npub.equals(collection.getId())) {
+                        requestedCollection = collection;
+                        break;
+                    }
+                }
+
+                if (requestedCollection == null) {
+                    res.status(404);
+                    return gson.toJson(createErrorResponse("Collection not found"));
+                }
+
+                // Check if collection is publicly accessible
+                CollectionSecurity security = requestedCollection.getSecurity();
+                if (security == null || !security.isPubliclyAccessible()) {
+                    res.status(403);
+                    return gson.toJson(createErrorResponse("Collection is not publicly accessible"));
+                }
+
+                // Get files in the requested path
+                List<JsonObject> filesList = new ArrayList<>();
+                for (CollectionFile file : requestedCollection.getFiles()) {
+                    String filePath = file.getPath();
+                    String fileDir = filePath.contains("/") ?
+                        filePath.substring(0, filePath.lastIndexOf("/")) : "";
+
+                    // Only include files in the requested directory
+                    if (path.equals(fileDir)) {
+                        JsonObject fileJson = new JsonObject();
+                        fileJson.addProperty("name", file.getName());
+                        fileJson.addProperty("path", file.getPath());
+                        fileJson.addProperty("type", file.isDirectory() ? "directory" : "file");
+                        if (!file.isDirectory()) {
+                            fileJson.addProperty("size", file.getSize());
+                            fileJson.addProperty("mimeType", file.getMimeType());
+                        }
+                        filesList.add(fileJson);
+                    }
+                }
+
+                // Create response
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.addProperty("collection_id", npub);
+                response.addProperty("path", path);
+                response.addProperty("count", filesList.size());
+                response.add("files", gson.toJsonTree(filesList));
+
+                Log.i(TAG_ID, "API: Returned " + filesList.size() + " files for collection " + npub);
+
+                res.status(200);
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error browsing collection files: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // GET /api/collections/:npub/file/* - Download a specific file
+        get("/api/collections/:npub/file/*", (req, res) -> {
+            try {
+                if (context == null) {
+                    res.status(503);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                String npub = req.params(":npub");
+                String filePath = req.splat()[0]; // Get the wildcard path
+
+                if (npub == null || npub.isEmpty() || filePath == null || filePath.isEmpty()) {
+                    res.status(400);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Collection npub and file path are required"));
+                }
+
+                // Security: Prevent path traversal attacks
+                if (filePath.contains("..") || filePath.startsWith("/")) {
+                    res.status(403);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Invalid file path"));
+                }
+
+                // Load collection
+                List<Collection> allCollections = CollectionLoader.loadCollectionsFromAppStorage(context);
+                Collection requestedCollection = null;
+
+                for (Collection collection : allCollections) {
+                    if (npub.equals(collection.getId())) {
+                        requestedCollection = collection;
+                        break;
+                    }
+                }
+
+                if (requestedCollection == null) {
+                    res.status(404);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Collection not found"));
+                }
+
+                // Check if collection is publicly accessible
+                CollectionSecurity security = requestedCollection.getSecurity();
+                if (security == null || !security.isPubliclyAccessible()) {
+                    res.status(403);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Collection is not publicly accessible"));
+                }
+
+                // Construct file path and check if it exists
+                File collectionRoot = new File(requestedCollection.getStoragePath());
+                File requestedFile = new File(collectionRoot, filePath);
+
+                // Additional security: Ensure file is within collection directory
+                String canonicalCollectionPath = collectionRoot.getCanonicalPath();
+                String canonicalFilePath = requestedFile.getCanonicalPath();
+                if (!canonicalFilePath.startsWith(canonicalCollectionPath)) {
+                    res.status(403);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Access denied: file outside collection"));
+                }
+
+                // Security: Don't serve files from extra/ directory or collection.js
+                // Exception: Allow extra/tree-data.js for remote browsing
+                if (filePath.equals("collection.js") ||
+                    (filePath.startsWith("extra/") && !filePath.equals("extra/tree-data.js"))) {
+                    res.status(403);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Access denied: system file"));
+                }
+
+                if (!requestedFile.exists() || !requestedFile.isFile()) {
+                    res.status(404);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("File not found"));
+                }
+
+                // Determine MIME type
+                String mimeType = "application/octet-stream";
+                String fileName = requestedFile.getName();
+                if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) {
+                    mimeType = "image/jpeg";
+                } else if (fileName.endsWith(".png")) {
+                    mimeType = "image/png";
+                } else if (fileName.endsWith(".gif")) {
+                    mimeType = "image/gif";
+                } else if (fileName.endsWith(".pdf")) {
+                    mimeType = "application/pdf";
+                } else if (fileName.endsWith(".txt")) {
+                    mimeType = "text/plain";
+                } else if (fileName.endsWith(".html")) {
+                    mimeType = "text/html";
+                } else if (fileName.endsWith(".json")) {
+                    mimeType = "application/json";
+                } else if (fileName.endsWith(".mp3")) {
+                    mimeType = "audio/mpeg";
+                } else if (fileName.endsWith(".mp4")) {
+                    mimeType = "video/mp4";
+                }
+
+                Log.i(TAG_ID, "API: Serving file " + filePath + " from collection " + npub);
+
+                // Read file content
+                byte[] fileContent = Files.readAllBytes(requestedFile.toPath());
+
+                // Set response properties BEFORE accessing raw()
+                res.status(200);
+                res.type(mimeType);
+                res.header("Content-Disposition", "inline; filename=\"" + fileName + "\"");
+                res.header("Content-Length", String.valueOf(fileContent.length));
+
+                // Get raw response and write bytes directly
+                try {
+                    javax.servlet.http.HttpServletResponse rawResponse = res.raw();
+                    rawResponse.getOutputStream().write(fileContent);
+                    rawResponse.getOutputStream().flush();
+                } catch (Exception writeEx) {
+                    Log.e(TAG_ID, "Error writing file to response: " + writeEx.getMessage());
+                    throw writeEx;
+                }
+
+                return null;
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error serving file: " + e.getMessage());
+                res.status(500);
+                res.type("application/json");
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // GET /api/collections/:npub/thumbnail/* - Get image thumbnail
+        get("/api/collections/:npub/thumbnail/*", (req, res) -> {
+            try {
+                if (context == null) {
+                    res.status(503);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                String npub = req.params(":npub");
+                String filePath = req.splat()[0]; // Get the wildcard path
+
+                if (npub == null || npub.isEmpty() || filePath == null || filePath.isEmpty()) {
+                    res.status(400);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Collection npub and file path are required"));
+                }
+
+                // Security: Prevent path traversal attacks
+                if (filePath.contains("..") || filePath.startsWith("/")) {
+                    res.status(403);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Invalid file path"));
+                }
+
+                // Load collection
+                List<Collection> allCollections = CollectionLoader.loadCollectionsFromAppStorage(context);
+                Collection requestedCollection = null;
+
+                for (Collection collection : allCollections) {
+                    if (npub.equals(collection.getId())) {
+                        requestedCollection = collection;
+                        break;
+                    }
+                }
+
+                if (requestedCollection == null) {
+                    res.status(404);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Collection not found"));
+                }
+
+                // Check if collection is publicly accessible
+                CollectionSecurity security = requestedCollection.getSecurity();
+                if (security == null || !security.isPubliclyAccessible()) {
+                    res.status(403);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Collection is not publicly accessible"));
+                }
+
+                // Construct file path and check if it exists
+                File collectionRoot = new File(requestedCollection.getStoragePath());
+                File requestedFile = new File(collectionRoot, filePath);
+
+                // Additional security: Ensure file is within collection directory
+                String canonicalCollectionPath = collectionRoot.getCanonicalPath();
+                String canonicalFilePath = requestedFile.getCanonicalPath();
+                if (!canonicalFilePath.startsWith(canonicalCollectionPath)) {
+                    res.status(403);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Access denied: file outside collection"));
+                }
+
+                // Security: Don't serve files from extra/ directory
+                if (filePath.startsWith("extra/")) {
+                    res.status(403);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Access denied: system file"));
+                }
+
+                if (!requestedFile.exists() || !requestedFile.isFile()) {
+                    res.status(404);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("File not found"));
+                }
+
+                // Check if file is an image
+                String fileName = requestedFile.getName().toLowerCase();
+                if (!fileName.endsWith(".jpg") && !fileName.endsWith(".jpeg") &&
+                    !fileName.endsWith(".png") && !fileName.endsWith(".gif")) {
+                    res.status(400);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("File is not an image"));
+                }
+
+                Log.i(TAG_ID, "API: Generating thumbnail for " + filePath + " from collection " + npub);
+
+                // Load and downsample image to create thumbnail
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inJustDecodeBounds = true;
+                BitmapFactory.decodeFile(requestedFile.getAbsolutePath(), options);
+
+                // Calculate sample size for 200x200 thumbnail
+                int targetSize = 200;
+                int width = options.outWidth;
+                int height = options.outHeight;
+                int inSampleSize = 1;
+
+                if (height > targetSize || width > targetSize) {
+                    final int halfHeight = height / 2;
+                    final int halfWidth = width / 2;
+                    while ((halfHeight / inSampleSize) >= targetSize && (halfWidth / inSampleSize) >= targetSize) {
+                        inSampleSize *= 2;
+                    }
+                }
+
+                options.inSampleSize = inSampleSize;
+                options.inJustDecodeBounds = false;
+
+                // Decode with downsampling
+                Bitmap thumbnail = BitmapFactory.decodeFile(requestedFile.getAbsolutePath(), options);
+
+                if (thumbnail == null) {
+                    res.status(500);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Failed to decode image"));
+                }
+
+                // Compress to JPEG
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                thumbnail.compress(Bitmap.CompressFormat.JPEG, 85, baos);
+                byte[] thumbnailBytes = baos.toByteArray();
+                thumbnail.recycle(); // Free bitmap memory
+
+                // Set response properties
+                res.status(200);
+                res.type("image/jpeg");
+                res.header("Content-Length", String.valueOf(thumbnailBytes.length));
+                res.header("Cache-Control", "public, max-age=86400"); // Cache for 24 hours
+
+                // Write thumbnail bytes
+                try {
+                    javax.servlet.http.HttpServletResponse rawResponse = res.raw();
+                    rawResponse.getOutputStream().write(thumbnailBytes);
+                    rawResponse.getOutputStream().flush();
+                } catch (Exception writeEx) {
+                    Log.e(TAG_ID, "Error writing thumbnail to response: " + writeEx.getMessage());
+                    throw writeEx;
+                }
+
+                return null;
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error serving thumbnail: " + e.getMessage());
+                res.status(500);
+                res.type("application/json");
                 return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
             }
         });
