@@ -186,23 +186,31 @@ public class ChatNotificationManager {
      * Check if we should show notification (app in background or chat not open)
      */
     public static boolean shouldShowNotification(Context context) {
-        // Check if chat fragment is currently visible
-        if (context instanceof MainActivity) {
-            MainActivity mainActivity = (MainActivity) context;
-            // Check if activity is in foreground
-            if (!mainActivity.isFinishing() && !mainActivity.isDestroyed()) {
-                // Check if chat fragment is visible
-                if (offgrid.geogram.core.Central.getInstance() != null &&
-                    offgrid.geogram.core.Central.getInstance().broadcastChatFragment != null &&
-                    offgrid.geogram.core.Central.getInstance().broadcastChatFragment.isVisible()) {
-                    // Chat is currently open, don't show notification
-                    Log.d(TAG, "shouldShowNotification: false (chat is currently visible)");
-                    return false;
-                }
-            }
+        MainActivity mainActivity = MainActivity.getInstance();
+
+        // If MainActivity doesn't exist or is finishing/destroyed, show notification
+        if (mainActivity == null || mainActivity.isFinishing() || mainActivity.isDestroyed()) {
+            Log.d(TAG, "shouldShowNotification: true (activity not available)");
+            return true;
         }
-        // App in background or chat not open, show notification
-        Log.d(TAG, "shouldShowNotification: true (app in background or chat not visible)");
+
+        // If app is in background, ALWAYS show notification
+        if (!mainActivity.isInForeground()) {
+            Log.d(TAG, "shouldShowNotification: true (app in background)");
+            return true;
+        }
+
+        // App is in foreground - check if chat is currently visible
+        if (offgrid.geogram.core.Central.getInstance() != null &&
+            offgrid.geogram.core.Central.getInstance().broadcastChatFragment != null &&
+            offgrid.geogram.core.Central.getInstance().broadcastChatFragment.isVisible()) {
+            // Chat is currently open and visible, don't show notification
+            Log.d(TAG, "shouldShowNotification: false (chat is currently visible in foreground)");
+            return false;
+        }
+
+        // App in foreground but chat not visible, show notification
+        Log.d(TAG, "shouldShowNotification: true (app in foreground but chat not visible)");
         return true;
     }
 }

@@ -370,29 +370,33 @@ public class EventBleMessageReceived extends EventAction {
         // Trigger UI refresh from database to prevent duplicates
         Central.getInstance().broadcastChatFragment.refreshMessagesFromDatabase();
 
-        // Check if chat is currently visible
-        boolean chatIsOpen = Central.getInstance().broadcastChatFragment != null &&
-            Central.getInstance().broadcastChatFragment.isVisible();
+        // Check if we should show notification (considers both foreground state and chat visibility)
+        offgrid.geogram.MainActivity mainActivity = offgrid.geogram.MainActivity.getInstance();
 
-        if (chatIsOpen) {
-            // Chat is open - mark message as read immediately
-            Log.i(TAG, "Chat is open, marking BLE message as read immediately");
+        if (mainActivity == null) {
+            // MainActivity not available, can't show notification
+            Log.w(TAG, "MainActivity not available, cannot show notification");
+            return;
+        }
+
+        boolean shouldShowNotification = offgrid.geogram.apps.chat.ChatNotificationManager.shouldShowNotification(mainActivity);
+
+        if (!shouldShowNotification) {
+            // Chat is visible in foreground - mark message as read immediately
+            Log.i(TAG, "Chat is visible in foreground, marking BLE message as read immediately");
             chatMessage.setRead(true);
             DatabaseMessages.getInstance().flushNow();
         } else {
-            // Chat is not open - update counter and show notification
-            offgrid.geogram.MainActivity mainActivity = offgrid.geogram.MainActivity.getInstance();
-            if (mainActivity != null) {
-                mainActivity.runOnUiThread(() -> {
-                    mainActivity.updateChatCount();
-                    Log.i(TAG, "Updated chat counter badge for BLE message");
+            // App in background or chat not visible - update counter and show notification
+            mainActivity.runOnUiThread(() -> {
+                mainActivity.updateChatCount();
+                Log.i(TAG, "Updated chat counter badge for BLE message");
 
-                    // Show Android notification
-                    Log.i(TAG, "Showing notification for BLE message");
-                    offgrid.geogram.apps.chat.ChatNotificationManager.getInstance(mainActivity)
-                        .showUnreadMessagesNotification();
-                });
-            }
+                // Show Android notification
+                Log.i(TAG, "Showing notification for BLE message");
+                offgrid.geogram.apps.chat.ChatNotificationManager.getInstance(mainActivity)
+                    .showUnreadMessagesNotification();
+            });
         }
     }
 

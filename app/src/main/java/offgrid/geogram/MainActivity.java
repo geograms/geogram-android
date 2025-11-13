@@ -77,8 +77,10 @@ public class MainActivity extends AppCompatActivity {
 
     // Keep this non-static to avoid holding UI across process lifetime
     public ListView beacons;
-    // This flag can stay static; it doesn’t hold context or views.
+    // This flag can stay static; it doesn't hold context or views.
     private static boolean wasCreatedBefore = false;
+    // Track if activity is currently in foreground
+    private boolean isInForeground = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,6 +114,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        isInForeground = true; // App is now in foreground
 
         if (!PermissionsHelper.hasAllPermissions(this)) {
             // If returning from settings and permissions still not granted, show dialog again
@@ -126,6 +129,12 @@ public class MainActivity extends AppCompatActivity {
 
         // Handle intent extras (e.g., from notification tap)
         handleIntent(getIntent());
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        isInForeground = false; // App is going to background
     }
 
     /**
@@ -516,6 +525,14 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "Error updating chat count: " + e.getMessage());
             chatCountBadge.setVisibility(android.view.View.GONE);
         }
+    }
+
+    /**
+     * Check if the activity is currently in the foreground
+     * @return true if activity is visible to user, false if in background
+     */
+    public boolean isInForeground() {
+        return isInForeground;
     }
 
     /**

@@ -2,39 +2,58 @@ package offgrid.geogram.relay;
 
 import android.content.Context;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 import offgrid.geogram.ble.BluetoothMessage;
 import offgrid.geogram.ble.BluetoothSender;
 import offgrid.geogram.core.Central;
 import offgrid.geogram.core.Log;
+import offgrid.geogram.wifi.WiFiDiscoveryService;
 
 /**
- * Handles relay message synchronization over BLE.
+ * Handles relay message synchronization over BLE and WiFi.
+ * Prefers WiFi when available for faster, more reliable transfer.
  *
  * Implements the sync protocol:
  * 1. Inventory exchange - share list of message IDs
  * 2. Gap analysis - identify missing messages
  * 3. Message transfer - request and send missing messages
  *
- * Message format:
+ * BLE Message format:
  * - INV:<msg-id1>,<msg-id2>,... - Inventory list
  * - REQ:<msg-id> - Request specific message
  * - MSG:<relay-message-markdown> - Relay message content
+ *
+ * WiFi uses HTTP API endpoints instead of BLE messages.
  */
 public class RelayMessageSync {
 
     private static final String TAG = "RelayMessageSync";
 
-    // Protocol commands
+    // Protocol commands (BLE)
     private static final String CMD_INVENTORY = "INV:";
     private static final String CMD_REQUEST = "REQ:";
     private static final String CMD_MESSAGE = "MSG:";
+
+    // WiFi HTTP API
+    private static final int WIFI_API_PORT = 45678;
+    private static final int WIFI_TIMEOUT_MS = 10000; // 10 second timeout for WiFi
+    private static final Gson gson = new Gson();
 
     // Sync state
     private static final int MAX_INVENTORY_SIZE = 50; // Max message IDs per inventory
@@ -45,6 +64,10 @@ public class RelayMessageSync {
     private final RelayStorage storage;
     private final RelaySettings settings;
     private final BluetoothSender bluetoothSender;
+    private final WiFiDiscoveryService wifiDiscovery;
+
+    // Executor for async WiFi HTTP requests
+    private final ExecutorService wifiExecutor = Executors.newFixedThreadPool(3);
 
     // Track sync sessions with remote devices
     private final Map<String, SyncSession> activeSessions = new HashMap<>();
@@ -61,6 +84,7 @@ public class RelayMessageSync {
         this.storage = new RelayStorage(this.context); // Use application context
         this.settings = new RelaySettings(this.context); // Use application context
         this.bluetoothSender = BluetoothSender.getInstance(this.context); // Use application context
+        this.wifiDiscovery = WiFiDiscoveryService.getInstance(this.context); // Use application context
     }
 
     public static synchronized RelayMessageSync getInstance(Context context) {
@@ -72,6 +96,8 @@ public class RelayMessageSync {
 
     /**
      * Start sync session with a remote device.
+     * Prefers WiFi over BLE for faster, more reliable transfer.
+     * Automatically falls back to BLE if WiFi fails.
      * Sends inventory of outbox messages.
      *
      * @param remoteDeviceId ID of remote device
@@ -82,26 +108,51 @@ public class RelayMessageSync {
             return;
         }
 
-        // Verify GATT connection exists before attempting sync
-        // Relay sync now uses GATT for high-bandwidth, reliable transfer
-        if (!bluetoothSender.hasActiveConnection(remoteDeviceId)) {
-            Log.w(TAG, "No active GATT connection to " + remoteDeviceId + ", skipping sync");
-            Log.w(TAG, "Active connections: " + bluetoothSender.getActiveConnectionCount());
+        // Check if WiFi is available for this device
+        String wifiIp = wifiDiscovery.getDeviceIp(remoteDeviceId);
+        boolean wifiAvailable = (wifiIp != null && !wifiIp.isEmpty());
+
+        // Check if BLE is available
+        boolean bleAvailable = bluetoothSender.hasActiveConnection(remoteDeviceId);
+
+        if (wifiAvailable) {
+            // Try WiFi first (will automatically fall back to BLE on failure)
+            Log.i(TAG, "=== RELAY SYNC STARTED (WiFi) ===");
+            Log.i(TAG, "Local device: " + getDeviceId());
+            Log.i(TAG, "Remote device: " + remoteDeviceId);
+            Log.i(TAG, "Remote IP: " + wifiIp);
+            Log.i(TAG, "Auto-accept: " + settings.isAutoAcceptEnabled());
+            Log.i(TAG, "Using WiFi HTTP API for high-speed sync (BLE fallback available: " + bleAvailable + ")");
+
+            // Get or create sync session
+            SyncSession session = getOrCreateSession(remoteDeviceId);
+            session.lastSyncAttempt = System.currentTimeMillis();
+            session.useWiFi = true;
+            session.wifiIp = wifiIp;
+
+            // Send inventory via WiFi (will fall back to BLE if fails)
+            sendWiFiInventory(remoteDeviceId, wifiIp);
+        } else if (bleAvailable) {
+            // Use BLE
+            Log.i(TAG, "=== RELAY SYNC STARTED (BLE) ===");
+            Log.i(TAG, "Local device: " + getDeviceId());
+            Log.i(TAG, "Remote device: " + remoteDeviceId);
+            Log.i(TAG, "Auto-accept: " + settings.isAutoAcceptEnabled());
+            Log.i(TAG, "Using GATT connection for high-bandwidth sync");
+
+            // Get or create sync session
+            SyncSession session = getOrCreateSession(remoteDeviceId);
+            session.lastSyncAttempt = System.currentTimeMillis();
+            session.useWiFi = false;
+
+            // Send inventory via BLE
+            sendInventory(remoteDeviceId);
+        } else {
+            // No connection available
+            Log.w(TAG, "No WiFi or BLE connection available for " + remoteDeviceId + ", skipping sync");
+            Log.w(TAG, "Active BLE connections: " + bluetoothSender.getActiveConnectionCount());
             return;
         }
-
-        Log.i(TAG, "=== RELAY SYNC STARTED ===");
-        Log.i(TAG, "Local device: " + getDeviceId());
-        Log.i(TAG, "Remote device: " + remoteDeviceId);
-        Log.i(TAG, "Auto-accept: " + settings.isAutoAcceptEnabled());
-        Log.i(TAG, "Using GATT connection for high-bandwidth sync");
-
-        // Get or create sync session
-        SyncSession session = getOrCreateSession(remoteDeviceId);
-        session.lastSyncAttempt = System.currentTimeMillis();
-
-        // Send inventory
-        sendInventory(remoteDeviceId);
     }
 
     /**
@@ -193,60 +244,15 @@ public class RelayMessageSync {
     }
 
     /**
-     * Handle inventory message from remote device.
+     * Handle inventory message from remote device (BLE).
      * Performs gap analysis and requests missing messages.
      */
     private void handleInventory(String remoteDeviceId, String inventoryData) {
-        Log.i(TAG, "--- Processing Inventory ---");
+        Log.i(TAG, "--- Processing BLE Inventory ---");
         Log.i(TAG, "From: " + remoteDeviceId);
 
-        // Parse inventory
-        String[] remoteIds = inventoryData.trim().isEmpty() ? new String[0] : inventoryData.split(",");
-        Set<String> remoteInventory = new HashSet<>();
-        for (String id : remoteIds) {
-            if (!id.trim().isEmpty()) {
-                remoteInventory.add(id.trim());
-            }
-        }
-
-        Log.i(TAG, "Remote has " + remoteInventory.size() + " messages");
-
-        if (remoteInventory.isEmpty()) {
-            Log.d(TAG, "Empty inventory received - remote has no messages");
-            return;
-        }
-
-        // Get our inbox messages
-        List<String> inboxIds = storage.listMessages("inbox");
-        Set<String> localInventory = new HashSet<>(inboxIds);
-        Log.i(TAG, "Local inbox has " + localInventory.size() + " messages");
-
-        // Gap analysis - find messages we don't have
-        List<String> missingMessages = new ArrayList<>();
-        for (String remoteId : remoteInventory) {
-            if (!localInventory.contains(remoteId) && !isRecentlyProcessed(remoteId)) {
-                missingMessages.add(remoteId);
-            }
-        }
-
-        Log.i(TAG, "Missing " + missingMessages.size() + " messages from remote");
-
-        if (missingMessages.isEmpty()) {
-            Log.d(TAG, "No missing messages to request");
-            return;
-        }
-
-        // Request missing messages (batch limited)
-        int requestCount = Math.min(missingMessages.size(), MAX_REQUEST_BATCH);
-        Log.i(TAG, "Requesting " + requestCount + " messages");
-        for (int i = 0; i < requestCount; i++) {
-            requestMessage(remoteDeviceId, missingMessages.get(i));
-        }
-
-        // Update session
-        SyncSession session = getOrCreateSession(remoteDeviceId);
-        session.lastInventoryReceived = System.currentTimeMillis();
-        session.pendingRequests.addAll(missingMessages.subList(0, requestCount));
+        // Use common handler with BLE flag
+        handleInventoryCommon(remoteDeviceId, inventoryData, false);
     }
 
     /**
@@ -319,67 +325,16 @@ public class RelayMessageSync {
     }
 
     /**
-     * Handle incoming relay message.
+     * Handle incoming relay message (BLE).
      * Saves to inbox if accepted by settings.
      */
     private void handleRelayMessage(String remoteDeviceId, String markdown) {
-        Log.i(TAG, "--- Processing Relay Message ---");
+        Log.i(TAG, "--- Processing BLE Relay Message ---");
         Log.i(TAG, "From: " + remoteDeviceId);
         Log.i(TAG, "Content size: " + markdown.length() + " bytes");
 
-        // Parse markdown
-        RelayMessage message = RelayMessage.parseMarkdown(markdown);
-        if (message == null) {
-            Log.e(TAG, "✗ Failed to parse relay message markdown");
-            return;
-        }
-
-        Log.i(TAG, "Parsed message ID: " + message.getId());
-        Log.i(TAG, "Message from: " + message.getFromCallsign() + " to: " + message.getToCallsign());
-
-        // Check if already processed
-        if (isRecentlyProcessed(message.getId())) {
-            Log.d(TAG, "Message " + message.getId() + " already processed (skipping)");
-            return;
-        }
-
-        // Check if we already have this message
-        if (storage.getMessage(message.getId()) != null) {
-            Log.d(TAG, "Message " + message.getId() + " already in storage (skipping)");
-            addToRecentlyProcessed(message.getId());
-            return;
-        }
-
-        // Check acceptance based on settings
-        boolean shouldAccept = message.shouldAccept(settings);
-        Log.i(TAG, "Should accept: " + shouldAccept + " (auto-accept: " + settings.isAutoAcceptEnabled() + ")");
-
-        if (!shouldAccept) {
-            Log.w(TAG, "✗ Message rejected by relay settings");
-            return;
-        }
-
-        // Update metadata
-        message.setReceivedAt(System.currentTimeMillis() / 1000);
-        message.setReceivedVia("bluetooth");
-        message.addRelayNode(getDeviceId());
-
-        // Save to inbox
-        boolean saved = storage.saveMessage(message, "inbox");
-        if (saved) {
-            Log.i(TAG, "✓ Message saved to inbox successfully");
-            addToRecentlyProcessed(message.getId());
-
-            // Remove from session pending requests
-            SyncSession session = activeSessions.get(remoteDeviceId);
-            if (session != null) {
-                session.pendingRequests.remove(message.getId());
-                session.messagesReceived++;
-                Log.i(TAG, "Session stats - Received: " + session.messagesReceived + ", Sent: " + session.messagesSent);
-            }
-        } else {
-            Log.e(TAG, "✗ Failed to save message to inbox");
-        }
+        // Use common handler with bluetooth flag
+        handleRelayMessageCommon(remoteDeviceId, markdown, "bluetooth");
     }
 
     /**
@@ -517,10 +472,13 @@ public class RelayMessageSync {
         int messagesSent;
         int messagesReceived;
         final Set<String> pendingRequests = new HashSet<>();
+        boolean useWiFi; // true if using WiFi, false if using BLE
+        String wifiIp;   // IP address for WiFi sync
 
         SyncSession(String remoteDeviceId) {
             this.remoteDeviceId = remoteDeviceId;
             this.lastSyncAttempt = System.currentTimeMillis();
+            this.useWiFi = false;
         }
     }
 
@@ -543,6 +501,384 @@ public class RelayMessageSync {
                     ", messagesReceived=" + totalMessagesReceived +
                     ", pendingRequests=" + totalPendingRequests +
                     '}';
+        }
+    }
+
+    // ========== WiFi SYNC METHODS ==========
+
+    /**
+     * Send inventory via WiFi HTTP API
+     */
+    private void sendWiFiInventory(String remoteDeviceId, String wifiIp) {
+        wifiExecutor.execute(() -> {
+            try {
+                // Get messages from outbox
+                List<String> outboxIds = storage.listMessages("outbox");
+                Log.i(TAG, "Sending WiFi inventory to " + remoteDeviceId + " (" + wifiIp + ")");
+                Log.i(TAG, "Outbox contains " + outboxIds.size() + " messages");
+
+                // Filter out unparsable messages
+                List<String> validIds = new ArrayList<>();
+                for (String messageId : outboxIds) {
+                    RelayMessage msg = storage.getMessage(messageId, "outbox");
+                    if (msg != null) {
+                        validIds.add(messageId);
+                    }
+                }
+
+                if (validIds.size() < outboxIds.size()) {
+                    Log.w(TAG, "Filtered out " + (outboxIds.size() - validIds.size()) + " unparsable messages");
+                }
+
+                // Limit inventory size
+                int count = Math.min(validIds.size(), MAX_INVENTORY_SIZE);
+                List<String> inventoryIds = validIds.subList(0, Math.min(validIds.size(), count));
+
+                // Build inventory string
+                String inventoryData = String.join(",", inventoryIds);
+
+                // Send via HTTP
+                sendWiFiHttpPost(wifiIp, "/api/relay/sync/inventory", createInventoryJson(inventoryData));
+                Log.i(TAG, "✓ Sent WiFi inventory with " + inventoryIds.size() + " messages");
+
+            } catch (Exception e) {
+                Log.w(TAG, "✗ WiFi inventory failed (" + e.getMessage() + "), falling back to BLE");
+
+                // Mark WiFi as unavailable for this session
+                SyncSession session = activeSessions.get(remoteDeviceId);
+                if (session != null) {
+                    session.useWiFi = false;
+                    session.wifiIp = null;
+                }
+
+                // Fall back to BLE
+                fallbackToBLE(remoteDeviceId);
+            }
+        });
+    }
+
+    /**
+     * Send message request via WiFi HTTP API
+     */
+    private void sendWiFiRequest(String remoteDeviceId, String wifiIp, String messageId) {
+        wifiExecutor.execute(() -> {
+            try {
+                Log.i(TAG, "→ Requesting message via WiFi: " + messageId);
+                sendWiFiHttpPost(wifiIp, "/api/relay/sync/request", createRequestJson(messageId));
+            } catch (Exception e) {
+                Log.w(TAG, "✗ WiFi request failed (" + e.getMessage() + "), falling back to BLE");
+
+                // Mark WiFi as unavailable for this session
+                SyncSession session = activeSessions.get(remoteDeviceId);
+                if (session != null) {
+                    session.useWiFi = false;
+                    session.wifiIp = null;
+                }
+
+                // Fall back to BLE for this specific request
+                requestMessage(remoteDeviceId, messageId);
+            }
+        });
+    }
+
+    /**
+     * Send relay message via WiFi HTTP API
+     */
+    private void sendWiFiRelayMessage(String remoteDeviceId, String wifiIp, RelayMessage message) {
+        wifiExecutor.execute(() -> {
+            try {
+                Log.i(TAG, "→ Sending relay message via WiFi: " + message.getId());
+                String markdown = message.toMarkdown();
+                sendWiFiHttpPost(wifiIp, "/api/relay/sync/message", createMessageJson(markdown));
+                Log.i(TAG, "✓ Sent WiFi relay message");
+            } catch (Exception e) {
+                Log.w(TAG, "✗ WiFi relay message failed (" + e.getMessage() + "), falling back to BLE");
+
+                // Mark WiFi as unavailable for this session
+                SyncSession session = activeSessions.get(remoteDeviceId);
+                if (session != null) {
+                    session.useWiFi = false;
+                    session.wifiIp = null;
+                }
+
+                // Fall back to BLE
+                sendBluetoothMessage(remoteDeviceId, CMD_MESSAGE + message.toMarkdown());
+            }
+        });
+    }
+
+    /**
+     * Fall back to BLE when WiFi fails.
+     * Attempts to send inventory via BLE if GATT connection is available.
+     */
+    private void fallbackToBLE(String remoteDeviceId) {
+        // Check if BLE connection is available
+        if (!bluetoothSender.hasActiveConnection(remoteDeviceId)) {
+            Log.w(TAG, "No BLE connection available for fallback to " + remoteDeviceId);
+            return;
+        }
+
+        Log.i(TAG, "Attempting BLE fallback for relay sync with " + remoteDeviceId);
+
+        // Send inventory via BLE
+        try {
+            sendInventory(remoteDeviceId);
+        } catch (Exception e) {
+            Log.e(TAG, "BLE fallback also failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Helper to send HTTP POST request to WiFi device
+     */
+    private void sendWiFiHttpPost(String ipAddress, String endpoint, JsonObject payload) throws IOException {
+        String urlString = "http://" + ipAddress + ":" + WIFI_API_PORT + endpoint;
+        HttpURLConnection conn = null;
+
+        try {
+            URL url = new URL(urlString);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setConnectTimeout(WIFI_TIMEOUT_MS);
+            conn.setReadTimeout(WIFI_TIMEOUT_MS);
+            conn.setDoOutput(true);
+
+            // Write JSON payload
+            byte[] jsonBytes = gson.toJson(payload).getBytes(StandardCharsets.UTF_8);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(jsonBytes);
+                os.flush();
+            }
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode != 200) {
+                throw new IOException("HTTP " + responseCode + " from " + ipAddress);
+            }
+        } catch (java.net.ConnectException e) {
+            throw new IOException("Device offline or unreachable: " + ipAddress, e);
+        } catch (java.net.SocketTimeoutException e) {
+            throw new IOException("Connection timeout: " + ipAddress, e);
+        } catch (java.net.UnknownHostException e) {
+            throw new IOException("Unknown host: " + ipAddress, e);
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
+    /**
+     * Create JSON payload for inventory
+     */
+    private JsonObject createInventoryJson(String inventoryData) {
+        JsonObject json = new JsonObject();
+        json.addProperty("remoteDeviceId", getDeviceId());
+        json.addProperty("inventory", inventoryData);
+        return json;
+    }
+
+    /**
+     * Create JSON payload for request
+     */
+    private JsonObject createRequestJson(String messageId) {
+        JsonObject json = new JsonObject();
+        json.addProperty("remoteDeviceId", getDeviceId());
+        json.addProperty("messageId", messageId);
+        return json;
+    }
+
+    /**
+     * Create JSON payload for relay message
+     */
+    private JsonObject createMessageJson(String markdown) {
+        JsonObject json = new JsonObject();
+        json.addProperty("remoteDeviceId", getDeviceId());
+        json.addProperty("markdown", markdown);
+        return json;
+    }
+
+    /**
+     * Handle inventory received via WiFi (called by API endpoint)
+     */
+    public void handleWiFiInventory(String remoteDeviceId, String inventoryData) {
+        Log.i(TAG, "--- Processing WiFi Inventory ---");
+        Log.i(TAG, "From: " + remoteDeviceId);
+
+        // Reuse the existing inventory handler logic
+        handleInventoryCommon(remoteDeviceId, inventoryData, true);
+    }
+
+    /**
+     * Handle message request received via WiFi (called by API endpoint)
+     */
+    public void handleWiFiRequest(String remoteDeviceId, String messageId) {
+        Log.i(TAG, "--- Processing WiFi Request ---");
+        Log.i(TAG, "From: " + remoteDeviceId);
+        Log.i(TAG, "Requested message ID: " + messageId);
+
+        // Load message from outbox
+        RelayMessage message = storage.getMessage(messageId, "outbox");
+        if (message == null) {
+            Log.w(TAG, "✗ Requested message not found in outbox: " + messageId);
+            return;
+        }
+
+        Log.i(TAG, "Found message - from: " + message.getFromCallsign() + " to: " + message.getToCallsign());
+
+        // Check if message should be sent
+        if (!message.shouldAccept(settings)) {
+            Log.w(TAG, "✗ Message rejected by relay settings");
+            return;
+        }
+
+        // Get session to determine connection type
+        SyncSession session = activeSessions.get(remoteDeviceId);
+        if (session != null && session.useWiFi && session.wifiIp != null) {
+            // Send via WiFi
+            Log.i(TAG, "→ Sending message via WiFi to " + session.wifiIp);
+            sendWiFiRelayMessage(remoteDeviceId, session.wifiIp, message);
+
+            // Update message metadata
+            message.addRelayNode(getDeviceId());
+            message.setReceivedVia("wifi");
+
+            // Move to sent folder
+            storage.moveMessage(message.getId(), "outbox", "sent");
+            Log.i(TAG, "✓ Message moved to sent folder");
+        } else {
+            Log.w(TAG, "✗ No WiFi session found for " + remoteDeviceId);
+        }
+    }
+
+    /**
+     * Handle relay message received via WiFi (called by API endpoint)
+     */
+    public void handleWiFiRelayMessage(String remoteDeviceId, String markdown) {
+        Log.i(TAG, "--- Processing WiFi Relay Message ---");
+        Log.i(TAG, "From: " + remoteDeviceId);
+        Log.i(TAG, "Content size: " + markdown.length() + " bytes");
+
+        // Reuse the existing relay message handler logic
+        handleRelayMessageCommon(remoteDeviceId, markdown, "wifi");
+    }
+
+    /**
+     * Common inventory handling logic (shared by BLE and WiFi)
+     */
+    private void handleInventoryCommon(String remoteDeviceId, String inventoryData, boolean isWiFi) {
+        // Parse inventory
+        String[] remoteIds = inventoryData.trim().isEmpty() ? new String[0] : inventoryData.split(",");
+        Set<String> remoteInventory = new HashSet<>();
+        for (String id : remoteIds) {
+            if (!id.trim().isEmpty()) {
+                remoteInventory.add(id.trim());
+            }
+        }
+
+        Log.i(TAG, "Remote has " + remoteInventory.size() + " messages");
+
+        if (remoteInventory.isEmpty()) {
+            Log.d(TAG, "Empty inventory received - remote has no messages");
+            return;
+        }
+
+        // Get our inbox messages
+        List<String> inboxIds = storage.listMessages("inbox");
+        Set<String> localInventory = new HashSet<>(inboxIds);
+        Log.i(TAG, "Local inbox has " + localInventory.size() + " messages");
+
+        // Gap analysis - find messages we don't have
+        List<String> missingMessages = new ArrayList<>();
+        for (String remoteId : remoteInventory) {
+            if (!localInventory.contains(remoteId) && !isRecentlyProcessed(remoteId)) {
+                missingMessages.add(remoteId);
+            }
+        }
+
+        Log.i(TAG, "Missing " + missingMessages.size() + " messages from remote");
+
+        if (missingMessages.isEmpty()) {
+            Log.d(TAG, "No missing messages to request");
+            return;
+        }
+
+        // Request missing messages (batch limited)
+        int requestCount = Math.min(missingMessages.size(), MAX_REQUEST_BATCH);
+        Log.i(TAG, "Requesting " + requestCount + " messages");
+
+        SyncSession session = getOrCreateSession(remoteDeviceId);
+
+        for (int i = 0; i < requestCount; i++) {
+            String messageId = missingMessages.get(i);
+            if (isWiFi && session.useWiFi && session.wifiIp != null) {
+                sendWiFiRequest(remoteDeviceId, session.wifiIp, messageId);
+            } else {
+                requestMessage(remoteDeviceId, messageId);
+            }
+        }
+
+        // Update session
+        session.lastInventoryReceived = System.currentTimeMillis();
+        session.pendingRequests.addAll(missingMessages.subList(0, requestCount));
+    }
+
+    /**
+     * Common relay message handling logic (shared by BLE and WiFi)
+     */
+    private void handleRelayMessageCommon(String remoteDeviceId, String markdown, String receivedVia) {
+        // Parse markdown
+        RelayMessage message = RelayMessage.parseMarkdown(markdown);
+        if (message == null) {
+            Log.e(TAG, "✗ Failed to parse relay message markdown");
+            return;
+        }
+
+        Log.i(TAG, "Parsed message ID: " + message.getId());
+        Log.i(TAG, "Message from: " + message.getFromCallsign() + " to: " + message.getToCallsign());
+
+        // Check if already processed
+        if (isRecentlyProcessed(message.getId())) {
+            Log.d(TAG, "Message " + message.getId() + " already processed (skipping)");
+            return;
+        }
+
+        // Check if we already have this message
+        if (storage.getMessage(message.getId()) != null) {
+            Log.d(TAG, "Message " + message.getId() + " already in storage (skipping)");
+            addToRecentlyProcessed(message.getId());
+            return;
+        }
+
+        // Check acceptance based on settings
+        boolean shouldAccept = message.shouldAccept(settings);
+        Log.i(TAG, "Should accept: " + shouldAccept + " (auto-accept: " + settings.isAutoAcceptEnabled() + ")");
+
+        if (!shouldAccept) {
+            Log.w(TAG, "✗ Message rejected by relay settings");
+            return;
+        }
+
+        // Update metadata
+        message.setReceivedAt(System.currentTimeMillis() / 1000);
+        message.setReceivedVia(receivedVia);
+        message.addRelayNode(getDeviceId());
+
+        // Save to inbox
+        boolean saved = storage.saveMessage(message, "inbox");
+        if (saved) {
+            Log.i(TAG, "✓ Message saved to inbox successfully");
+            addToRecentlyProcessed(message.getId());
+
+            // Remove from session pending requests
+            SyncSession session = activeSessions.get(remoteDeviceId);
+            if (session != null) {
+                session.pendingRequests.remove(message.getId());
+                session.messagesReceived++;
+                Log.i(TAG, "Session stats - Received: " + session.messagesReceived + ", Sent: " + session.messagesSent);
+            }
+        } else {
+            Log.e(TAG, "✗ Failed to save message to inbox");
         }
     }
 

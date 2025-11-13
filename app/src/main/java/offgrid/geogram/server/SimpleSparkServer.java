@@ -94,6 +94,12 @@ public class SimpleSparkServer implements Runnable {
                     "<li>GET /api/relay/message/:messageId - Get specific message by ID</li>" +
                     "<li>DELETE /api/relay/message/:messageId - Delete message from relay</li>" +
                     "</ul>" +
+                    "<h3>Relay Sync (WiFi-based)</h3>" +
+                    "<ul>" +
+                    "<li>POST /api/relay/sync/inventory - Receive inventory from remote device</li>" +
+                    "<li>POST /api/relay/sync/request - Receive message request from remote device</li>" +
+                    "<li>POST /api/relay/sync/message - Receive relay message from remote device</li>" +
+                    "</ul>" +
                     "<h3>Devices</h3>" +
                     "<ul>" +
                     "<li>GET /api/devices/nearby - List nearby devices detected via BLE</li>" +
@@ -193,18 +199,16 @@ public class SimpleSparkServer implements Runnable {
                     Log.i(TAG_ID, "Triggered immediate UI refresh for WiFi message");
                 }
 
-                // Check if chat is currently visible
-                boolean chatIsOpen = offgrid.geogram.core.Central.getInstance() != null &&
-                    offgrid.geogram.core.Central.getInstance().broadcastChatFragment != null &&
-                    offgrid.geogram.core.Central.getInstance().broadcastChatFragment.isVisible();
+                // Check if we should show notification (considers both foreground state and chat visibility)
+                boolean shouldShowNotification = offgrid.geogram.apps.chat.ChatNotificationManager.shouldShowNotification(context);
 
-                if (chatIsOpen) {
-                    // Chat is open - mark message as read immediately
-                    Log.i(TAG_ID, "Chat is open, marking WiFi message as read immediately");
+                if (!shouldShowNotification) {
+                    // Chat is visible in foreground - mark message as read immediately
+                    Log.i(TAG_ID, "Chat is visible in foreground, marking WiFi message as read immediately");
                     wifiMessage.setRead(true);
                     offgrid.geogram.database.DatabaseMessages.getInstance().flushNow();
                 } else {
-                    // Chat is not open - update counter and show notification
+                    // App in background or chat not visible - update counter and show notification
                     offgrid.geogram.MainActivity mainActivity = offgrid.geogram.MainActivity.getInstance();
                     if (mainActivity != null) {
                         mainActivity.runOnUiThread(() -> {
@@ -724,6 +728,139 @@ public class SimpleSparkServer implements Runnable {
 
             } catch (Exception e) {
                 Log.e(TAG_ID, "Error deleting message: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // ========== RELAY SYNC ENDPOINTS (WiFi-based sync protocol) ==========
+
+        // POST /api/relay/sync/inventory - Receive inventory from remote device
+        post("/api/relay/sync/inventory", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                if (context == null) {
+                    res.status(503);
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                // Parse JSON request body
+                String body = req.body();
+                JsonObject jsonRequest = gson.fromJson(body, JsonObject.class);
+
+                if (jsonRequest == null || !jsonRequest.has("remoteDeviceId") || !jsonRequest.has("inventory")) {
+                    res.status(400);
+                    return gson.toJson(createErrorResponse("Missing 'remoteDeviceId' or 'inventory' field"));
+                }
+
+                String remoteDeviceId = jsonRequest.get("remoteDeviceId").getAsString();
+                String inventoryData = jsonRequest.get("inventory").getAsString();
+
+                Log.i(TAG_ID, "API: Received relay sync inventory from " + remoteDeviceId);
+                Log.i(TAG_ID, "Inventory data: " + inventoryData);
+
+                // Process inventory via RelayMessageSync
+                offgrid.geogram.relay.RelayMessageSync relaySync =
+                    offgrid.geogram.relay.RelayMessageSync.getInstance(context);
+                relaySync.handleWiFiInventory(remoteDeviceId, inventoryData);
+
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.addProperty("message", "Inventory processed");
+
+                res.status(200);
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error processing relay inventory: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // POST /api/relay/sync/request - Receive message request from remote device
+        post("/api/relay/sync/request", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                if (context == null) {
+                    res.status(503);
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                // Parse JSON request body
+                String body = req.body();
+                JsonObject jsonRequest = gson.fromJson(body, JsonObject.class);
+
+                if (jsonRequest == null || !jsonRequest.has("remoteDeviceId") || !jsonRequest.has("messageId")) {
+                    res.status(400);
+                    return gson.toJson(createErrorResponse("Missing 'remoteDeviceId' or 'messageId' field"));
+                }
+
+                String remoteDeviceId = jsonRequest.get("remoteDeviceId").getAsString();
+                String messageId = jsonRequest.get("messageId").getAsString();
+
+                Log.i(TAG_ID, "API: Received relay message request from " + remoteDeviceId + " for message " + messageId);
+
+                // Process request via RelayMessageSync
+                offgrid.geogram.relay.RelayMessageSync relaySync =
+                    offgrid.geogram.relay.RelayMessageSync.getInstance(context);
+                relaySync.handleWiFiRequest(remoteDeviceId, messageId);
+
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.addProperty("message", "Request processed");
+
+                res.status(200);
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error processing relay request: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // POST /api/relay/sync/message - Receive relay message from remote device
+        post("/api/relay/sync/message", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                if (context == null) {
+                    res.status(503);
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                // Parse JSON request body
+                String body = req.body();
+                JsonObject jsonRequest = gson.fromJson(body, JsonObject.class);
+
+                if (jsonRequest == null || !jsonRequest.has("remoteDeviceId") || !jsonRequest.has("markdown")) {
+                    res.status(400);
+                    return gson.toJson(createErrorResponse("Missing 'remoteDeviceId' or 'markdown' field"));
+                }
+
+                String remoteDeviceId = jsonRequest.get("remoteDeviceId").getAsString();
+                String markdown = jsonRequest.get("markdown").getAsString();
+
+                Log.i(TAG_ID, "API: Received relay message from " + remoteDeviceId);
+                Log.i(TAG_ID, "Message size: " + markdown.length() + " bytes");
+
+                // Process relay message via RelayMessageSync
+                offgrid.geogram.relay.RelayMessageSync relaySync =
+                    offgrid.geogram.relay.RelayMessageSync.getInstance(context);
+                relaySync.handleWiFiRelayMessage(remoteDeviceId, markdown);
+
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.addProperty("message", "Relay message processed");
+
+                res.status(200);
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error processing relay message: " + e.getMessage());
                 res.status(500);
                 return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
             }
