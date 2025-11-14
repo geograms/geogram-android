@@ -23,6 +23,12 @@ public class Device implements Comparable<Device> {
     private boolean profileFetched = false;
     private long profileFetchTimestamp = 0; // Timestamp when profile was last fetched
 
+    // I2P information (fetched via WiFi API, used for internet connectivity)
+    private String i2pDestination = null;           // Base32 .b32.i2p address
+    private boolean i2pEnabled = false;             // Whether remote device has I2P enabled
+    private boolean i2pReady = false;               // Whether remote device I2P is ready
+    private long i2pLastSeen = 0;                   // Timestamp of last I2P info update
+
     // WiFi reachability
     private boolean isWiFiReachable = true; // Assume reachable by default
     private long lastReachabilityCheck = 0; // Timestamp of last reachability check
@@ -102,6 +108,47 @@ public class Device implements Comparable<Device> {
     /** Set profile npub. */
     public void setProfileNpub(String npub) {
         this.profileNpub = npub;
+    }
+
+    /** Get I2P destination (Base32 .b32.i2p address). */
+    public String getI2PDestination() {
+        return i2pDestination;
+    }
+
+    /** Set I2P destination. */
+    public void setI2PDestination(String destination) {
+        this.i2pDestination = destination;
+        this.i2pLastSeen = System.currentTimeMillis();
+    }
+
+    /** Check if device has I2P destination. */
+    public boolean hasI2PDestination() {
+        return i2pDestination != null && !i2pDestination.isEmpty();
+    }
+
+    /** Check if remote device has I2P enabled. */
+    public boolean isI2PEnabled() {
+        return i2pEnabled;
+    }
+
+    /** Set I2P enabled status. */
+    public void setI2PEnabled(boolean enabled) {
+        this.i2pEnabled = enabled;
+    }
+
+    /** Check if remote device I2P is ready (tunnels established). */
+    public boolean isI2PReady() {
+        return i2pReady;
+    }
+
+    /** Set I2P ready status. */
+    public void setI2PReady(boolean ready) {
+        this.i2pReady = ready;
+    }
+
+    /** Get timestamp when I2P info was last updated. */
+    public long getI2PLastSeen() {
+        return i2pLastSeen;
     }
 
     /** Get profile picture bitmap, or null if not set. */
