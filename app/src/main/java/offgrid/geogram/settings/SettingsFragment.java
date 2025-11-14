@@ -380,6 +380,16 @@ public class SettingsFragment extends Fragment {
         ImageButton btnCopyNPUB = view.findViewById(R.id.btn_copy_npub);
         btnCopyNPUB.setOnClickListener(v -> copyToClipboard(npub, "NPUB"));
 
+        // I2P Settings Navigation
+        view.findViewById(R.id.btn_i2p_settings).setOnClickListener(v -> {
+            if (getActivity() != null) {
+                androidx.fragment.app.FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
+                transaction.replace(R.id.fragment_container, offgrid.geogram.fragments.I2PSettingsFragment.newInstance());
+                transaction.addToBackStack(null);
+                transaction.commit();
+            }
+        });
+
         // Reset Identity Button
         view.findViewById(R.id.btn_reset_identity).setOnClickListener(v -> {
             androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(requireContext())

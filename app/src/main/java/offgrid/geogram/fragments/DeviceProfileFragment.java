@@ -31,6 +31,7 @@ import offgrid.geogram.R;
 import offgrid.geogram.apps.chat.ChatFragmentDevice;
 import offgrid.geogram.devices.Device;
 import offgrid.geogram.devices.DeviceManager;
+import offgrid.geogram.network.ConnectionManager;
 
 public class DeviceProfileFragment extends Fragment {
 
@@ -88,6 +89,11 @@ public class DeviceProfileFragment extends Fragment {
             String cachedNpub = offgrid.geogram.util.RemoteProfileCache.getNpub(getContext(), deviceId);
             android.graphics.Bitmap cachedPicture = offgrid.geogram.util.RemoteProfileCache.getProfilePicture(getContext(), deviceId);
 
+            // Load I2P information from cache
+            String cachedI2PDest = offgrid.geogram.util.RemoteProfileCache.getI2PDestination(getContext(), deviceId);
+            boolean cachedI2PEnabled = offgrid.geogram.util.RemoteProfileCache.isI2PEnabled(getContext(), deviceId);
+            boolean cachedI2PReady = offgrid.geogram.util.RemoteProfileCache.isI2PReady(getContext(), deviceId);
+
             if (cachedNickname != null) {
                 device.setProfileNickname(cachedNickname);
             }
@@ -100,6 +106,13 @@ public class DeviceProfileFragment extends Fragment {
             if (cachedPicture != null) {
                 device.setProfilePicture(cachedPicture);
             }
+
+            // Set I2P information on device
+            if (cachedI2PDest != null) {
+                device.setI2PDestination(cachedI2PDest);
+            }
+            device.setI2PEnabled(cachedI2PEnabled);
+            device.setI2PReady(cachedI2PReady);
         }
 
         // Get view references for profile section
@@ -114,6 +127,7 @@ public class DeviceProfileFragment extends Fragment {
         TextView firstSeenView = view.findViewById(R.id.tv_first_seen);
         TextView lastSeenView = view.findViewById(R.id.tv_last_seen);
         TextView connectionCountView = view.findViewById(R.id.tv_connection_count);
+        TextView connectionMethodView = view.findViewById(R.id.tv_connection_method);
 
         if (device != null) {
             // Display profile information
@@ -212,6 +226,13 @@ public class DeviceProfileFragment extends Fragment {
                 totalConnections += event.timestamps.size();
             }
             connectionCountView.setText(String.valueOf(totalConnections));
+
+            // Connection method
+            ConnectionManager connectionManager = ConnectionManager.getInstance(getContext());
+            ConnectionManager.ConnectionMethod method = connectionManager.selectConnectionMethod(device);
+            String methodDescription = ConnectionManager.getConnectionDescription(method);
+            String speedDescription = ConnectionManager.getConnectionSpeed(method);
+            connectionMethodView.setText(methodDescription + " (" + speedDescription + ")");
         } else {
             // Device not found in DeviceManager (only seen via messages)
             nicknameView.setVisibility(View.GONE);
@@ -221,6 +242,7 @@ public class DeviceProfileFragment extends Fragment {
             firstSeenView.setText("Not detected");
             lastSeenView.setText("Unknown");
             connectionCountView.setText("0");
+            connectionMethodView.setText("Offline (N/A)");
         }
 
         // Initialize messaging buttons
@@ -318,6 +340,21 @@ public class DeviceProfileFragment extends Fragment {
                         String npub = jsonResponse.has("npub") && !jsonResponse.get("npub").isJsonNull()
                             ? jsonResponse.get("npub").getAsString() : "";
 
+                        // Extract I2P information
+                        String i2pDestination = null;
+                        boolean i2pEnabled = false;
+                        boolean i2pReady = false;
+
+                        if (jsonResponse.has("i2p") && !jsonResponse.get("i2p").isJsonNull()) {
+                            com.google.gson.JsonObject i2pInfo = jsonResponse.getAsJsonObject("i2p");
+                            i2pDestination = i2pInfo.has("destination") && !i2pInfo.get("destination").isJsonNull()
+                                ? i2pInfo.get("destination").getAsString() : null;
+                            i2pEnabled = i2pInfo.has("enabled") && !i2pInfo.get("enabled").isJsonNull()
+                                ? i2pInfo.get("enabled").getAsBoolean() : false;
+                            i2pReady = i2pInfo.has("ready") && !i2pInfo.get("ready").isJsonNull()
+                                ? i2pInfo.get("ready").getAsBoolean() : false;
+                        }
+
                         // Update device with profile data
                         if (nickname != null && !nickname.isEmpty()) {
                             finalDevice.setProfileNickname(nickname);
@@ -332,7 +369,14 @@ public class DeviceProfileFragment extends Fragment {
                             finalDevice.setProfileNpub(npub);
                         }
 
-                        // Save to cache
+                        // Update device with I2P data
+                        if (i2pDestination != null && !i2pDestination.isEmpty()) {
+                            finalDevice.setI2PDestination(i2pDestination);
+                        }
+                        finalDevice.setI2PEnabled(i2pEnabled);
+                        finalDevice.setI2PReady(i2pReady);
+
+                        // Save to cache (including I2P information)
                         offgrid.geogram.util.RemoteProfileCache.saveProfile(
                             getContext(),
                             finalDevice.ID,
@@ -340,7 +384,10 @@ public class DeviceProfileFragment extends Fragment {
                             finalDevice.getProfileDescription(),
                             finalDevice.getProfilePicture(),
                             finalDevice.getProfilePreferredColor(),
-                            finalDevice.getProfileNpub()
+                            finalDevice.getProfileNpub(),
+                            i2pDestination,
+                            i2pEnabled,
+                            i2pReady
                         );
 
                         android.util.Log.d("DeviceProfile", "Refreshed profile for " + deviceId);
