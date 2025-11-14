@@ -105,6 +105,80 @@
                 android:layout_marginStart="16dp"
                 android:layout_marginEnd="16dp" />
 
+            <!-- Profile Section -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Profile"
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                android:paddingTop="16dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp" />
+
+            <EditText
+                android:id="@+id/edit_nickname"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Nickname (e.g., John Doe)"
+                android:inputType="text"
+                android:textColor="@color/white"
+                android:textColorHint="@color/gray"
+                android:backgroundTint="@color/dark_gray"
+                android:padding="8dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp" />
+
+            <EditText
+                android:id="@+id/edit_description"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Description (200 letters max)"
+                android:maxLength="200"
+                android:inputType="textMultiLine"
+                android:textColor="@color/white"
+                android:textColorHint="@color/gray"
+                android:backgroundTint="@color/dark_gray"
+                android:padding="8dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:scrollHorizontally="false"
+                android:gravity="top|start"
+                android:minLines="3" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp">
+
+                <ImageView
+                    android:id="@+id/img_profile_preview"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:scaleType="centerInside"
+                    android:background="@drawable/rounded_profile_background"
+                    android:src="@drawable/ic_person"
+                    app:tint="@color/white"
+                    android:padding="12dp"
+                    android:contentDescription="Profile picture preview" />
+
+                <Button
+                    android:id="@+id/btn_choose_profile_image"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Choose Profile Picture"
+                    android:textColor="@color/white"
+                    android:backgroundTint="@color/gray"
+                    android:layout_marginStart="16dp" />
+            </LinearLayout>
+
             <!--
             <EditText
                 android:id="@+id/edit_intro"
@@ -252,7 +326,9 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:hint="NSEC"
-                    android:inputType="text"
+                    android:inputType="none"
+                    android:focusable="false"
+                    android:cursorVisible="false"
                     android:textColor="@color/white"
                     android:textColorHint="@color/gray"
                     android:backgroundTint="@color/dark_gray"
@@ -319,15 +395,4 @@
         </LinearLayout>
     </ScrollView>
 
-    <!-- Floating Action Button -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/btn_save_settings"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
-        android:contentDescription="Save"
-        android:src="@drawable/ic_save"
-        app:tint="@color/white"
-        app:backgroundTint="@color/gray" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

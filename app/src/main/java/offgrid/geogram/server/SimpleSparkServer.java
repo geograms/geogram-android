@@ -119,6 +119,11 @@ public class SimpleSparkServer implements Runnable {
                     "<li>POST /api/groups/:callsign/messages - Send message to a group</li>" +
                     "<li>GET /api/groups/:callsign/info - Get group/conversation info</li>" +
                     "</ul>" +
+                    "<h3>Profile</h3>" +
+                    "<ul>" +
+                    "<li>GET /api/profile - Get device profile (nickname, description)</li>" +
+                    "<li>GET /api/profile/picture - Get profile picture</li>" +
+                    "</ul>" +
                     "<h3>Collections</h3>" +
                     "<ul>" +
                     "<li>GET /api/collections - List all public collections</li>" +
@@ -1323,6 +1328,97 @@ public class SimpleSparkServer implements Runnable {
             } catch (Exception e) {
                 Log.e(TAG_ID, "Error retrieving collections: " + e.getMessage());
                 res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // GET /api/profile - Get device profile (nickname, description, profile picture)
+        get("/api/profile", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                if (context == null) {
+                    res.status(503);
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                // Get profile data
+                String nickname = offgrid.geogram.util.ProfilePreferences.getNickname(context);
+                String description = offgrid.geogram.util.ProfilePreferences.getDescription(context);
+                String imagePath = offgrid.geogram.util.ProfilePreferences.getProfileImagePath(context);
+
+                // Get preferred color from settings
+                offgrid.geogram.settings.SettingsUser settings = offgrid.geogram.core.Central.getInstance().getSettings();
+                String preferredColor = "";
+                if (settings != null && settings.getPreferredColor() != null) {
+                    preferredColor = settings.getPreferredColor();
+                }
+
+                // Create response
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.addProperty("nickname", nickname != null && !nickname.isEmpty() ? nickname : "");
+                response.addProperty("description", description != null && !description.isEmpty() ? description : "");
+                response.addProperty("preferredColor", preferredColor);
+                response.addProperty("hasProfilePicture", imagePath != null && !imagePath.isEmpty() && new java.io.File(imagePath).exists());
+
+                Log.i(TAG_ID, "API: Returned profile data");
+
+                res.status(200);
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error getting profile: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // GET /api/profile/picture - Get profile picture
+        get("/api/profile/picture", (req, res) -> {
+            try {
+                if (context == null) {
+                    res.status(503);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                String imagePath = offgrid.geogram.util.ProfilePreferences.getProfileImagePath(context);
+
+                if (imagePath == null || imagePath.isEmpty()) {
+                    res.status(404);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("No profile picture set"));
+                }
+
+                java.io.File imageFile = new java.io.File(imagePath);
+                if (!imageFile.exists()) {
+                    res.status(404);
+                    res.type("application/json");
+                    return gson.toJson(createErrorResponse("Profile picture file not found"));
+                }
+
+                // Serve the image
+                res.type("image/jpeg");
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(imageFile);
+                     java.io.OutputStream out = res.raw().getOutputStream()) {
+
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = fis.read(buffer)) != -1) {
+                        out.write(buffer, 0, bytesRead);
+                    }
+                    out.flush();
+                }
+
+                Log.i(TAG_ID, "API: Served profile picture");
+                res.status(200);
+                return res;
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error serving profile picture: " + e.getMessage());
+                res.status(500);
+                res.type("application/json");
                 return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
             }
         });

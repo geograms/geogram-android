@@ -735,7 +735,21 @@ public class ChatFragmentBroadcast extends Fragment {
             return "light gray";
         }
 
-        // Array of pleasant, distinguishable colors (avoiding red/yellow which look like warnings)
+        // Try to get preferred color from device profile if available
+        java.util.TreeSet<offgrid.geogram.devices.Device> devices =
+            offgrid.geogram.devices.DeviceManager.getInstance().getDevicesSpotted();
+
+        for (offgrid.geogram.devices.Device device : devices) {
+            if (device.ID.equals(authorId)) {
+                String preferredColor = device.getProfilePreferredColor();
+                if (preferredColor != null && !preferredColor.isEmpty()) {
+                    return preferredColor;
+                }
+                break;
+            }
+        }
+
+        // Fallback: Array of pleasant, distinguishable colors (avoiding red/yellow which look like warnings)
         String[] colors = {
             "light blue",
             "light green",

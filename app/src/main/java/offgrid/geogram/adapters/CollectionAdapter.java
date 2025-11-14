@@ -21,12 +21,22 @@ public class CollectionAdapter extends RecyclerView.Adapter<CollectionAdapter.Vi
         void onCollectionClick(Collection collection);
     }
 
+    public interface OnCollectionLongClickListener {
+        void onCollectionLongClick(Collection collection, View view);
+    }
+
     private List<Collection> collections;
     private final OnCollectionClickListener listener;
+    private final OnCollectionLongClickListener longClickListener;
 
     public CollectionAdapter(OnCollectionClickListener listener) {
+        this(listener, null);
+    }
+
+    public CollectionAdapter(OnCollectionClickListener listener, OnCollectionLongClickListener longClickListener) {
         this.collections = new ArrayList<>();
         this.listener = listener;
+        this.longClickListener = longClickListener;
     }
 
     @NonNull
@@ -40,7 +50,7 @@ public class CollectionAdapter extends RecyclerView.Adapter<CollectionAdapter.Vi
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Collection collection = collections.get(position);
-        holder.bind(collection, listener);
+        holder.bind(collection, listener, longClickListener);
     }
 
     @Override
@@ -65,6 +75,7 @@ public class CollectionAdapter extends RecyclerView.Adapter<CollectionAdapter.Vi
         private final TextView filesCount;
         private final TextView size;
         private final TextView adminTag;
+        private final ImageView favoriteStar;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -74,13 +85,21 @@ public class CollectionAdapter extends RecyclerView.Adapter<CollectionAdapter.Vi
             filesCount = itemView.findViewById(R.id.collection_files_count);
             size = itemView.findViewById(R.id.collection_size);
             adminTag = itemView.findViewById(R.id.collection_admin_tag);
+            favoriteStar = itemView.findViewById(R.id.collection_favorite_star);
         }
 
-        public void bind(Collection collection, OnCollectionClickListener listener) {
+        public void bind(Collection collection, OnCollectionClickListener listener, OnCollectionLongClickListener longClickListener) {
             title.setText(collection.getTitle());
             description.setText(collection.getDescription());
             filesCount.setText(collection.getFilesCount() + " files");
             size.setText(collection.getFormattedSize());
+
+            // Show favorite star if collection is favorited
+            if (collection.isFavorite()) {
+                favoriteStar.setVisibility(View.VISIBLE);
+            } else {
+                favoriteStar.setVisibility(View.GONE);
+            }
 
             // Show ADMIN tag if user owns this collection
             if (collection.isOwned()) {
@@ -97,6 +116,14 @@ public class CollectionAdapter extends RecyclerView.Adapter<CollectionAdapter.Vi
                 if (listener != null) {
                     listener.onCollectionClick(collection);
                 }
+            });
+
+            itemView.setOnLongClickListener(v -> {
+                if (longClickListener != null) {
+                    longClickListener.onCollectionLongClick(collection, v);
+                    return true;
+                }
+                return false;
             });
         }
     }

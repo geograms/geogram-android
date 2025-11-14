@@ -26,6 +26,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -123,7 +124,7 @@ public class CollectionsFragment extends Fragment {
         GridLayoutManager layoutManager = new GridLayoutManager(getContext(), 1);
         recyclerView.setLayoutManager(layoutManager);
 
-        adapter = new CollectionAdapter(this::onCollectionClick);
+        adapter = new CollectionAdapter(this::onCollectionClick, this::onCollectionLongClick);
         recyclerView.setAdapter(adapter);
     }
 
@@ -252,6 +253,17 @@ public class CollectionsFragment extends Fragment {
                 }
             }
         }
+
+        // Sort: favorites on top, then by title
+        java.util.Collections.sort(filteredCollections, (c1, c2) -> {
+            // First, sort by favorite status (favorites first)
+            if (c1.isFavorite() != c2.isFavorite()) {
+                return c1.isFavorite() ? -1 : 1;
+            }
+            // Then sort alphabetically by title
+            return c1.getTitle().compareToIgnoreCase(c2.getTitle());
+        });
+
         updateUI();
     }
 
@@ -276,5 +288,136 @@ public class CollectionsFragment extends Fragment {
                     .addToBackStack(null)
                     .commit();
         }
+    }
+
+    private void onCollectionLongClick(Collection collection, View view) {
+        // Show context menu with options
+        showCollectionContextMenu(collection);
+    }
+
+    private void showCollectionContextMenu(Collection collection) {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder builder =
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext());
+        builder.setTitle(collection.getTitle());
+
+        String[] options;
+        if (collection.isFavorite()) {
+            options = new String[]{"Remove favorite", "Delete from device"};
+        } else {
+            options = new String[]{"Favorite", "Delete from device"};
+        }
+
+        builder.setItems(options, (dialog, which) -> {
+            if (which == 0) {
+                // Favorite/Remove favorite option
+                toggleFavorite(collection);
+            } else if (which == 1) {
+                // Delete option selected
+                showDeleteConfirmationDialog(collection);
+            }
+        });
+
+        builder.show();
+    }
+
+    private void showDeleteConfirmationDialog(Collection collection) {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder builder =
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext());
+        builder.setTitle("Delete Collection");
+        builder.setMessage("Are you sure you want to delete \"" + collection.getTitle() + "\" from your device? This will delete all files in this collection.");
+
+        builder.setPositiveButton("Delete", (dialog, which) -> {
+            deleteCollection(collection);
+        });
+
+        builder.setNegativeButton("Cancel", (dialog, which) -> {
+            dialog.dismiss();
+        });
+
+        androidx.appcompat.app.AlertDialog dialog = builder.create();
+        dialog.show();
+
+        // Force button text colors to white
+        android.widget.Button positiveButton = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE);
+        android.widget.Button negativeButton = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE);
+
+        if (positiveButton != null) {
+            positiveButton.setTextColor(getResources().getColor(R.color.white, null));
+        }
+        if (negativeButton != null) {
+            negativeButton.setTextColor(getResources().getColor(R.color.white, null));
+        }
+    }
+
+    private void deleteCollection(Collection collection) {
+        new Thread(() -> {
+            try {
+                // Get the collection folder
+                File collectionsDir = new File(requireContext().getFilesDir(), "collections");
+                File collectionFolder = new File(collectionsDir, collection.getId());
+
+                if (collectionFolder.exists()) {
+                    // Recursively delete all files and folders
+                    boolean success = deleteRecursive(collectionFolder);
+
+                    handler.post(() -> {
+                        if (success) {
+                            android.widget.Toast.makeText(getContext(),
+                                "Collection deleted successfully",
+                                android.widget.Toast.LENGTH_SHORT).show();
+
+                            // Reload collections
+                            loadCollections();
+                        } else {
+                            android.widget.Toast.makeText(getContext(),
+                                "Failed to delete collection",
+                                android.widget.Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                } else {
+                    handler.post(() -> {
+                        android.widget.Toast.makeText(getContext(),
+                            "Collection folder not found",
+                            android.widget.Toast.LENGTH_SHORT).show();
+                    });
+                }
+            } catch (Exception e) {
+                android.util.Log.e("CollectionsFragment", "Error deleting collection: " + e.getMessage());
+                handler.post(() -> {
+                    android.widget.Toast.makeText(getContext(),
+                        "Error deleting collection: " + e.getMessage(),
+                        android.widget.Toast.LENGTH_SHORT).show();
+                });
+            }
+        }).start();
+    }
+
+    private boolean deleteRecursive(File fileOrDirectory) {
+        if (fileOrDirectory.isDirectory()) {
+            File[] children = fileOrDirectory.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    if (!deleteRecursive(child)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return fileOrDirectory.delete();
+    }
+
+    private void toggleFavorite(Collection collection) {
+        boolean newFavoriteStatus = !collection.isFavorite();
+        collection.setFavorite(newFavoriteStatus);
+
+        // Save to preferences
+        offgrid.geogram.util.CollectionPreferences.setFavorite(requireContext(),
+            collection.getId(), newFavoriteStatus);
+
+        // Update the UI
+        filterCollections(searchInput.getText().toString());
+
+        String message = newFavoriteStatus ? "Added to favorites" : "Removed from favorites";
+        android.widget.Toast.makeText(getContext(), message, android.widget.Toast.LENGTH_SHORT).show();
     }
 }

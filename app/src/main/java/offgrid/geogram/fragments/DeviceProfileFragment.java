@@ -36,6 +36,10 @@ public class DeviceProfileFragment extends Fragment {
 
     private static final String ARG_DEVICE_ID = "device_id";
 
+    private View rootView;
+    private String deviceId;
+    private android.content.BroadcastReceiver wifiDiscoveryReceiver;
+
     public static DeviceProfileFragment newInstance(String deviceId) {
         DeviceProfileFragment fragment = new DeviceProfileFragment();
         Bundle args = new Bundle();
@@ -48,9 +52,10 @@ public class DeviceProfileFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_device_profile, container, false);
+        this.rootView = view;
 
         // Get device ID from arguments
-        String deviceId = getArguments() != null ? getArguments().getString(ARG_DEVICE_ID) : null;
+        deviceId = getArguments() != null ? getArguments().getString(ARG_DEVICE_ID) : null;
         if (deviceId == null) {
             return view;
         }
@@ -158,10 +163,10 @@ public class DeviceProfileFragment extends Fragment {
             collectionsCard.setVisibility(View.VISIBLE);
             collectionsCount.setText("Loading...");
 
-            // Fetch collections count in background thread
+            // Fetch collections list in background thread (we need the full list to filter owned ones)
             new Thread(() -> {
                 try {
-                    String apiUrl = "http://" + deviceIp + ":45678/api/collections/count";
+                    String apiUrl = "http://" + deviceIp + ":45678/api/collections";
                     URL url = new URL(apiUrl);
                     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                     conn.setRequestMethod("GET");
@@ -178,9 +183,22 @@ public class DeviceProfileFragment extends Fragment {
                         }
                         reader.close();
 
-                        // Parse JSON response
+                        // Parse JSON response and filter out owned collections
                         JsonObject jsonResponse = JsonParser.parseString(response.toString()).getAsJsonObject();
-                        int count = jsonResponse.get("count").getAsInt();
+                        com.google.gson.JsonArray collectionsArray = jsonResponse.getAsJsonArray("collections");
+
+                        int filteredCount = 0;
+                        for (int i = 0; i < collectionsArray.size(); i++) {
+                            JsonObject collectionJson = collectionsArray.get(i).getAsJsonObject();
+                            String collectionId = collectionJson.get("id").getAsString();
+
+                            // Skip collections that we own (are admin of)
+                            if (!offgrid.geogram.util.CollectionKeysManager.isOwnedCollection(getContext(), collectionId)) {
+                                filteredCount++;
+                            }
+                        }
+
+                        final int count = filteredCount;
 
                         // Update UI on main thread
                         if (getActivity() != null) {
@@ -244,6 +262,34 @@ public class DeviceProfileFragment extends Fragment {
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).setTopActionBarVisible(false);
         }
+
+        // Register WiFi discovery broadcast receiver
+        if (wifiDiscoveryReceiver == null) {
+            wifiDiscoveryReceiver = new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(android.content.Context context, android.content.Intent intent) {
+                    // WiFi discovery has found devices - refresh the collections card
+                    if (rootView != null && deviceId != null) {
+                        android.util.Log.d("DeviceProfile", "WiFi discovery update received - refreshing collections card");
+                        Device device = null;
+                        for (Device d : DeviceManager.getInstance().getDevicesSpotted()) {
+                            if (d.ID.equals(deviceId)) {
+                                device = d;
+                                break;
+                            }
+                        }
+                        setupCollectionsCard(rootView, deviceId, device);
+                    }
+                }
+            };
+        }
+
+        // Register receiver
+        if (getContext() != null) {
+            android.content.IntentFilter filter = new android.content.IntentFilter("offgrid.geogram.WIFI_DISCOVERY_UPDATE");
+            androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(getContext())
+                    .registerReceiver(wifiDiscoveryReceiver, filter);
+        }
     }
 
     @Override
@@ -252,6 +298,12 @@ public class DeviceProfileFragment extends Fragment {
         // Show top action bar when leaving
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).setTopActionBarVisible(true);
+        }
+
+        // Unregister WiFi discovery broadcast receiver
+        if (wifiDiscoveryReceiver != null && getContext() != null) {
+            androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(getContext())
+                    .unregisterReceiver(wifiDiscoveryReceiver);
         }
     }
 

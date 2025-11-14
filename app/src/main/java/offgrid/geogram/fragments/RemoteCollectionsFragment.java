@@ -131,6 +131,13 @@ public class RemoteCollectionsFragment extends Fragment {
                         JsonObject collectionJson = collectionsArray.get(i).getAsJsonObject();
 
                         String id = collectionJson.get("id").getAsString();
+
+                        // Skip collections that we own (are admin of)
+                        if (offgrid.geogram.util.CollectionKeysManager.isOwnedCollection(getContext(), id)) {
+                            android.util.Log.i("RemoteCollections", "Skipping owned collection: " + id);
+                            continue;
+                        }
+
                         String title = collectionJson.get("title").getAsString();
                         String description = collectionJson.has("description") ?
                                 collectionJson.get("description").getAsString() : "";

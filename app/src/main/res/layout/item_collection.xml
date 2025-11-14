@@ -56,6 +56,16 @@
                     android:maxLines="2"
                     android:ellipsize="end" />
 
+                <!-- Favorite Star -->
+                <ImageView
+                    android:id="@+id/collection_favorite_star"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@android:drawable/star_big_on"
+                    app:tint="#FFD700"
+                    android:layout_marginStart="8dp"
+                    android:visibility="gone" />
+
                 <!-- Admin Tag -->
                 <TextView
                     android:id="@+id/collection_admin_tag"

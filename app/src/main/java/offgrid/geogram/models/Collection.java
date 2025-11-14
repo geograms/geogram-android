@@ -15,6 +15,7 @@ public class Collection implements Serializable {
     private String updated;
     private String storagePath;
     private boolean isOwned;
+    private boolean isFavorite;
     private CollectionSecurity security;
     private List<CollectionFile> files;
 
@@ -119,6 +120,14 @@ public class Collection implements Serializable {
 
     public void setSecurity(CollectionSecurity security) {
         this.security = security;
+    }
+
+    public boolean isFavorite() {
+        return isFavorite;
+    }
+
+    public void setFavorite(boolean favorite) {
+        isFavorite = favorite;
     }
 
     public String getFormattedSize() {

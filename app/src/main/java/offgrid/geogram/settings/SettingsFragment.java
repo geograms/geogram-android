@@ -31,6 +31,8 @@ public class SettingsFragment extends Fragment {
     private static SettingsFragment instance;
     private SettingsUser settings = null;
     private View view = null;
+    private android.widget.ImageView profileImageView = null;
+    private androidx.activity.result.ActivityResultLauncher<Intent> profileImageLauncher;
 
     // Private constructor to enforce singleton pattern
     private SettingsFragment() {
@@ -45,6 +47,89 @@ public class SettingsFragment extends Fragment {
             instance = new SettingsFragment();
         }
         return instance;
+    }
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // Initialize profile image launcher
+        profileImageLauncher = registerForActivityResult(
+                new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == android.app.Activity.RESULT_OK && result.getData() != null) {
+                        android.net.Uri imageUri = result.getData().getData();
+                        if (imageUri != null) {
+                            try {
+                                // Copy image to internal storage
+                                java.io.InputStream inputStream = requireContext().getContentResolver().openInputStream(imageUri);
+                                if (inputStream != null) {
+                                    java.io.File profileDir = new java.io.File(requireContext().getFilesDir(), "profile");
+                                    if (!profileDir.exists()) {
+                                        profileDir.mkdirs();
+                                    }
+
+                                    java.io.File imageFile = new java.io.File(profileDir, "profile_image.jpg");
+
+                                    // Decode and rescale the image to max 200x200
+                                    android.graphics.Bitmap originalBitmap = android.graphics.BitmapFactory.decodeStream(inputStream);
+                                    inputStream.close();
+
+                                    if (originalBitmap != null) {
+                                        // Calculate scaling to fit within 200x200 while maintaining aspect ratio
+                                        int width = originalBitmap.getWidth();
+                                        int height = originalBitmap.getHeight();
+                                        int maxSize = 200;
+
+                                        float scale = Math.min((float) maxSize / width, (float) maxSize / height);
+                                        int newWidth = Math.round(width * scale);
+                                        int newHeight = Math.round(height * scale);
+
+                                        android.graphics.Bitmap scaledBitmap = android.graphics.Bitmap.createScaledBitmap(
+                                            originalBitmap, newWidth, newHeight, true);
+
+                                        // Save the scaled bitmap as JPEG
+                                        java.io.FileOutputStream outputStream = new java.io.FileOutputStream(imageFile);
+                                        scaledBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, outputStream);
+                                        outputStream.close();
+
+                                        // Clean up
+                                        if (scaledBitmap != originalBitmap) {
+                                            originalBitmap.recycle();
+                                        }
+                                    } else {
+                                        Toast.makeText(getContext(), "Failed to decode image", Toast.LENGTH_SHORT).show();
+                                        return;
+                                    }
+
+                                    // Save path to preferences
+                                    offgrid.geogram.util.ProfilePreferences.setProfileImagePath(requireContext(), imageFile.getAbsolutePath());
+
+                                    // Update UI
+                                    if (profileImageView != null) {
+                                        android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeFile(imageFile.getAbsolutePath());
+                                        if (bitmap != null) {
+                                            // Clear the white tint and update display
+                                            profileImageView.setImageTintList(null);
+
+                                            // Apply rounded corners
+                                            android.graphics.Bitmap roundedBitmap = getRoundedCornerBitmap(bitmap, 12);
+                                            profileImageView.setImageBitmap(roundedBitmap);
+                                            profileImageView.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+                                            profileImageView.setPadding(0, 0, 0, 0);
+                                        }
+                                    }
+
+                                    Toast.makeText(getContext(), "Profile picture updated", Toast.LENGTH_SHORT).show();
+                                }
+                            } catch (Exception e) {
+                                android.util.Log.e("SettingsFragment", "Error saving profile image: " + e.getMessage());
+                                Toast.makeText(getContext(), "Error saving profile image", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    }
+                }
+        );
     }
 
     @Nullable
@@ -77,6 +162,20 @@ public class SettingsFragment extends Fragment {
     @Override
     public void onPause() {
         super.onPause();
+
+        // Auto-save all settings when leaving the fragment
+        if (view != null) {
+            EditText nicknameField = view.findViewById(R.id.edit_nickname);
+            EditText descriptionField = view.findViewById(R.id.edit_description);
+
+            if (nicknameField != null && descriptionField != null) {
+                String nickname = nicknameField.getText().toString().trim();
+                String description = descriptionField.getText().toString().trim();
+                offgrid.geogram.util.ProfilePreferences.setNickname(requireContext(), nickname);
+                offgrid.geogram.util.ProfilePreferences.setDescription(requireContext(), description);
+            }
+        }
+
         // Show top action bar when leaving
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).setTopActionBarVisible(true);
@@ -124,8 +223,52 @@ public class SettingsFragment extends Fragment {
         EditText callsignField = view.findViewById(R.id.edit_callsign);
         callsignField.setText(settings.getCallsign());
 
+        // Profile fields
+        EditText nicknameField = view.findViewById(R.id.edit_nickname);
+        EditText descriptionField = view.findViewById(R.id.edit_description);
+        profileImageView = view.findViewById(R.id.img_profile_preview);
+        android.widget.Button chooseProfileImageButton = view.findViewById(R.id.btn_choose_profile_image);
+
+        // Load saved profile data
+        String savedNickname = offgrid.geogram.util.ProfilePreferences.getNickname(requireContext());
+        String savedDescription = offgrid.geogram.util.ProfilePreferences.getDescription(requireContext());
+        String savedImagePath = offgrid.geogram.util.ProfilePreferences.getProfileImagePath(requireContext());
+
+        nicknameField.setText(savedNickname);
+        descriptionField.setText(savedDescription);
+
+        // Load profile image if exists
+        if (savedImagePath != null && !savedImagePath.isEmpty()) {
+            try {
+                android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeFile(savedImagePath);
+                if (bitmap != null) {
+                    // Clear the white tint and update display
+                    profileImageView.setImageTintList(null);
+
+                    // Apply rounded corners
+                    android.graphics.Bitmap roundedBitmap = getRoundedCornerBitmap(bitmap, 12);
+                    profileImageView.setImageBitmap(roundedBitmap);
+                    profileImageView.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+                    profileImageView.setPadding(0, 0, 0, 0);
+                }
+            } catch (Exception e) {
+                android.util.Log.e("SettingsFragment", "Error loading profile image: " + e.getMessage());
+            }
+        }
+
+        // Choose profile image button
+        chooseProfileImageButton.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_PICK);
+            intent.setType("image/*");
+            profileImageLauncher.launch(intent);
+        });
+
         Spinner preferredColorSpinner = view.findViewById(R.id.spinner_preferred_color);
         String[] colorOptions = getResources().getStringArray(R.array.color_options);
+
+        // Track whether this is the initial setup to avoid triggering listener
+        final boolean[] isInitialSetup = {true};
+
         for (int i = 0; i < colorOptions.length; i++) {
             if (colorOptions[i].equals(settings.getPreferredColor())) {
                 preferredColorSpinner.setSelection(i);
@@ -193,12 +336,41 @@ public class SettingsFragment extends Fragment {
             }
         });
 
-        // Save Button
-        View saveButton = view.findViewById(R.id.btn_save_settings);
-        saveButton.setOnClickListener(v -> {
-            saveSettings(npub, nsec, preferredColorSpinner);
-            // Removed (legacy) - sendProfileToEveryone used BroadcastSender (Google Play Services)
-            requireActivity().onBackPressed(); // Navigate back
+        // Auto-save nickname when focus is lost
+        nicknameField.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) {
+                String nickname = nicknameField.getText().toString().trim();
+                offgrid.geogram.util.ProfilePreferences.setNickname(requireContext(), nickname);
+            }
+        });
+
+        // Auto-save description when focus is lost
+        descriptionField.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) {
+                String description = descriptionField.getText().toString().trim();
+                offgrid.geogram.util.ProfilePreferences.setDescription(requireContext(), description);
+            }
+        });
+
+        // Auto-save preferred color when changed
+        preferredColorSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                // Skip the initial selection trigger
+                if (isInitialSetup[0]) {
+                    isInitialSetup[0] = false;
+                    return;
+                }
+
+                String selectedColor = colorOptions[position];
+                settings.setPreferredColor(selectedColor);
+                saveSettings(settings);
+            }
+
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {
+                // No action needed
+            }
         });
 
         // Copy to clipboard button functionality
@@ -239,6 +411,14 @@ public class SettingsFragment extends Fragment {
             settings.setNpub(identity.npub);
             settings.setNsec(identity.nsec);
             settings.setCallsign(identity.callsign);
+
+            // Set a random preferred color if not already set
+            if (settings.getPreferredColor() == null || settings.getPreferredColor().isEmpty()) {
+                String[] colorOptions = getResources().getStringArray(R.array.color_options);
+                int randomIndex = new java.util.Random().nextInt(colorOptions.length);
+                settings.setPreferredColor(colorOptions[randomIndex]);
+            }
+
             saveSettings(settings);
         } catch (Exception e) {
             Toast.makeText(requireContext(), "Error generating identity: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -281,7 +461,7 @@ public class SettingsFragment extends Fragment {
     private void saveSettings(SettingsUser settings) {
         try {
             SettingsLoader.saveSettings(requireContext(), settings);
-            Toast.makeText(requireContext(), "Settings saved successfully", Toast.LENGTH_SHORT).show();
+            // No success toast - settings save silently
         } catch (Exception e) {
             Toast.makeText(requireContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
@@ -320,5 +500,34 @@ public class SettingsFragment extends Fragment {
                 textView.setTextColor(getResources().getColor(R.color.gray, null));
             }
         }
+    }
+
+    /**
+     * Create a bitmap with rounded corners
+     * @param bitmap The original bitmap
+     * @param cornerRadiusDp Corner radius in dp
+     * @return Bitmap with rounded corners
+     */
+    private android.graphics.Bitmap getRoundedCornerBitmap(android.graphics.Bitmap bitmap, int cornerRadiusDp) {
+        // Convert dp to pixels
+        float density = getResources().getDisplayMetrics().density;
+        float cornerRadiusPx = cornerRadiusDp * density;
+
+        android.graphics.Bitmap output = android.graphics.Bitmap.createBitmap(
+            bitmap.getWidth(), bitmap.getHeight(), android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(output);
+
+        final android.graphics.Paint paint = new android.graphics.Paint();
+        final android.graphics.Rect rect = new android.graphics.Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
+        final android.graphics.RectF rectF = new android.graphics.RectF(rect);
+
+        paint.setAntiAlias(true);
+        canvas.drawARGB(0, 0, 0, 0);
+        canvas.drawRoundRect(rectF, cornerRadiusPx, cornerRadiusPx, paint);
+
+        paint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(bitmap, rect, rect, paint);
+
+        return output;
     }
 }

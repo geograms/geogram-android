@@ -110,6 +110,9 @@ public class CollectionLoader {
             // Check if we own this collection (have the nsec)
             collection.setOwned(CollectionKeysManager.isOwnedCollection(context, id));
 
+            // Load favorite status
+            collection.setFavorite(CollectionPreferences.isFavorite(context, id));
+
             // Load security.json if it exists
             File securityJson = new File(folder, "extra/security.json");
             if (securityJson.exists()) {

@@ -14,6 +14,18 @@ public class Device implements Comparable<Device> {
     private DeviceModel deviceModel = null;
     private String deviceVersion = null;
 
+    // Profile information (fetched via WiFi API)
+    private String profileNickname = null;
+    private String profileDescription = null;
+    private String profilePreferredColor = null;
+    private android.graphics.Bitmap profilePicture = null;
+    private boolean profileFetched = false;
+    private long profileFetchTimestamp = 0; // Timestamp when profile was last fetched
+
+    // WiFi reachability
+    private boolean isWiFiReachable = true; // Assume reachable by default
+    private long lastReachabilityCheck = 0; // Timestamp of last reachability check
+
     // when was this device located before?
     public final TreeSet<EventConnected> connectedEvents = new TreeSet<>();
 
@@ -49,6 +61,90 @@ public class Device implements Comparable<Device> {
             return deviceModel.getDisplayNameWithVersion(deviceVersion);
         }
         return deviceType.toString();
+    }
+
+    /** Get profile nickname, or null if not set. */
+    public String getProfileNickname() {
+        return profileNickname;
+    }
+
+    /** Set profile nickname. */
+    public void setProfileNickname(String nickname) {
+        this.profileNickname = nickname;
+    }
+
+    /** Get profile description, or null if not set. */
+    public String getProfileDescription() {
+        return profileDescription;
+    }
+
+    /** Set profile description. */
+    public void setProfileDescription(String description) {
+        this.profileDescription = description;
+    }
+
+    /** Get profile preferred color, or null if not set. */
+    public String getProfilePreferredColor() {
+        return profilePreferredColor;
+    }
+
+    /** Set profile preferred color. */
+    public void setProfilePreferredColor(String color) {
+        this.profilePreferredColor = color;
+    }
+
+    /** Get profile picture bitmap, or null if not set. */
+    public android.graphics.Bitmap getProfilePicture() {
+        return profilePicture;
+    }
+
+    /** Set profile picture bitmap. */
+    public void setProfilePicture(android.graphics.Bitmap picture) {
+        this.profilePicture = picture;
+    }
+
+    /** Check if profile has been fetched and is still valid (not older than 6 hours). */
+    public boolean isProfileFetched() {
+        if (!profileFetched) {
+            return false;
+        }
+
+        // Check if profile is older than 6 hours (21600000 milliseconds)
+        long currentTime = System.currentTimeMillis();
+        long profileAge = currentTime - profileFetchTimestamp;
+        long sixHoursInMillis = 6 * 60 * 60 * 1000;
+
+        if (profileAge > sixHoursInMillis) {
+            // Profile is stale, mark as not fetched
+            profileFetched = false;
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Mark profile as fetched with current timestamp. */
+    public void setProfileFetched(boolean fetched) {
+        this.profileFetched = fetched;
+        if (fetched) {
+            this.profileFetchTimestamp = System.currentTimeMillis();
+        }
+    }
+
+    /** Check if device is reachable via WiFi. */
+    public boolean isWiFiReachable() {
+        return isWiFiReachable;
+    }
+
+    /** Set WiFi reachability status. */
+    public void setWiFiReachable(boolean reachable) {
+        this.isWiFiReachable = reachable;
+        this.lastReachabilityCheck = System.currentTimeMillis();
+    }
+
+    /** Get timestamp of last reachability check. */
+    public long getLastReachabilityCheck() {
+        return lastReachabilityCheck;
     }
 
     /** Latest (most recent) timestamp across all locations, or Long.MIN_VALUE if none. */

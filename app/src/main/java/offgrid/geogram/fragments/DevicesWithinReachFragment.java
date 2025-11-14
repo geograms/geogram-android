@@ -32,11 +32,15 @@ import offgrid.geogram.events.EventType;
 public class DevicesWithinReachFragment extends Fragment {
 
     private static final String EVENT_LISTENER_ID = "DevicesWithinReachFragment_Listener";
+    private static final long REACHABILITY_CHECK_INTERVAL = 60000; // Check every minute
 
     private RecyclerView recyclerView;
     private DeviceAdapter adapter;
     private TextView emptyMessage;
     private EventAction deviceUpdateListener;
+    private android.os.Handler reachabilityHandler;
+    private Runnable reachabilityCheckRunnable;
+    private android.content.BroadcastReceiver wifiDiscoveryReceiver;
 
     @Nullable
     @Override
@@ -147,12 +151,129 @@ public class DevicesWithinReachFragment extends Fragment {
         if (getView() != null) {
             loadDevices();
         }
+
+        // Start periodic reachability checks
+        startReachabilityChecks();
+
+        // Register WiFi discovery broadcast receiver
+        if (wifiDiscoveryReceiver == null) {
+            wifiDiscoveryReceiver = new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(android.content.Context context, android.content.Intent intent) {
+                    // WiFi discovery has found devices - refresh the device list
+                    android.util.Log.d("DevicesFragment", "WiFi discovery update received - refreshing device list");
+                    loadDevices();
+                }
+            };
+        }
+
+        // Register receiver
+        if (getContext() != null) {
+            android.content.IntentFilter filter = new android.content.IntentFilter("offgrid.geogram.WIFI_DISCOVERY_UPDATE");
+            androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(getContext())
+                    .registerReceiver(wifiDiscoveryReceiver, filter);
+        }
     }
 
     @Override
     public void onPause() {
         super.onPause();
         // Note: EventControl doesn't have removeEvent, listener stays registered
+
+        // Stop periodic reachability checks
+        stopReachabilityChecks();
+
+        // Unregister WiFi discovery broadcast receiver
+        if (wifiDiscoveryReceiver != null && getContext() != null) {
+            androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(getContext())
+                    .unregisterReceiver(wifiDiscoveryReceiver);
+        }
+    }
+
+    private void startReachabilityChecks() {
+        if (reachabilityHandler == null) {
+            reachabilityHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        }
+
+        if (reachabilityCheckRunnable == null) {
+            reachabilityCheckRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    checkDevicesReachability();
+                    // Schedule next check
+                    if (reachabilityHandler != null) {
+                        reachabilityHandler.postDelayed(this, REACHABILITY_CHECK_INTERVAL);
+                    }
+                }
+            };
+        }
+
+        // Start first check immediately
+        reachabilityHandler.post(reachabilityCheckRunnable);
+    }
+
+    private void stopReachabilityChecks() {
+        if (reachabilityHandler != null && reachabilityCheckRunnable != null) {
+            reachabilityHandler.removeCallbacks(reachabilityCheckRunnable);
+        }
+    }
+
+    private void checkDevicesReachability() {
+        TreeSet<Device> devices = DeviceManager.getInstance().getDevicesSpotted();
+        offgrid.geogram.wifi.WiFiDiscoveryService wifiService =
+            offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(requireContext());
+
+        for (Device device : devices) {
+            String deviceIp = wifiService.getDeviceIp(device.ID);
+
+            if (deviceIp != null) {
+                // Device has WiFi - check if it's reachable
+                checkDeviceReachability(device, deviceIp);
+            }
+        }
+    }
+
+    private void checkDeviceReachability(Device device, String deviceIp) {
+        // Run in background thread
+        new Thread(() -> {
+            try {
+                String apiUrl = "http://" + deviceIp + ":45678/api/status";
+                java.net.URL url = new java.net.URL(apiUrl);
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(3000);
+                conn.setReadTimeout(3000);
+
+                int responseCode = conn.getResponseCode();
+                boolean isReachable = (responseCode == java.net.HttpURLConnection.HTTP_OK);
+
+                // Update device reachability status
+                device.setWiFiReachable(isReachable);
+
+                conn.disconnect();
+
+                // Update UI if reachability changed
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (adapter != null) {
+                            adapter.notifyDataSetChanged();
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                // Device not reachable
+                device.setWiFiReachable(false);
+
+                // Update UI
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (adapter != null) {
+                            adapter.notifyDataSetChanged();
+                        }
+                    });
+                }
+            }
+        }).start();
     }
 
     // RecyclerView Adapter
@@ -208,23 +329,61 @@ public class DevicesWithinReachFragment extends Fragment {
         static class DeviceViewHolder extends RecyclerView.ViewHolder {
             private final TextView deviceName;
             private final TextView deviceType;
+            private final TextView profileDescription;
             private final TextView deviceLastSeen;
             private final TextView relayBadge;
             private final android.widget.LinearLayout channelIndicators;
+            private final android.widget.ImageView profileImage;
 
             public DeviceViewHolder(@NonNull View itemView) {
                 super(itemView);
                 deviceName = itemView.findViewById(R.id.device_name);
                 deviceType = itemView.findViewById(R.id.device_type);
+                profileDescription = itemView.findViewById(R.id.profile_description);
                 deviceLastSeen = itemView.findViewById(R.id.device_last_seen);
                 relayBadge = itemView.findViewById(R.id.relay_badge);
                 channelIndicators = itemView.findViewById(R.id.channel_indicators);
+                profileImage = itemView.findViewById(R.id.profile_image);
             }
 
             public void bind(Device device) {
-                deviceName.setText(device.ID);
+                // Display nickname with callsign if available, otherwise just callsign
+                if (device.getProfileNickname() != null && !device.getProfileNickname().isEmpty()) {
+                    deviceName.setText(device.getProfileNickname() + " (" + device.ID + ")");
+                } else {
+                    deviceName.setText(device.ID);
+                }
+
+                // Display profile picture if available
+                if (device.getProfilePicture() != null) {
+                    // Create circular bitmap for profile picture
+                    android.graphics.Bitmap profileBitmap = device.getProfilePicture();
+                    android.graphics.Bitmap circularBitmap = getCircularBitmap(profileBitmap);
+
+                    profileImage.setImageBitmap(circularBitmap);
+                    profileImage.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+                    profileImage.setPadding(2, 2, 2, 2);
+                    profileImage.setBackgroundColor(0); // Remove background
+                } else {
+                    profileImage.setImageResource(R.drawable.ic_person);
+                    profileImage.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+                    profileImage.setPadding(8, 8, 8, 8);
+                    profileImage.setBackgroundColor(itemView.getContext().getResources().getColor(R.color.dark_gray, null));
+                }
+
                 // Display custom device model if available, otherwise show device type
                 deviceType.setText(device.getDisplayName());
+
+                // Display profile description if available
+                if (device.getProfileDescription() != null && !device.getProfileDescription().isEmpty()) {
+                    profileDescription.setText(device.getProfileDescription());
+                    profileDescription.setVisibility(View.VISIBLE);
+                } else {
+                    profileDescription.setVisibility(View.GONE);
+                }
+
+                // Fetch profile data if WiFi is available and not yet fetched
+                fetchProfileIfAvailable(device);
 
                 // Show relay badge for IGate devices
                 if (device.deviceType == DeviceType.INTERNET_IGATE) {
@@ -333,6 +492,23 @@ public class DevicesWithinReachFragment extends Fragment {
                     );
                     wifiBadge.setLayoutParams(params);
                     channelIndicators.addView(wifiBadge);
+
+                    // Add "Not reachable" indicator if WiFi device is unreachable
+                    if (!device.isWiFiReachable()) {
+                        TextView unreachableBadge = new TextView(itemView.getContext());
+                        unreachableBadge.setText("NOT REACHABLE");
+                        unreachableBadge.setTextSize(10);
+                        unreachableBadge.setTextColor(Color.WHITE);
+                        unreachableBadge.setBackgroundColor(0xFFCC0000); // Red background
+                        unreachableBadge.setPadding(8, 4, 8, 4);
+                        android.widget.LinearLayout.LayoutParams unreachableParams = new android.widget.LinearLayout.LayoutParams(
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                        );
+                        unreachableParams.setMargins(8, 0, 0, 0);
+                        unreachableBadge.setLayoutParams(unreachableParams);
+                        channelIndicators.addView(unreachableBadge);
+                    }
                 }
 
                 // Show/hide channel indicators based on whether any badges were added
@@ -341,6 +517,147 @@ public class DevicesWithinReachFragment extends Fragment {
                 } else {
                     channelIndicators.setVisibility(View.GONE);
                 }
+            }
+
+            private void fetchProfileIfAvailable(Device device) {
+                // Skip if already fetched
+                if (device.isProfileFetched()) {
+                    return;
+                }
+
+                // Check if device has WiFi available
+                offgrid.geogram.wifi.WiFiDiscoveryService wifiService =
+                    offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(itemView.getContext());
+                String deviceIp = wifiService.getDeviceIp(device.ID);
+
+                if (deviceIp == null) {
+                    return; // No WiFi available
+                }
+
+                // Mark as fetched to prevent duplicate requests
+                device.setProfileFetched(true);
+
+                // Fetch profile in background thread
+                new Thread(() -> {
+                    try {
+                        // Fetch profile metadata
+                        String apiUrl = "http://" + deviceIp + ":45678/api/profile";
+                        java.net.URL url = new java.net.URL(apiUrl);
+                        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                        conn.setRequestMethod("GET");
+                        conn.setConnectTimeout(3000);
+                        conn.setReadTimeout(3000);
+
+                        int responseCode = conn.getResponseCode();
+                        if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                            java.io.BufferedReader reader = new java.io.BufferedReader(
+                                new java.io.InputStreamReader(conn.getInputStream()));
+                            StringBuilder response = new StringBuilder();
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                response.append(line);
+                            }
+                            reader.close();
+
+                            // Parse JSON response
+                            com.google.gson.JsonObject jsonResponse = com.google.gson.JsonParser
+                                .parseString(response.toString()).getAsJsonObject();
+
+                            if (jsonResponse.get("success").getAsBoolean()) {
+                                String nickname = jsonResponse.has("nickname") && !jsonResponse.get("nickname").isJsonNull()
+                                    ? jsonResponse.get("nickname").getAsString() : "";
+                                String description = jsonResponse.has("description") && !jsonResponse.get("description").isJsonNull()
+                                    ? jsonResponse.get("description").getAsString() : "";
+                                String preferredColor = jsonResponse.has("preferredColor") && !jsonResponse.get("preferredColor").isJsonNull()
+                                    ? jsonResponse.get("preferredColor").getAsString() : "";
+                                boolean hasProfilePicture = jsonResponse.has("hasProfilePicture")
+                                    && jsonResponse.get("hasProfilePicture").getAsBoolean();
+
+                                // Update device with profile data
+                                if (nickname != null && !nickname.isEmpty()) {
+                                    device.setProfileNickname(nickname);
+                                }
+                                if (description != null && !description.isEmpty()) {
+                                    device.setProfileDescription(description);
+                                }
+                                if (preferredColor != null && !preferredColor.isEmpty()) {
+                                    device.setProfilePreferredColor(preferredColor);
+                                }
+
+                                // Fetch profile picture if available
+                                if (hasProfilePicture) {
+                                    fetchProfilePicture(device, deviceIp);
+                                } else {
+                                    // Update UI on main thread
+                                    updateUIAfterProfileFetch(device);
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.e("DevicesFragment", "Error fetching profile for " + device.ID + ": " + e.getMessage());
+                    }
+                }).start();
+            }
+
+            private void fetchProfilePicture(Device device, String deviceIp) {
+                try {
+                    String pictureUrl = "http://" + deviceIp + ":45678/api/profile/picture";
+                    java.net.URL url = new java.net.URL(pictureUrl);
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("GET");
+                    conn.setConnectTimeout(3000);
+                    conn.setReadTimeout(3000);
+
+                    int responseCode = conn.getResponseCode();
+                    if (responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                        java.io.InputStream inputStream = conn.getInputStream();
+                        android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeStream(inputStream);
+                        inputStream.close();
+
+                        if (bitmap != null) {
+                            device.setProfilePicture(bitmap);
+                        }
+                    }
+
+                    // Update UI on main thread
+                    updateUIAfterProfileFetch(device);
+                } catch (Exception e) {
+                    android.util.Log.e("DevicesFragment", "Error fetching profile picture for " + device.ID + ": " + e.getMessage());
+                    // Still update UI to show nickname even if picture failed
+                    updateUIAfterProfileFetch(device);
+                }
+            }
+
+            private void updateUIAfterProfileFetch(Device device) {
+                // Update UI on main thread
+                if (itemView.getContext() instanceof android.app.Activity) {
+                    ((android.app.Activity) itemView.getContext()).runOnUiThread(() -> {
+                        // Rebind to update display
+                        bind(device);
+                    });
+                }
+            }
+
+            /**
+             * Create a circular bitmap from a square bitmap
+             */
+            private android.graphics.Bitmap getCircularBitmap(android.graphics.Bitmap bitmap) {
+                int size = Math.min(bitmap.getWidth(), bitmap.getHeight());
+
+                android.graphics.Bitmap output = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+                android.graphics.Canvas canvas = new android.graphics.Canvas(output);
+
+                final android.graphics.Paint paint = new android.graphics.Paint();
+                final android.graphics.Rect rect = new android.graphics.Rect(0, 0, size, size);
+
+                paint.setAntiAlias(true);
+                canvas.drawARGB(0, 0, 0, 0);
+                canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint);
+
+                paint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+                canvas.drawBitmap(bitmap, null, rect, paint);
+
+                return output;
             }
         }
     }
