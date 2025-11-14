@@ -1394,6 +1394,15 @@ public class SimpleSparkServer implements Runnable {
                     }
                 }
 
+                // Get or generate I2P destination
+                offgrid.geogram.i2p.I2PService i2pService = offgrid.geogram.i2p.I2PService.getInstance(context);
+                String i2pDestination = i2pService.getI2PDestination();
+                if (i2pDestination == null || i2pDestination.isEmpty()) {
+                    i2pDestination = i2pService.generateAndSaveDestination();
+                }
+                boolean i2pEnabled = i2pService.isEnabled();
+                boolean i2pReady = i2pService.isI2PReady();
+
                 // Create response
                 JsonObject response = new JsonObject();
                 response.addProperty("success", true);
@@ -1402,6 +1411,14 @@ public class SimpleSparkServer implements Runnable {
                 response.addProperty("preferredColor", preferredColor);
                 response.addProperty("npub", npub);
                 response.addProperty("hasProfilePicture", imagePath != null && !imagePath.isEmpty() && new java.io.File(imagePath).exists());
+
+                // Add I2P information
+                JsonObject i2pInfo = new JsonObject();
+                i2pInfo.addProperty("destination", i2pDestination != null ? i2pDestination : "");
+                i2pInfo.addProperty("enabled", i2pEnabled);
+                i2pInfo.addProperty("ready", i2pReady);
+                i2pInfo.addProperty("lastSeen", System.currentTimeMillis());
+                response.add("i2p", i2pInfo);
 
                 Log.i(TAG_ID, "API: Returned profile data");
 
