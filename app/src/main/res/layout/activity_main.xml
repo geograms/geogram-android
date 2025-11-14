@@ -78,13 +78,15 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="Messages"
                 android:src="@drawable/ic_messages"
+                android:visibility="gone"
                 app:tint="@color/white" />
 
             <!-- Relay Button with Badge -->
             <FrameLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp">
+                android:layout_marginStart="8dp"
+                android:visibility="gone">
 
                 <ImageButton
                     android:id="@+id/btn_relay"
