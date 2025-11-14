@@ -8,7 +8,6 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:paddingBottom="88dp"
         android:clipToPadding="false"
         android:fillViewport="false">
 
@@ -377,6 +376,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
+        android:visibility="gone"
         app:backgroundTint="@color/dark_gray">
 
         <LinearLayout
