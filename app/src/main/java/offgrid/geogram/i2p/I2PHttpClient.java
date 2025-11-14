@@ -28,7 +28,7 @@ import java.nio.charset.StandardCharsets;
  * - Destination addresses are .b32.i2p or full Base64
  */
 public class I2PHttpClient {
-    private static final String TAG = "I2PHttpClient";
+    private static final String TAG = "I2P/HttpClient";
     private static final int I2P_CONNECT_TIMEOUT = 90000; // 90 seconds
     private static final int I2P_READ_TIMEOUT = 60000; // 60 seconds
 

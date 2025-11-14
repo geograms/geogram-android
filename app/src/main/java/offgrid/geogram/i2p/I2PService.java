@@ -27,7 +27,7 @@ import java.util.Properties;
  * - Battery-aware operation
  */
 public class I2PService {
-    private static final String TAG = "I2PService";
+    private static final String TAG = "I2P/Service";
     private static final String PREFS_NAME = "i2p_prefs";
     private static final String PREF_ENABLED = "i2p_enabled";
     private static final String PREF_BATTERY_THRESHOLD = "battery_disconnect_threshold";
@@ -128,17 +128,32 @@ public class I2PService {
 
                 // Load or create destination
                 File destFile = new File(context.getFilesDir(), "i2p/destination.dat");
+                boolean destinationLoaded = false;
+
                 if (destFile.exists()) {
-                    Log.i(TAG, "Loading existing I2P destination...");
-                    FileInputStream fis = new FileInputStream(destFile);
-                    destination = new Destination();
-                    destination.readBytes(fis);
-                    fis.close();
-                } else {
+                    try {
+                        Log.i(TAG, "Loading existing I2P destination...");
+                        FileInputStream fis = new FileInputStream(destFile);
+                        destination = new Destination();
+                        destination.readBytes(fis);
+                        fis.close();
+                        destinationLoaded = true;
+                        Log.i(TAG, "Successfully loaded I2P destination from file");
+                    } catch (Exception e) {
+                        Log.w(TAG, "Failed to load I2P destination (corrupted file): " + e.getMessage());
+                        // Delete corrupted file
+                        if (destFile.delete()) {
+                            Log.i(TAG, "Deleted corrupted destination file, will create new one");
+                        }
+                    }
+                }
+
+                if (!destinationLoaded) {
                     Log.i(TAG, "Creating new I2P destination...");
                     FileOutputStream fos = new FileOutputStream(destFile);
                     destination = i2pClient.createDestination(fos);
                     fos.close();
+                    Log.i(TAG, "Successfully created new I2P destination");
                 }
 
                 Log.i(TAG, "I2P destination: " + destination.toBase32());

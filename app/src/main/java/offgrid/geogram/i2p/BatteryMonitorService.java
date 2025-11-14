@@ -19,7 +19,7 @@ import offgrid.geogram.core.Log;
  * - Show notifications for battery-related I2P state changes
  */
 public class BatteryMonitorService extends Service {
-    private static final String TAG = "BatteryMonitorService";
+    private static final String TAG = "I2P/Battery";
     private static final int RECONNECT_HYSTERESIS = 5; // 5% above disconnect threshold
 
     private BroadcastReceiver batteryReceiver;
