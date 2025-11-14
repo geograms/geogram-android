@@ -157,6 +157,17 @@ public class CollectionsFragment extends Fragment {
             handler.post(() -> {
                 allCollections = collections;
                 filteredCollections = new ArrayList<>(allCollections);
+
+                // Sort: favorites on top, then by title
+                java.util.Collections.sort(filteredCollections, (c1, c2) -> {
+                    // First, sort by favorite status (favorites first)
+                    if (c1.isFavorite() != c2.isFavorite()) {
+                        return c1.isFavorite() ? -1 : 1;
+                    }
+                    // Then sort alphabetically by title
+                    return c1.getTitle().compareToIgnoreCase(c2.getTitle());
+                });
+
                 updateUI();
                 swipeRefresh.setRefreshing(false);
             });

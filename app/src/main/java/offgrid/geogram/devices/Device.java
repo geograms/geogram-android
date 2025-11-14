@@ -18,6 +18,7 @@ public class Device implements Comparable<Device> {
     private String profileNickname = null;
     private String profileDescription = null;
     private String profilePreferredColor = null;
+    private String profileNpub = null;
     private android.graphics.Bitmap profilePicture = null;
     private boolean profileFetched = false;
     private long profileFetchTimestamp = 0; // Timestamp when profile was last fetched
@@ -91,6 +92,16 @@ public class Device implements Comparable<Device> {
     /** Set profile preferred color. */
     public void setProfilePreferredColor(String color) {
         this.profilePreferredColor = color;
+    }
+
+    /** Get profile npub, or null if not set. */
+    public String getProfileNpub() {
+        return profileNpub;
+    }
+
+    /** Set profile npub. */
+    public void setProfileNpub(String npub) {
+        this.profileNpub = npub;
     }
 
     /** Get profile picture bitmap, or null if not set. */

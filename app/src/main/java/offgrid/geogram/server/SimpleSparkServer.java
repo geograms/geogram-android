@@ -1294,14 +1294,48 @@ public class SimpleSparkServer implements Runnable {
                     return gson.toJson(createErrorResponse("Server context not initialized"));
                 }
 
+                // Get requesting device's IP address
+                String requestIp = req.ip();
+                Log.d(TAG_ID, "API: /api/collections request from IP: " + requestIp);
+
+                // Try to find the requesting device's npub by IP address
+                String requestingNpub = null;
+                offgrid.geogram.devices.Device requestingDevice = findDeviceByIp(requestIp);
+                if (requestingDevice != null) {
+                    requestingNpub = requestingDevice.getProfileNpub();
+                    Log.d(TAG_ID, "API: Found requesting device " + requestingDevice.ID + " with npub: " + (requestingNpub != null ? "present" : "null"));
+                }
+
                 // Load all collections
                 List<Collection> allCollections = CollectionLoader.loadCollectionsFromAppStorage(context);
 
-                // Filter to only public collections
-                List<JsonObject> publicCollections = new ArrayList<>();
+                // Filter collections based on visibility and permissions
+                List<JsonObject> accessibleCollections = new ArrayList<>();
                 for (Collection collection : allCollections) {
                     CollectionSecurity security = collection.getSecurity();
-                    if (security != null && security.isPubliclyAccessible()) {
+                    if (security == null) {
+                        continue;
+                    }
+
+                    boolean isAccessible = false;
+
+                    // Check visibility
+                    if (security.getVisibility() == CollectionSecurity.Visibility.PUBLIC) {
+                        // Public collections are accessible to everyone
+                        isAccessible = true;
+                    } else if (security.getVisibility() == CollectionSecurity.Visibility.GROUP) {
+                        // Group collections: check if requesting npub is in whitelist
+                        if (requestingNpub != null && !requestingNpub.isEmpty()) {
+                            List<String> whitelist = security.getWhitelistedUsers();
+                            if (whitelist != null && whitelist.contains(requestingNpub)) {
+                                isAccessible = true;
+                                Log.d(TAG_ID, "API: Collection " + collection.getId() + " accessible via group permission for npub");
+                            }
+                        }
+                    }
+                    // PRIVATE collections are never accessible via API
+
+                    if (isAccessible) {
                         JsonObject collectionJson = new JsonObject();
                         collectionJson.addProperty("id", collection.getId());
                         collectionJson.addProperty("title", collection.getTitle());
@@ -1310,23 +1344,23 @@ public class SimpleSparkServer implements Runnable {
                         collectionJson.addProperty("totalSize", collection.getTotalSize());
                         collectionJson.addProperty("formattedSize", collection.getFormattedSize());
                         collectionJson.addProperty("updated", collection.getUpdated());
-                        publicCollections.add(collectionJson);
+                        accessibleCollections.add(collectionJson);
                     }
                 }
 
                 // Create response
                 JsonObject response = new JsonObject();
                 response.addProperty("success", true);
-                response.addProperty("count", publicCollections.size());
-                response.add("collections", gson.toJsonTree(publicCollections));
+                response.addProperty("count", accessibleCollections.size());
+                response.add("collections", gson.toJsonTree(accessibleCollections));
 
-                Log.i(TAG_ID, "API: Returned " + publicCollections.size() + " public collections");
+                Log.i(TAG_ID, "API: Returned " + accessibleCollections.size() + " accessible collections (requestingNpub: " + (requestingNpub != null ? "present" : "null") + ")");
 
                 res.status(200);
                 return gson.toJson(response);
 
             } catch (Exception e) {
-                Log.e(TAG_ID, "Error retrieving collections: " + e.getMessage());
+                Log.e(TAG_ID, "Error retrieving collections: " + e.getMessage(), e);
                 res.status(500);
                 return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
             }
@@ -1347,11 +1381,17 @@ public class SimpleSparkServer implements Runnable {
                 String description = offgrid.geogram.util.ProfilePreferences.getDescription(context);
                 String imagePath = offgrid.geogram.util.ProfilePreferences.getProfileImagePath(context);
 
-                // Get preferred color from settings
+                // Get preferred color and npub from settings
                 offgrid.geogram.settings.SettingsUser settings = offgrid.geogram.core.Central.getInstance().getSettings();
                 String preferredColor = "";
-                if (settings != null && settings.getPreferredColor() != null) {
-                    preferredColor = settings.getPreferredColor();
+                String npub = "";
+                if (settings != null) {
+                    if (settings.getPreferredColor() != null) {
+                        preferredColor = settings.getPreferredColor();
+                    }
+                    if (settings.getNpub() != null) {
+                        npub = settings.getNpub();
+                    }
                 }
 
                 // Create response
@@ -1360,6 +1400,7 @@ public class SimpleSparkServer implements Runnable {
                 response.addProperty("nickname", nickname != null && !nickname.isEmpty() ? nickname : "");
                 response.addProperty("description", description != null && !description.isEmpty() ? description : "");
                 response.addProperty("preferredColor", preferredColor);
+                response.addProperty("npub", npub);
                 response.addProperty("hasProfilePicture", imagePath != null && !imagePath.isEmpty() && new java.io.File(imagePath).exists());
 
                 Log.i(TAG_ID, "API: Returned profile data");
@@ -1574,11 +1615,20 @@ public class SimpleSparkServer implements Runnable {
                     return gson.toJson(createErrorResponse("Collection not found"));
                 }
 
-                // Check if collection is publicly accessible
+                // Get requesting device's npub for permission check
+                String requestIp = req.ip();
+                String requestingNpub = null;
+                offgrid.geogram.devices.Device requestingDevice = findDeviceByIp(requestIp);
+                if (requestingDevice != null) {
+                    requestingNpub = requestingDevice.getProfileNpub();
+                }
+
+                // Check if requesting device has access to this collection
                 CollectionSecurity security = requestedCollection.getSecurity();
-                if (security == null || !security.isPubliclyAccessible()) {
+                if (!hasCollectionAccess(security, requestingNpub)) {
                     res.status(403);
-                    return gson.toJson(createErrorResponse("Collection is not publicly accessible"));
+                    Log.d(TAG_ID, "API: Access denied to collection " + npub + " for IP " + requestIp + " (npub: " + (requestingNpub != null ? "present" : "null") + ")");
+                    return gson.toJson(createErrorResponse("Access denied to this collection"));
                 }
 
                 // Get files in the requested path
@@ -1664,12 +1714,21 @@ public class SimpleSparkServer implements Runnable {
                     return gson.toJson(createErrorResponse("Collection not found"));
                 }
 
-                // Check if collection is publicly accessible
+                // Get requesting device's npub for permission check
+                String requestIp = req.ip();
+                String requestingNpub = null;
+                offgrid.geogram.devices.Device requestingDevice = findDeviceByIp(requestIp);
+                if (requestingDevice != null) {
+                    requestingNpub = requestingDevice.getProfileNpub();
+                }
+
+                // Check if requesting device has access to this collection
                 CollectionSecurity security = requestedCollection.getSecurity();
-                if (security == null || !security.isPubliclyAccessible()) {
+                if (!hasCollectionAccess(security, requestingNpub)) {
                     res.status(403);
                     res.type("application/json");
-                    return gson.toJson(createErrorResponse("Collection is not publicly accessible"));
+                    Log.d(TAG_ID, "API: Access denied to file in collection " + npub + " for IP " + requestIp + " (npub: " + (requestingNpub != null ? "present" : "null") + ")");
+                    return gson.toJson(createErrorResponse("Access denied to this collection"));
                 }
 
                 // Construct file path and check if it exists
@@ -1796,12 +1855,21 @@ public class SimpleSparkServer implements Runnable {
                     return gson.toJson(createErrorResponse("Collection not found"));
                 }
 
-                // Check if collection is publicly accessible
+                // Get requesting device's npub for permission check
+                String requestIp = req.ip();
+                String requestingNpub = null;
+                offgrid.geogram.devices.Device requestingDevice = findDeviceByIp(requestIp);
+                if (requestingDevice != null) {
+                    requestingNpub = requestingDevice.getProfileNpub();
+                }
+
+                // Check if requesting device has access to this collection
                 CollectionSecurity security = requestedCollection.getSecurity();
-                if (security == null || !security.isPubliclyAccessible()) {
+                if (!hasCollectionAccess(security, requestingNpub)) {
                     res.status(403);
                     res.type("application/json");
-                    return gson.toJson(createErrorResponse("Collection is not publicly accessible"));
+                    Log.d(TAG_ID, "API: Access denied to thumbnail in collection " + npub + " for IP " + requestIp + " (npub: " + (requestingNpub != null ? "present" : "null") + ")");
+                    return gson.toJson(createErrorResponse("Access denied to this collection"));
                 }
 
                 // Construct file path and check if it exists
@@ -1953,6 +2021,64 @@ public class SimpleSparkServer implements Runnable {
         JsonObject errorResponse = new JsonObject();
         errorResponse.addProperty("error", message);
         return errorResponse;
+    }
+
+    /**
+     * Find a device by IP address
+     * Looks through WiFi discovery service to match IP to device callsign/ID
+     */
+    private offgrid.geogram.devices.Device findDeviceByIp(String requestIp) {
+        try {
+            if (context == null || requestIp == null) {
+                return null;
+            }
+
+            // Get all known devices
+            java.util.TreeSet<offgrid.geogram.devices.Device> devices =
+                offgrid.geogram.devices.DeviceManager.getInstance().getDevicesSpotted();
+
+            // Check each device to see if its IP matches
+            offgrid.geogram.wifi.WiFiDiscoveryService wifiService =
+                offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(context);
+
+            for (offgrid.geogram.devices.Device device : devices) {
+                String deviceIp = wifiService.getDeviceIp(device.ID);
+                if (deviceIp != null && deviceIp.equals(requestIp)) {
+                    return device;
+                }
+            }
+
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG_ID, "Error finding device by IP: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Check if requesting device has access to a collection
+     * Checks PUBLIC, PRIVATE, and GROUP permissions
+     */
+    private boolean hasCollectionAccess(CollectionSecurity security, String requestingNpub) {
+        if (security == null) {
+            return false;
+        }
+
+        // Check visibility
+        if (security.getVisibility() == CollectionSecurity.Visibility.PUBLIC) {
+            // Public collections are accessible to everyone
+            return true;
+        } else if (security.getVisibility() == CollectionSecurity.Visibility.GROUP) {
+            // Group collections: check if requesting npub is in whitelist
+            if (requestingNpub != null && !requestingNpub.isEmpty()) {
+                List<String> whitelist = security.getWhitelistedUsers();
+                if (whitelist != null && whitelist.contains(requestingNpub)) {
+                    return true;
+                }
+            }
+        }
+        // PRIVATE collections are never accessible via API
+        return false;
     }
 
     // Helper class for conversation statistics

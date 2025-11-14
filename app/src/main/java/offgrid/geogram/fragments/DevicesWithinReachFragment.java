@@ -520,9 +520,32 @@ public class DevicesWithinReachFragment extends Fragment {
             }
 
             private void fetchProfileIfAvailable(Device device) {
-                // Skip if already fetched
-                if (device.isProfileFetched()) {
-                    return;
+                // First, try to load from cache to show something immediately
+                if (offgrid.geogram.util.RemoteProfileCache.isCacheValid(itemView.getContext(), device.ID)) {
+                    // Load cached profile immediately for faster display
+                    String cachedNickname = offgrid.geogram.util.RemoteProfileCache.getNickname(itemView.getContext(), device.ID);
+                    String cachedDescription = offgrid.geogram.util.RemoteProfileCache.getDescription(itemView.getContext(), device.ID);
+                    String cachedColor = offgrid.geogram.util.RemoteProfileCache.getPreferredColor(itemView.getContext(), device.ID);
+                    String cachedNpub = offgrid.geogram.util.RemoteProfileCache.getNpub(itemView.getContext(), device.ID);
+                    android.graphics.Bitmap cachedPicture = offgrid.geogram.util.RemoteProfileCache.getProfilePicture(itemView.getContext(), device.ID);
+
+                    if (cachedNickname != null) {
+                        device.setProfileNickname(cachedNickname);
+                    }
+                    if (cachedDescription != null) {
+                        device.setProfileDescription(cachedDescription);
+                    }
+                    if (cachedNpub != null) {
+                        device.setProfileNpub(cachedNpub);
+                    }
+                    if (cachedColor != null) {
+                        device.setProfilePreferredColor(cachedColor);
+                    }
+                    if (cachedPicture != null) {
+                        device.setProfilePicture(cachedPicture);
+                    }
+
+                    android.util.Log.d("DevicesFragment", "Loaded profile from cache for " + device.ID);
                 }
 
                 // Check if device has WiFi available
@@ -531,7 +554,15 @@ public class DevicesWithinReachFragment extends Fragment {
                 String deviceIp = wifiService.getDeviceIp(device.ID);
 
                 if (deviceIp == null) {
-                    return; // No WiFi available
+                    return; // No WiFi available, use cached data only
+                }
+
+                // Skip if already fetched recently (within the last minute to avoid spam)
+                if (device.isProfileFetched()) {
+                    long timeSinceLastFetch = System.currentTimeMillis() - device.getLastReachabilityCheck();
+                    if (timeSinceLastFetch < 60000) { // Less than 1 minute ago
+                        return;
+                    }
                 }
 
                 // Mark as fetched to prevent duplicate requests
@@ -570,6 +601,8 @@ public class DevicesWithinReachFragment extends Fragment {
                                     ? jsonResponse.get("description").getAsString() : "";
                                 String preferredColor = jsonResponse.has("preferredColor") && !jsonResponse.get("preferredColor").isJsonNull()
                                     ? jsonResponse.get("preferredColor").getAsString() : "";
+                                String npub = jsonResponse.has("npub") && !jsonResponse.get("npub").isJsonNull()
+                                    ? jsonResponse.get("npub").getAsString() : "";
                                 boolean hasProfilePicture = jsonResponse.has("hasProfilePicture")
                                     && jsonResponse.get("hasProfilePicture").getAsBoolean();
 
@@ -582,6 +615,9 @@ public class DevicesWithinReachFragment extends Fragment {
                                 }
                                 if (preferredColor != null && !preferredColor.isEmpty()) {
                                     device.setProfilePreferredColor(preferredColor);
+                                }
+                                if (npub != null && !npub.isEmpty()) {
+                                    device.setProfileNpub(npub);
                                 }
 
                                 // Fetch profile picture if available
@@ -629,6 +665,17 @@ public class DevicesWithinReachFragment extends Fragment {
             }
 
             private void updateUIAfterProfileFetch(Device device) {
+                // Save profile to cache
+                offgrid.geogram.util.RemoteProfileCache.saveProfile(
+                    itemView.getContext(),
+                    device.ID,
+                    device.getProfileNickname(),
+                    device.getProfileDescription(),
+                    device.getProfilePicture(),
+                    device.getProfilePreferredColor(),
+                    device.getProfileNpub()
+                );
+
                 // Update UI on main thread
                 if (itemView.getContext() instanceof android.app.Activity) {
                     ((android.app.Activity) itemView.getContext()).runOnUiThread(() -> {

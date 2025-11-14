@@ -81,6 +81,7 @@ public class CollectionBrowserFragment extends Fragment {
     private TextView breadcrumbPath;
     private LinearLayout breadcrumbContainer;
     private ImageButton btnBack;
+    private ImageButton btnSettings;
     private ImageButton btnInfo;
     private FloatingActionButton fabAdd;
 
@@ -166,6 +167,7 @@ public class CollectionBrowserFragment extends Fragment {
         breadcrumbPath = view.findViewById(R.id.breadcrumb_path);
         breadcrumbContainer = view.findViewById(R.id.breadcrumb_container);
         btnBack = view.findViewById(R.id.btn_back);
+        btnSettings = view.findViewById(R.id.btn_settings);
         btnInfo = view.findViewById(R.id.btn_info);
         fabAdd = view.findViewById(R.id.fab_add);
 
@@ -186,6 +188,7 @@ public class CollectionBrowserFragment extends Fragment {
         setupRecyclerView();
         setupNavigation();
         setupSearch();
+        setupSettingsButton();
         setupInfoButton();
         setupAddButton();
 
@@ -317,6 +320,28 @@ public class CollectionBrowserFragment extends Fragment {
                 navigateUp();
             }
         });
+    }
+
+    private void setupSettingsButton() {
+        // Show settings button only if user is administrator of the collection
+        boolean isAdmin = offgrid.geogram.util.CollectionKeysManager.isOwnedCollection(getContext(), collection.getId());
+
+        if (isAdmin && !isRemoteMode) {
+            btnSettings.setVisibility(View.VISIBLE);
+            btnSettings.setOnClickListener(v -> {
+                if (collection == null) return;
+
+                // Navigate to CollectionSettingsFragment
+                CollectionSettingsFragment settingsFragment = CollectionSettingsFragment.newInstance(collection);
+                getParentFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_container, settingsFragment)
+                        .addToBackStack(null)
+                        .commit();
+            });
+        } else {
+            btnSettings.setVisibility(View.GONE);
+        }
     }
 
     private void setupInfoButton() {

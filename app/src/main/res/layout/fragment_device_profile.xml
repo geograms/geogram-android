@@ -8,8 +8,9 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:paddingBottom="72dp"
-        android:clipToPadding="false">
+        android:paddingBottom="88dp"
+        android:clipToPadding="false"
+        android:fillViewport="false">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -52,51 +53,242 @@
                 android:paddingStart="8dp"/>
         </LinearLayout>
 
-        <!-- Device Information Card -->
+        <!-- Profile Card -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="#353535"
             android:padding="16dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="top">
+
+                <!-- Profile Picture -->
+                <ImageView
+                    android:id="@+id/profile_image"
+                    android:layout_width="96dp"
+                    android:layout_height="96dp"
+                    android:scaleType="centerInside"
+                    android:background="@drawable/rounded_profile_background"
+                    android:src="@drawable/ic_person"
+                    android:padding="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:contentDescription="Profile picture" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <!-- Nickname -->
+                    <TextView
+                        android:id="@+id/tv_nickname"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Nickname"
+                        android:textColor="@color/white"
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
+                    <!-- Callsign -->
+                    <TextView
+                        android:id="@+id/tv_callsign"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="X1ABCD"
+                        android:textColor="#AAAAAA"
+                        android:textSize="16sp"
+                        android:layout_marginTop="2dp" />
+
+                    <!-- Device Type -->
+                    <TextView
+                        android:id="@+id/tv_device_type"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="HT_PORTABLE"
+                        android:textColor="#888888"
+                        android:textSize="14sp"
+                        android:layout_marginTop="4dp" />
+
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Description -->
+            <TextView
+                android:id="@+id/tv_description"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#CCCCCC"
+                android:textSize="15sp"
+                android:layout_marginTop="12dp"
+                android:visibility="gone" />
+
+            <!-- Npub (Nostr Public Key) -->
+            <LinearLayout
+                android:id="@+id/npub_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="12dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Nostr Public Key"
+                    android:textColor="#888888"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:paddingBottom="4dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/tv_npub"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text=""
+                        android:textColor="#CCCCCC"
+                        android:textSize="13sp"
+                        android:fontFamily="monospace"
+                        android:ellipsize="middle"
+                        android:singleLine="true" />
+
+                    <ImageButton
+                        android:id="@+id/btn_copy_npub"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:background="@android:color/transparent"
+                        android:src="@drawable/ic_copy"
+                        android:contentDescription="Copy npub"
+                        android:padding="4dp"
+                        app:tint="@color/white"
+                        android:layout_marginStart="8dp" />
+
+                </LinearLayout>
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Statistics Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#353535"
+            android:padding="16dp"
+            android:layout_marginTop="12dp"
             android:layout_marginStart="16dp"
             android:layout_marginEnd="16dp">
 
             <TextView
-                android:id="@+id/tv_device_type"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Type: HT_PORTABLE"
+                android:text="Connection Statistics"
                 android:textColor="@color/white"
                 android:textSize="16sp"
+                android:textStyle="bold"
                 android:paddingBottom="12dp" />
 
-            <TextView
-                android:id="@+id/tv_first_seen"
+            <!-- Stats Grid -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="First seen: Jan 01, 2025 12:00:00"
-                android:textColor="@color/white"
-                android:textSize="16sp"
-                android:paddingBottom="12dp" />
+                android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/tv_last_seen"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Last seen: Jan 01, 2025 12:05:00"
-                android:textColor="@color/white"
-                android:textSize="16sp"
-                android:paddingBottom="12dp" />
+                <!-- First Seen -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:paddingEnd="8dp">
 
-            <TextView
-                android:id="@+id/tv_connection_count"
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="First Seen"
+                        android:textColor="#888888"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_first_seen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Jan 01, 12:00"
+                        android:textColor="@color/white"
+                        android:textSize="14sp"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+
+                <!-- Last Seen -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:paddingStart="8dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Last Seen"
+                        android:textColor="#888888"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_last_seen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Jan 01, 12:05"
+                        android:textColor="@color/white"
+                        android:textSize="14sp"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Times Detected -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Times detected: 5"
-                android:textColor="@color/white"
-                android:textSize="16sp" />
+                android:orientation="vertical"
+                android:layout_marginTop="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Times Detected"
+                    android:textColor="#888888"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_connection_count"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="5"
+                    android:textColor="@color/white"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
 
         </LinearLayout>
 
@@ -108,21 +300,37 @@
             android:orientation="vertical"
             android:background="#353535"
             android:padding="16dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="12dp"
             android:layout_marginStart="16dp"
             android:layout_marginEnd="16dp"
+            android:layout_marginBottom="16dp"
             android:clickable="true"
             android:focusable="true"
             android:visibility="gone">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Collections"
-                android:textColor="@color/white"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:paddingBottom="12dp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingBottom="12dp">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_collections"
+                    app:tint="@color/white"
+                    android:layout_marginEnd="8dp"
+                    android:contentDescription="Collections icon" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Collections"
+                    android:textColor="@color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
