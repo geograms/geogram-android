@@ -166,7 +166,11 @@ public class I2PService {
                 sessionProps.setProperty("inbound.quantity", "3"); // 3 tunnels
                 sessionProps.setProperty("outbound.quantity", "3"); // 3 tunnels
 
-                i2pSession = i2pClient.createSession(null, sessionProps);
+                // Read destination file to pass to session
+                FileInputStream destInputStream = new FileInputStream(destFile);
+                i2pSession = i2pClient.createSession(destInputStream, sessionProps);
+                destInputStream.close();
+
                 i2pSession.connect();
 
                 Log.i(TAG, "I2P session connected, building tunnels...");
