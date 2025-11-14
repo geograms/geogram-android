@@ -18,6 +18,7 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven("https://jitpack.io") // Add JitPack here as well
+        maven("https://repo.i2p2.de/maven2") // I2P Maven repository
     }
 }
 

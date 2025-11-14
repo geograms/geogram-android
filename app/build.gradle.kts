@@ -40,6 +40,19 @@ android {
             isIncludeAndroidResources = true
         }
     }
+
+    packagingOptions {
+        resources {
+            // Exclude duplicate META-INF files from I2P libraries
+            excludes += listOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt"
+            )
+        }
+    }
 }
 
 /** Kill duplicate classes by excluding the old IntelliJ annotations everywhere. */
@@ -60,6 +73,12 @@ dependencies {
     implementation(libs.viewpager2)
     implementation(libs.runner)
     implementation(libs.swiperefreshlayout)
+
+    // I2P Embedded Router for anonymous networking
+    // Using core I2P libraries since Android-specific library is not published
+    implementation("net.i2p:i2p:0.9.50")
+    implementation("net.i2p.client:streaming:0.9.50")
+    implementation("net.i2p.client:mstreaming:0.9.50")
 
     // Room
     implementation(libs.room.runtime)

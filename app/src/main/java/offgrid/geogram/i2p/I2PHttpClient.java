@@ -3,6 +3,10 @@ package offgrid.geogram.i2p;
 import android.content.Context;
 import offgrid.geogram.core.Log;
 
+import net.i2p.client.streaming.I2PSocket;
+import net.i2p.client.streaming.I2PSocketManager;
+import net.i2p.data.Destination;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
@@ -10,17 +14,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
 /**
- * HTTP client that routes requests through I2P tunnels.
+ * HTTP client that routes requests through embedded I2P router.
  *
- * This client uses the SAM bridge to establish STREAM connections
+ * Uses I2PSocket from the embedded router to establish connections
  * to remote I2P destinations and sends HTTP requests through them.
  *
  * Key differences from regular HTTP:
- * - Higher latency (30-90 seconds for connection)
+ * - Higher latency (30-90 seconds for first connection)
  * - Longer timeouts required
  * - Destination addresses are .b32.i2p or full Base64
  */
@@ -73,24 +76,31 @@ public class I2PHttpClient {
             return null;
         }
 
-        SAMBridge samBridge = i2pService.getSAMBridge();
-        if (samBridge == null || !samBridge.isConnected()) {
-            Log.e(TAG, "SAM bridge not connected");
+        I2PSocketManager socketManager = i2pService.getSocketManager();
+        if (socketManager == null) {
+            Log.e(TAG, "I2P socket manager not available");
             return null;
         }
 
-        Socket socket = null;
+        I2PSocket socket = null;
         try {
             Log.i(TAG, "Downloading file via I2P: " + i2pDestination + path);
 
+            // Parse destination
+            Destination dest = parseDestination(i2pDestination);
+            if (dest == null) {
+                Log.e(TAG, "Invalid I2P destination: " + i2pDestination);
+                return null;
+            }
+
             // Connect to I2P destination
-            socket = samBridge.connectStream(i2pDestination);
+            socket = socketManager.connect(dest);
             if (socket == null) {
                 Log.e(TAG, "Failed to connect to I2P destination");
                 return null;
             }
 
-            socket.setSoTimeout(I2P_READ_TIMEOUT);
+            socket.setReadTimeout(I2P_READ_TIMEOUT);
 
             // Send HTTP GET request
             BufferedWriter writer = new BufferedWriter(
@@ -135,8 +145,9 @@ public class I2PHttpClient {
 
             return fileData;
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             Log.e(TAG, "I2P file download failed: " + e.getMessage());
+            e.printStackTrace();
             return null;
         } finally {
             if (socket != null) {
@@ -158,24 +169,31 @@ public class I2PHttpClient {
             return null;
         }
 
-        SAMBridge samBridge = i2pService.getSAMBridge();
-        if (samBridge == null || !samBridge.isConnected()) {
-            Log.e(TAG, "SAM bridge not connected");
+        I2PSocketManager socketManager = i2pService.getSocketManager();
+        if (socketManager == null) {
+            Log.e(TAG, "I2P socket manager not available");
             return null;
         }
 
-        Socket socket = null;
+        I2PSocket socket = null;
         try {
             Log.i(TAG, "Sending " + method + " request via I2P: " + i2pDestination + path);
 
-            // Connect to I2P destination via SAM bridge
-            socket = samBridge.connectStream(i2pDestination);
+            // Parse destination
+            Destination dest = parseDestination(i2pDestination);
+            if (dest == null) {
+                Log.e(TAG, "Invalid I2P destination: " + i2pDestination);
+                return null;
+            }
+
+            // Connect to I2P destination
+            socket = socketManager.connect(dest);
             if (socket == null) {
                 Log.e(TAG, "Failed to connect to I2P destination");
                 return null;
             }
 
-            socket.setSoTimeout(I2P_READ_TIMEOUT);
+            socket.setReadTimeout(I2P_READ_TIMEOUT);
 
             // Build and send HTTP request
             BufferedWriter writer = new BufferedWriter(
@@ -237,8 +255,9 @@ public class I2PHttpClient {
                 return null;
             }
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             Log.e(TAG, "I2P HTTP request failed: " + e.getMessage());
+            e.printStackTrace();
             return null;
         } finally {
             if (socket != null) {
@@ -248,6 +267,34 @@ public class I2PHttpClient {
                     Log.e(TAG, "Error closing socket: " + e.getMessage());
                 }
             }
+        }
+    }
+
+    /**
+     * Parse I2P destination string to Destination object
+     *
+     * @param destString .b32.i2p or full Base64 destination
+     * @return Destination object or null if invalid
+     */
+    private Destination parseDestination(String destString) {
+        try {
+            // If it's a .b32.i2p address, need to look it up
+            // For now, we'll require full Base64 destinations
+            // TODO: Add naming service lookup for .b32.i2p addresses
+
+            if (destString.endsWith(".b32.i2p")) {
+                Log.w(TAG, "b32.i2p lookup not yet implemented, need full Base64 destination");
+                return null;
+            }
+
+            // Try to parse as full Base64 destination
+            Destination dest = new Destination();
+            dest.fromBase64(destString);
+            return dest;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to parse destination: " + e.getMessage());
+            return null;
         }
     }
 
