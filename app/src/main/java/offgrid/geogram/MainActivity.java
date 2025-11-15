@@ -305,11 +305,11 @@ public class MainActivity extends AppCompatActivity {
         // Start WiFi device discovery for local network communication
         offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(this).start();
 
-        // Initialize I2P service for anonymous internet connectivity
-        offgrid.geogram.i2p.I2PService.getInstance(this).initialize();
+        // Initialize P2P service for internet peer connectivity via libp2p
+        offgrid.geogram.p2p.P2PService.getInstance(this).initialize();
 
-        // Start battery monitor service for I2P power management
-        Intent batteryMonitorIntent = new Intent(this, offgrid.geogram.i2p.BatteryMonitorService.class);
+        // Start battery monitor service for P2P power management
+        Intent batteryMonitorIntent = new Intent(this, offgrid.geogram.p2p.BatteryMonitorService.class);
         startService(batteryMonitorIntent);
     }
 

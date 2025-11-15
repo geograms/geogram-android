@@ -1394,14 +1394,11 @@ public class SimpleSparkServer implements Runnable {
                     }
                 }
 
-                // Get or generate I2P destination
-                offgrid.geogram.i2p.I2PService i2pService = offgrid.geogram.i2p.I2PService.getInstance(context);
-                String i2pDestination = i2pService.getI2PDestination();
-                if (i2pDestination == null || i2pDestination.isEmpty()) {
-                    i2pDestination = i2pService.generateAndSaveDestination();
-                }
-                boolean i2pEnabled = i2pService.isEnabled();
-                boolean i2pReady = i2pService.isI2PReady();
+                // Get P2P peer ID
+                offgrid.geogram.p2p.P2PService p2pService = offgrid.geogram.p2p.P2PService.getInstance(context);
+                String p2pPeerId = p2pService.getPeerId();
+                boolean p2pEnabled = p2pService.isEnabled();
+                boolean p2pReady = p2pService.isP2PReady();
 
                 // Create response
                 JsonObject response = new JsonObject();
@@ -1412,13 +1409,13 @@ public class SimpleSparkServer implements Runnable {
                 response.addProperty("npub", npub);
                 response.addProperty("hasProfilePicture", imagePath != null && !imagePath.isEmpty() && new java.io.File(imagePath).exists());
 
-                // Add I2P information
-                JsonObject i2pInfo = new JsonObject();
-                i2pInfo.addProperty("destination", i2pDestination != null ? i2pDestination : "");
-                i2pInfo.addProperty("enabled", i2pEnabled);
-                i2pInfo.addProperty("ready", i2pReady);
-                i2pInfo.addProperty("lastSeen", System.currentTimeMillis());
-                response.add("i2p", i2pInfo);
+                // Add P2P information
+                JsonObject p2pInfo = new JsonObject();
+                p2pInfo.addProperty("peerId", p2pPeerId != null ? p2pPeerId : "");
+                p2pInfo.addProperty("enabled", p2pEnabled);
+                p2pInfo.addProperty("ready", p2pReady);
+                p2pInfo.addProperty("lastSeen", System.currentTimeMillis());
+                response.add("p2p", p2pInfo);
 
                 Log.i(TAG_ID, "API: Returned profile data");
 

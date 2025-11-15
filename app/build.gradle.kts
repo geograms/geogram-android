@@ -74,11 +74,9 @@ dependencies {
     implementation(libs.runner)
     implementation(libs.swiperefreshlayout)
 
-    // I2P Embedded Router for anonymous networking
-    // Using core I2P libraries since Android-specific library is not published
-    implementation("net.i2p:i2p:0.9.50")
-    implementation("net.i2p.client:streaming:0.9.50")
-    implementation("net.i2p.client:mstreaming:0.9.50")
+    // P2P networking - NOTE: Using stub implementation for now
+    // jvm-libp2p is not Android-compatible, need alternative solution
+    // implementation("io.libp2p:jvm-libp2p:1.2.2-RELEASE")
 
     // Room
     implementation(libs.room.runtime)

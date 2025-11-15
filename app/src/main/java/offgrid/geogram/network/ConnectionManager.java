@@ -3,15 +3,15 @@ package offgrid.geogram.network;
 import android.content.Context;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.devices.Device;
-import offgrid.geogram.i2p.I2PService;
+import offgrid.geogram.p2p.P2PService;
 import offgrid.geogram.wifi.WiFiDiscoveryService;
 
 /**
- * Manages connection routing between WiFi, I2P, and BLE.
+ * Manages connection routing between WiFi, P2P, and BLE.
  *
  * Connection priority:
  * 1. WiFi (fastest, lowest latency)
- * 2. I2P (global reach, higher latency)
+ * 2. P2P (global reach via libp2p)
  * 3. BLE (local only, discovery only)
  */
 public class ConnectionManager {
@@ -19,7 +19,7 @@ public class ConnectionManager {
     private static ConnectionManager instance;
 
     private Context context;
-    private I2PService i2pService;
+    private P2PService p2pService;
     private WiFiDiscoveryService wifiService;
 
     /**
@@ -27,14 +27,14 @@ public class ConnectionManager {
      */
     public enum ConnectionMethod {
         WIFI,
-        I2P,
+        P2P,
         BLE,
         NONE
     }
 
     private ConnectionManager(Context context) {
         this.context = context.getApplicationContext();
-        this.i2pService = I2PService.getInstance(context);
+        this.p2pService = P2PService.getInstance(context);
         this.wifiService = WiFiDiscoveryService.getInstance(context);
     }
 
@@ -50,7 +50,7 @@ public class ConnectionManager {
      *
      * Priority:
      * 1. WiFi - if device has WiFi IP and is reachable
-     * 2. I2P - if device has I2P destination and our I2P is ready
+     * 2. P2P - if device has peer ID and our P2P node is ready
      * 3. BLE - if device is in BLE range (discovery only)
      * 4. NONE - no connection available
      *
@@ -68,10 +68,10 @@ public class ConnectionManager {
             return ConnectionMethod.WIFI;
         }
 
-        // Priority 2: I2P (if device has I2P and our I2P is ready)
-        if (hasI2PConnection(device)) {
-            Log.d(TAG, "Selected I2P for device " + device.ID);
-            return ConnectionMethod.I2P;
+        // Priority 2: P2P (if device has peer ID and our P2P is ready)
+        if (hasP2PConnection(device)) {
+            Log.d(TAG, "Selected P2P for device " + device.ID);
+            return ConnectionMethod.P2P;
         }
 
         // Priority 3: BLE (local discovery only, not for collections)
@@ -93,17 +93,17 @@ public class ConnectionManager {
     }
 
     /**
-     * Check if device has I2P connection
+     * Check if device has P2P connection
      */
-    private boolean hasI2PConnection(Device device) {
-        // Check if device has I2P destination
-        if (!device.hasI2PDestination() || !device.isI2PEnabled()) {
+    private boolean hasP2PConnection(Device device) {
+        // Check if device has peer ID
+        if (!device.hasP2PPeerId() || !device.isP2PEnabled()) {
             return false;
         }
 
-        // Check if our I2P is ready
-        if (!i2pService.isI2PReady()) {
-            Log.d(TAG, "Device " + device.ID + " has I2P but our I2P is not ready");
+        // Check if our P2P node is ready
+        if (!p2pService.isP2PReady()) {
+            Log.d(TAG, "Device " + device.ID + " has P2P but our P2P node is not ready");
             return false;
         }
 
@@ -136,16 +136,16 @@ public class ConnectionManager {
     }
 
     /**
-     * Get I2P destination for device (if available)
+     * Get P2P peer ID for device (if available)
      *
      * @param device The device
-     * @return I2P destination (.b32.i2p address), or null if not available
+     * @return Peer ID (Base58), or null if not available
      */
-    public String getI2PDestination(Device device) {
+    public String getP2PPeerId(Device device) {
         if (device == null) {
             return null;
         }
-        return device.getI2PDestination();
+        return device.getP2PPeerId();
     }
 
     /**
@@ -169,8 +169,8 @@ public class ConnectionManager {
         switch (method) {
             case WIFI:
                 return "WiFi";
-            case I2P:
-                return "I2P (Internet)";
+            case P2P:
+                return "P2P (Internet)";
             case BLE:
                 return "Bluetooth";
             case NONE:
@@ -190,8 +190,8 @@ public class ConnectionManager {
         switch (method) {
             case WIFI:
                 return "Fast";
-            case I2P:
-                return "Slow";
+            case P2P:
+                return "Medium";
             case BLE:
                 return "Very Slow";
             case NONE:
@@ -211,8 +211,8 @@ public class ConnectionManager {
         switch (method) {
             case WIFI:
                 return 100; // ~100ms
-            case I2P:
-                return 30000; // ~30 seconds
+            case P2P:
+                return 500; // ~500ms
             case BLE:
                 return 1000; // ~1 second
             case NONE:

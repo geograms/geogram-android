@@ -81,9 +81,9 @@
             android:exported="false"
             android:foregroundServiceType="location|dataSync" />
 
-        <!-- I2P Battery Monitor Service -->
+        <!-- P2P Battery Monitor Service -->
         <service
-            android:name="offgrid.geogram.i2p.BatteryMonitorService"
+            android:name="offgrid.geogram.p2p.BatteryMonitorService"
             android:exported="false" />
 
         <!-- Boot Receiver -->

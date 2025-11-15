@@ -89,10 +89,10 @@ public class DeviceProfileFragment extends Fragment {
             String cachedNpub = offgrid.geogram.util.RemoteProfileCache.getNpub(getContext(), deviceId);
             android.graphics.Bitmap cachedPicture = offgrid.geogram.util.RemoteProfileCache.getProfilePicture(getContext(), deviceId);
 
-            // Load I2P information from cache
-            String cachedI2PDest = offgrid.geogram.util.RemoteProfileCache.getI2PDestination(getContext(), deviceId);
-            boolean cachedI2PEnabled = offgrid.geogram.util.RemoteProfileCache.isI2PEnabled(getContext(), deviceId);
-            boolean cachedI2PReady = offgrid.geogram.util.RemoteProfileCache.isI2PReady(getContext(), deviceId);
+            // Load P2P information from cache
+            String cachedP2PPeerId = offgrid.geogram.util.RemoteProfileCache.getP2PPeerId(getContext(), deviceId);
+            boolean cachedP2PEnabled = offgrid.geogram.util.RemoteProfileCache.isP2PEnabled(getContext(), deviceId);
+            boolean cachedP2PReady = offgrid.geogram.util.RemoteProfileCache.isP2PReady(getContext(), deviceId);
 
             if (cachedNickname != null) {
                 device.setProfileNickname(cachedNickname);
@@ -107,12 +107,12 @@ public class DeviceProfileFragment extends Fragment {
                 device.setProfilePicture(cachedPicture);
             }
 
-            // Set I2P information on device
-            if (cachedI2PDest != null) {
-                device.setI2PDestination(cachedI2PDest);
+            // Set P2P information on device
+            if (cachedP2PPeerId != null) {
+                device.setP2PPeerId(cachedP2PPeerId);
             }
-            device.setI2PEnabled(cachedI2PEnabled);
-            device.setI2PReady(cachedI2PReady);
+            device.setP2PEnabled(cachedP2PEnabled);
+            device.setP2PReady(cachedP2PReady);
         }
 
         // Get view references for profile section
@@ -340,19 +340,19 @@ public class DeviceProfileFragment extends Fragment {
                         String npub = jsonResponse.has("npub") && !jsonResponse.get("npub").isJsonNull()
                             ? jsonResponse.get("npub").getAsString() : "";
 
-                        // Extract I2P information
-                        String i2pDestination = null;
-                        boolean i2pEnabled = false;
-                        boolean i2pReady = false;
+                        // Extract P2P information
+                        String p2pPeerId = null;
+                        boolean p2pEnabled = false;
+                        boolean p2pReady = false;
 
-                        if (jsonResponse.has("i2p") && !jsonResponse.get("i2p").isJsonNull()) {
-                            com.google.gson.JsonObject i2pInfo = jsonResponse.getAsJsonObject("i2p");
-                            i2pDestination = i2pInfo.has("destination") && !i2pInfo.get("destination").isJsonNull()
-                                ? i2pInfo.get("destination").getAsString() : null;
-                            i2pEnabled = i2pInfo.has("enabled") && !i2pInfo.get("enabled").isJsonNull()
-                                ? i2pInfo.get("enabled").getAsBoolean() : false;
-                            i2pReady = i2pInfo.has("ready") && !i2pInfo.get("ready").isJsonNull()
-                                ? i2pInfo.get("ready").getAsBoolean() : false;
+                        if (jsonResponse.has("p2p") && !jsonResponse.get("p2p").isJsonNull()) {
+                            com.google.gson.JsonObject p2pInfo = jsonResponse.getAsJsonObject("p2p");
+                            p2pPeerId = p2pInfo.has("peerId") && !p2pInfo.get("peerId").isJsonNull()
+                                ? p2pInfo.get("peerId").getAsString() : null;
+                            p2pEnabled = p2pInfo.has("enabled") && !p2pInfo.get("enabled").isJsonNull()
+                                ? p2pInfo.get("enabled").getAsBoolean() : false;
+                            p2pReady = p2pInfo.has("ready") && !p2pInfo.get("ready").isJsonNull()
+                                ? p2pInfo.get("ready").getAsBoolean() : false;
                         }
 
                         // Update device with profile data
@@ -369,14 +369,14 @@ public class DeviceProfileFragment extends Fragment {
                             finalDevice.setProfileNpub(npub);
                         }
 
-                        // Update device with I2P data
-                        if (i2pDestination != null && !i2pDestination.isEmpty()) {
-                            finalDevice.setI2PDestination(i2pDestination);
+                        // Update device with P2P data
+                        if (p2pPeerId != null && !p2pPeerId.isEmpty()) {
+                            finalDevice.setP2PPeerId(p2pPeerId);
                         }
-                        finalDevice.setI2PEnabled(i2pEnabled);
-                        finalDevice.setI2PReady(i2pReady);
+                        finalDevice.setP2PEnabled(p2pEnabled);
+                        finalDevice.setP2PReady(p2pReady);
 
-                        // Save to cache (including I2P information)
+                        // Save to cache (including P2P information)
                         offgrid.geogram.util.RemoteProfileCache.saveProfile(
                             getContext(),
                             finalDevice.ID,
@@ -385,9 +385,9 @@ public class DeviceProfileFragment extends Fragment {
                             finalDevice.getProfilePicture(),
                             finalDevice.getProfilePreferredColor(),
                             finalDevice.getProfileNpub(),
-                            i2pDestination,
-                            i2pEnabled,
-                            i2pReady
+                            p2pPeerId,
+                            p2pEnabled,
+                            p2pReady
                         );
 
                         android.util.Log.d("DeviceProfile", "Refreshed profile for " + deviceId);

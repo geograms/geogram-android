@@ -436,13 +436,13 @@ public class DevicesWithinReachFragment extends Fragment {
                     deviceLastSeen.setTextColor(Color.parseColor("#888888"));
                 }
 
-                // Add channel indicators (BLE, WIFI, I2P)
+                // Add channel indicators (BLE, WIFI, P2P)
                 channelIndicators.removeAllViews();
 
                 // Check which connection types this device has
                 boolean hasBLE = false;
                 boolean hasWiFi = false;
-                boolean hasI2P = false;
+                boolean hasP2P = false;
 
                 for (offgrid.geogram.devices.EventConnected event : device.connectedEvents) {
                     if (event.connectionType == offgrid.geogram.devices.ConnectionType.BLE) {
@@ -462,9 +462,9 @@ public class DevicesWithinReachFragment extends Fragment {
                     }
                 }
 
-                // Check if device has I2P
-                if (device.hasI2PDestination() && device.isI2PEnabled()) {
-                    hasI2P = true;
+                // Check if device has P2P
+                if (device.hasP2PPeerId() && device.isP2PEnabled()) {
+                    hasP2P = true;
                 }
 
                 // Add BLE badge
@@ -517,31 +517,31 @@ public class DevicesWithinReachFragment extends Fragment {
                     }
                 }
 
-                // Add I2P badge
-                if (hasI2P) {
-                    TextView i2pBadge = new TextView(itemView.getContext());
-                    i2pBadge.setText("I2P");
-                    i2pBadge.setTextSize(10);
-                    i2pBadge.setTextColor(Color.WHITE);
+                // Add P2P badge
+                if (hasP2P) {
+                    TextView p2pBadge = new TextView(itemView.getContext());
+                    p2pBadge.setText("P2P");
+                    p2pBadge.setTextSize(10);
+                    p2pBadge.setTextColor(Color.WHITE);
 
                     // Color based on ready status: purple if ready, grey if not ready
-                    if (device.isI2PReady()) {
-                        i2pBadge.setBackgroundColor(0xFF9C27B0); // Purple - I2P ready
+                    if (device.isP2PReady()) {
+                        p2pBadge.setBackgroundColor(0xFF9C27B0); // Purple - P2P ready
                     } else {
-                        i2pBadge.setBackgroundColor(0xFF757575); // Grey - I2P not ready
+                        p2pBadge.setBackgroundColor(0xFF757575); // Grey - P2P not ready
                     }
 
-                    i2pBadge.setPadding(8, 4, 8, 4);
-                    android.widget.LinearLayout.LayoutParams i2pParams = new android.widget.LinearLayout.LayoutParams(
+                    p2pBadge.setPadding(8, 4, 8, 4);
+                    android.widget.LinearLayout.LayoutParams p2pParams = new android.widget.LinearLayout.LayoutParams(
                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
                     );
-                    i2pBadge.setLayoutParams(i2pParams);
-                    channelIndicators.addView(i2pBadge);
+                    p2pBadge.setLayoutParams(p2pParams);
+                    channelIndicators.addView(p2pBadge);
                 }
 
                 // Show/hide channel indicators based on whether any badges were added
-                if (hasBLE || hasWiFi || hasI2P) {
+                if (hasBLE || hasWiFi || hasP2P) {
                     channelIndicators.setVisibility(View.VISIBLE);
                 } else {
                     channelIndicators.setVisibility(View.GONE);

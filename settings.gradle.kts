@@ -18,7 +18,8 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven("https://jitpack.io") // Add JitPack here as well
-        maven("https://repo.i2p2.de/maven2") // I2P Maven repository
+        maven("https://dl.cloudsmith.io/public/libp2p/jvm-libp2p/maven/") // libp2p Maven repository
+        maven("https://artifacts.consensys.net/public/maven/maven/") // ConsenSys repository for noise-java
     }
 }
 

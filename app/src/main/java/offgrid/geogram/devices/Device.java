@@ -23,11 +23,11 @@ public class Device implements Comparable<Device> {
     private boolean profileFetched = false;
     private long profileFetchTimestamp = 0; // Timestamp when profile was last fetched
 
-    // I2P information (fetched via WiFi API, used for internet connectivity)
-    private String i2pDestination = null;           // Base32 .b32.i2p address
-    private boolean i2pEnabled = false;             // Whether remote device has I2P enabled
-    private boolean i2pReady = false;               // Whether remote device I2P is ready
-    private long i2pLastSeen = 0;                   // Timestamp of last I2P info update
+    // P2P information (fetched via WiFi API, used for internet connectivity)
+    private String p2pPeerId = null;                // libp2p Peer ID (Base58)
+    private boolean p2pEnabled = false;             // Whether remote device has P2P enabled
+    private boolean p2pReady = false;               // Whether remote device P2P is ready
+    private long p2pLastSeen = 0;                   // Timestamp of last P2P info update
 
     // WiFi reachability
     private boolean isWiFiReachable = true; // Assume reachable by default
@@ -110,45 +110,45 @@ public class Device implements Comparable<Device> {
         this.profileNpub = npub;
     }
 
-    /** Get I2P destination (Base32 .b32.i2p address). */
-    public String getI2PDestination() {
-        return i2pDestination;
+    /** Get P2P peer ID (libp2p Base58). */
+    public String getP2PPeerId() {
+        return p2pPeerId;
     }
 
-    /** Set I2P destination. */
-    public void setI2PDestination(String destination) {
-        this.i2pDestination = destination;
-        this.i2pLastSeen = System.currentTimeMillis();
+    /** Set P2P peer ID. */
+    public void setP2PPeerId(String peerId) {
+        this.p2pPeerId = peerId;
+        this.p2pLastSeen = System.currentTimeMillis();
     }
 
-    /** Check if device has I2P destination. */
-    public boolean hasI2PDestination() {
-        return i2pDestination != null && !i2pDestination.isEmpty();
+    /** Check if device has P2P peer ID. */
+    public boolean hasP2PPeerId() {
+        return p2pPeerId != null && !p2pPeerId.isEmpty();
     }
 
-    /** Check if remote device has I2P enabled. */
-    public boolean isI2PEnabled() {
-        return i2pEnabled;
+    /** Check if remote device has P2P enabled. */
+    public boolean isP2PEnabled() {
+        return p2pEnabled;
     }
 
-    /** Set I2P enabled status. */
-    public void setI2PEnabled(boolean enabled) {
-        this.i2pEnabled = enabled;
+    /** Set P2P enabled status. */
+    public void setP2PEnabled(boolean enabled) {
+        this.p2pEnabled = enabled;
     }
 
-    /** Check if remote device I2P is ready (tunnels established). */
-    public boolean isI2PReady() {
-        return i2pReady;
+    /** Check if remote device P2P is ready (node started). */
+    public boolean isP2PReady() {
+        return p2pReady;
     }
 
-    /** Set I2P ready status. */
-    public void setI2PReady(boolean ready) {
-        this.i2pReady = ready;
+    /** Set P2P ready status. */
+    public void setP2PReady(boolean ready) {
+        this.p2pReady = ready;
     }
 
-    /** Get timestamp when I2P info was last updated. */
-    public long getI2PLastSeen() {
-        return i2pLastSeen;
+    /** Get timestamp when P2P info was last updated. */
+    public long getP2PLastSeen() {
+        return p2pLastSeen;
     }
 
     /** Get profile picture bitmap, or null if not set. */
