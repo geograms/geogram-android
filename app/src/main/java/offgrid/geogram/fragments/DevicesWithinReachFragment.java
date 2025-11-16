@@ -97,7 +97,14 @@ public class DevicesWithinReachFragment extends Fragment {
             return; // Views not ready yet
         }
 
-        TreeSet<Device> devices = DeviceManager.getInstance().getDevicesSpotted();
+        TreeSet<Device> devices = new TreeSet<>(DeviceManager.getInstance().getDevicesSpotted());
+
+        // Add device relay server as a special device
+        Device relayDevice = createRelayDevice();
+        if (relayDevice != null) {
+            devices.add(relayDevice);
+        }
+
         android.util.Log.d("DevicesFragment", "loadDevices: Found " + devices.size() + " devices");
 
         if (devices.isEmpty()) {
@@ -312,6 +319,12 @@ public class DevicesWithinReachFragment extends Fragment {
 
             // Set click listener to navigate to device profile
             holder.itemView.setOnClickListener(v -> {
+                if (device.ID.equals("RELAY_SERVER")) {
+                    // Relay server - show empty panel (functionality to be added later)
+                    android.widget.Toast.makeText(v.getContext(), "Device Relay - Functionality coming soon", android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 if (getActivity() != null) {
                     DeviceProfileFragment fragment = DeviceProfileFragment.newInstance(device.ID);
                     getActivity().getSupportFragmentManager()
@@ -788,6 +801,36 @@ public class DevicesWithinReachFragment extends Fragment {
 
                 return output;
             }
+        }
+    }
+
+    /**
+     * Create a special device entry for the device relay server
+     */
+    private Device createRelayDevice() {
+        try {
+            // Create relay device
+            Device relayDevice = new Device("RELAY_SERVER", DeviceType.INTERNET_IGATE);
+            relayDevice.callsign = "RELAY";
+
+            // Check relay connection status
+            offgrid.geogram.p2p.DeviceRelayClient relayClient = offgrid.geogram.p2p.DeviceRelayClient.getInstance(requireContext());
+            boolean isConnected = relayClient.isConnected();
+
+            if (isConnected) {
+                // Add current connection event
+                offgrid.geogram.devices.EventConnected event = new offgrid.geogram.devices.EventConnected(
+                    offgrid.geogram.devices.ConnectionType.INTERNET, null // No location for relay
+                );
+                relayDevice.connectedEvents.add(event);
+            }
+
+            // TODO: Add historical connection events when available
+
+            return relayDevice;
+        } catch (Exception e) {
+            android.util.Log.e("DevicesFragment", "Error creating relay device", e);
+            return null;
         }
     }
 
