@@ -43,7 +43,7 @@ import offgrid.geogram.wifi.WiFiDiscoveryService;
  */
 public class RelayMessageSync {
 
-    private static final String TAG = "RelayMessageSync";
+    private static final String TAG = "Relay/MessageSync";
 
     // Protocol commands (BLE)
     private static final String CMD_INVENTORY = "INV:";

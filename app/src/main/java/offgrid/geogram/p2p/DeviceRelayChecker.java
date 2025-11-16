@@ -30,7 +30,7 @@ import okhttp3.Response;
  */
 public class DeviceRelayChecker {
 
-    private static final String TAG = "DeviceRelayChecker";
+    private static final String TAG = "Relay/Checker";
     private static final long UPDATE_INTERVAL_MS = 30000; // 30 seconds
 
     private static DeviceRelayChecker instance;
@@ -66,12 +66,24 @@ public class DeviceRelayChecker {
      */
     public void start() {
         if (isRunning) {
+            Log.d(TAG, "Relay checker already running");
             return;
         }
 
+        Log.i(TAG, "═══════════════════════════════════════════════════════");
+        Log.i(TAG, "RELAY CHECKER START");
+        Log.i(TAG, "═══════════════════════════════════════════════════════");
+
+        ConfigManager configManager = ConfigManager.getInstance(context);
+        boolean relayEnabled = configManager.getConfig().isDeviceRelayEnabled();
+        String relayUrl = configManager.getConfig().getDeviceRelayServerUrl();
+
+        Log.i(TAG, "Relay enabled: " + relayEnabled);
+        Log.i(TAG, "Relay URL: " + relayUrl);
+
         isRunning = true;
         updateRelayStatus();
-        Log.d(TAG, "Started relay status checker");
+        Log.i(TAG, "✓ Started relay status checker");
     }
 
     /**
@@ -116,7 +128,7 @@ public class DeviceRelayChecker {
             try {
                 ConfigManager configManager = ConfigManager.getInstance(context);
                 if (!configManager.getConfig().isDeviceRelayEnabled()) {
-                    Log.d(TAG, "Device relay is disabled, skipping status check");
+                    Log.w(TAG, "✗ Device relay is DISABLED, skipping status check");
                     scheduleNextUpdate();
                     return;
                 }

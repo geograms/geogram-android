@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class DeviceRelayClient extends WebSocketListener {
 
-    private static final String TAG = "DeviceRelayClient";
+    private static final String TAG = "Relay/Client";
     private static final int PING_INTERVAL_MS = 60000; // 1 minute
     private static final int RECONNECT_DELAY_MS = 5000; // 5 seconds
 
@@ -66,22 +66,33 @@ public class DeviceRelayClient extends WebSocketListener {
      * Start the relay client
      */
     public void start() {
-        ConfigManager configManager = ConfigManager.getInstance(context);
+        Log.i(TAG, "═══════════════════════════════════════════════════════");
+        Log.i(TAG, "RELAY CLIENT START");
+        Log.i(TAG, "═══════════════════════════════════════════════════════");
 
-        if (!configManager.getConfig().isDeviceRelayEnabled()) {
-            Log.d(TAG, "Device relay is disabled in settings");
+        ConfigManager configManager = ConfigManager.getInstance(context);
+        boolean relayEnabled = configManager.getConfig().isDeviceRelayEnabled();
+
+        Log.i(TAG, "Relay enabled: " + relayEnabled);
+
+        if (!relayEnabled) {
+            Log.w(TAG, "✗ Device relay is DISABLED in settings");
             return;
         }
 
         this.serverUrl = configManager.getConfig().getDeviceRelayServerUrl();
         this.callsign = configManager.getConfig().getCallsign();
 
+        Log.i(TAG, "Server URL: " + serverUrl);
+        Log.i(TAG, "Callsign: " + callsign);
+
         if (callsign == null || callsign.isEmpty()) {
-            Log.e(TAG, "Cannot start relay client: callsign not set");
+            Log.e(TAG, "✗ Cannot start relay client: callsign not set");
             return;
         }
 
         shouldConnect = true;
+        Log.i(TAG, "✓ Starting relay client connection...");
         connect();
     }
 
@@ -103,21 +114,23 @@ public class DeviceRelayClient extends WebSocketListener {
      */
     private void connect() {
         if (!shouldConnect) {
+            Log.w(TAG, "Skipping connection (shouldConnect=false)");
             return;
         }
 
         if (serverUrl == null || serverUrl.isEmpty()) {
-            Log.e(TAG, "Server URL not configured");
+            Log.e(TAG, "✗ Server URL not configured");
             return;
         }
 
-        Log.d(TAG, "Connecting to relay server: " + serverUrl);
+        Log.i(TAG, "→ Connecting to relay server: " + serverUrl);
 
         Request request = new Request.Builder()
                 .url(serverUrl)
                 .build();
 
         webSocket = okHttpClient.newWebSocket(request, this);
+        Log.d(TAG, "WebSocket connection initiated");
     }
 
     /**

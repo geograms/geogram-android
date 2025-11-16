@@ -19,7 +19,7 @@ import java.nio.charset.StandardCharsets;
  * HTTP client for making requests to remote devices over local WiFi
  */
 public class P2PHttpClient {
-    private static final String TAG = "WiFi/HttpClient";
+    private static final String TAG = "Relay/HttpClient";
 
     private final Context context;
 
