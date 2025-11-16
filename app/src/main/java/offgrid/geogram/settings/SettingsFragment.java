@@ -24,7 +24,6 @@ import androidx.fragment.app.Fragment;
 import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.core.Central;
-import offgrid.geogram.util.NetworkUtils;
 
 public class SettingsFragment extends Fragment {
 
@@ -32,6 +31,9 @@ public class SettingsFragment extends Fragment {
     private SettingsUser settings = null;
     private View view = null;
     private android.widget.ImageView profileImageView = null;
+    private EditText callsignField;
+    private EditText npubField;
+    private EditText nsecField;
     private androidx.activity.result.ActivityResultLauncher<Intent> profileImageLauncher;
 
     // Private constructor to enforce singleton pattern
@@ -157,6 +159,12 @@ public class SettingsFragment extends Fragment {
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).setTopActionBarVisible(false);
         }
+
+        // Refresh settings in case they were updated (e.g., from backup import)
+        settings = Central.getInstance().getSettings();
+        if (view != null) {
+            refreshUI(view);
+        }
     }
 
     @Override
@@ -220,8 +228,26 @@ public class SettingsFragment extends Fragment {
         }
 
         // Callsign (read-only)
-        EditText callsignField = view.findViewById(R.id.edit_callsign);
+        callsignField = view.findViewById(R.id.edit_callsign);
         callsignField.setText(settings.getCallsign());
+
+        // Store references for refresh
+        this.callsignField = callsignField;
+    }
+
+    private void refreshUI(View view) {
+        if (settings == null) return;
+
+        // Update identity fields
+        if (callsignField != null) {
+            callsignField.setText(settings.getCallsign());
+        }
+        if (npubField != null) {
+            npubField.setText(settings.getNpub());
+        }
+        if (nsecField != null) {
+            nsecField.setText(settings.getNsec());
+        }
 
         // Profile fields
         EditText nicknameField = view.findViewById(R.id.edit_nickname);
@@ -277,64 +303,10 @@ public class SettingsFragment extends Fragment {
         }
 
         // NOSTR Identity
-        EditText npub = view.findViewById(R.id.edit_npub);
-        EditText nsec = view.findViewById(R.id.edit_nsec);
-        npub.setText(settings.getNpub());
-        nsec.setText(settings.getNsec());
-
-        // HTTP API Settings
-        SwitchCompat httpApiSwitch = view.findViewById(R.id.switch_http_api);
-        TextView httpApiUrlText = view.findViewById(R.id.text_http_api_url);
-        ImageButton btnCopyHttpUrl = view.findViewById(R.id.btn_copy_http_url);
-        ImageButton btnShareHttpUrl = view.findViewById(R.id.btn_share_http_url);
-
-        // Set initial state
-        httpApiSwitch.setChecked(settings.isHttpApiEnabled());
-        updateHttpApiUrl(httpApiUrlText, settings.isHttpApiEnabled());
-
-        // Handle switch changes
-        httpApiSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            settings.setHttpApiEnabled(isChecked);
-            saveSettings(settings);
-            updateHttpApiUrl(httpApiUrlText, isChecked);
-
-            // Inform user about restart requirement
-            if (isChecked) {
-                Toast.makeText(getContext(), "HTTP API enabled. Restart app to apply.", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(getContext(), "HTTP API disabled. Restart app to apply.", Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        // Copy HTTP URL button
-        btnCopyHttpUrl.setOnClickListener(v -> {
-            String url = NetworkUtils.getServerUrl(45678);
-            if (url.startsWith("http://")) {
-                ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
-                ClipData clip = ClipData.newPlainText("HTTP API URL", url);
-                clipboard.setPrimaryClip(clip);
-                Toast.makeText(getContext(), "URL copied to clipboard", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(getContext(), "Server URL not available", Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        // Share HTTP URL button
-        btnShareHttpUrl.setOnClickListener(v -> {
-            String url = NetworkUtils.getServerUrl(45678);
-            if (url.startsWith("http://")) {
-                Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                shareIntent.setType("text/plain");
-                shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Geogram HTTP API");
-                shareIntent.putExtra(Intent.EXTRA_TEXT, "Geogram HTTP API Server:\n" + url + "\n\nEndpoints:\n" +
-                        "- POST /api/ble/send - Send BLE message\n" +
-                        "- GET /api/logs - Get recent logs\n" +
-                        "- GET /api/status - Get server status");
-                startActivity(Intent.createChooser(shareIntent, "Share HTTP API URL"));
-            } else {
-                Toast.makeText(getContext(), "Server URL not available", Toast.LENGTH_SHORT).show();
-            }
-        });
+        npubField = view.findViewById(R.id.edit_npub);
+        nsecField = view.findViewById(R.id.edit_nsec);
+        npubField.setText(settings.getNpub());
+        nsecField.setText(settings.getNsec());
 
         // Auto-save nickname when focus is lost
         nicknameField.setOnFocusChangeListener((v, hasFocus) -> {
@@ -375,20 +347,10 @@ public class SettingsFragment extends Fragment {
 
         // Copy to clipboard button functionality
         ImageButton btnCopyNSEC = view.findViewById(R.id.btn_copy_nsec);
-        btnCopyNSEC.setOnClickListener(v -> copyToClipboard(nsec, "NSEC"));
+        btnCopyNSEC.setOnClickListener(v -> copyToClipboard(nsecField, "NSEC"));
 
         ImageButton btnCopyNPUB = view.findViewById(R.id.btn_copy_npub);
-        btnCopyNPUB.setOnClickListener(v -> copyToClipboard(npub, "NPUB"));
-
-        // P2P Settings Navigation
-        view.findViewById(R.id.btn_i2p_settings).setOnClickListener(v -> {
-            if (getActivity() != null) {
-                androidx.fragment.app.FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
-                transaction.replace(R.id.fragment_container, offgrid.geogram.fragments.P2PSettingsFragment.newInstance());
-                transaction.addToBackStack(null);
-                transaction.commit();
-            }
-        });
+        btnCopyNPUB.setOnClickListener(v -> copyToClipboard(npubField, "NPUB"));
 
         // Reset Identity Button
         view.findViewById(R.id.btn_reset_identity).setOnClickListener(v -> {
@@ -449,8 +411,9 @@ public class SettingsFragment extends Fragment {
 
     public void reloadSettings() {
         // Callsign
-        EditText callsignField = view.findViewById(R.id.edit_callsign);
-        callsignField.setText(settings.getCallsign());
+        if (callsignField != null) {
+            callsignField.setText(settings.getCallsign());
+        }
 
         Spinner preferredColorSpinner = view.findViewById(R.id.spinner_preferred_color);
         String[] colorOptions = getResources().getStringArray(R.array.color_options);
@@ -462,10 +425,12 @@ public class SettingsFragment extends Fragment {
         }
 
         // NOSTR Identity
-        EditText npub = view.findViewById(R.id.edit_npub);
-        EditText nsec = view.findViewById(R.id.edit_nsec);
-        npub.setText(settings.getNpub());
-        nsec.setText(settings.getNsec());
+        if (npubField != null) {
+            npubField.setText(settings.getNpub());
+        }
+        if (nsecField != null) {
+            nsecField.setText(settings.getNsec());
+        }
     }
 
     private void saveSettings(SettingsUser settings) {
@@ -497,20 +462,7 @@ public class SettingsFragment extends Fragment {
         }
     }
 
-    private void updateHttpApiUrl(TextView textView, boolean enabled) {
-        if (!enabled) {
-            textView.setText("Server: Disabled");
-            textView.setTextColor(getResources().getColor(R.color.gray, null));
-        } else {
-            String url = NetworkUtils.getServerUrl(45678);
-            textView.setText("Server: " + url);
-            if (url.startsWith("http://")) {
-                textView.setTextColor(getResources().getColor(R.color.green, null));
-            } else {
-                textView.setTextColor(getResources().getColor(R.color.gray, null));
-            }
-        }
-    }
+
 
     /**
      * Create a bitmap with rounded corners
