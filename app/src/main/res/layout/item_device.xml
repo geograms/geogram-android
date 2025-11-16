@@ -36,21 +36,7 @@
             android:textSize="16sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/relay_badge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="RELAY"
-            android:textColor="#00FF00"
-            android:textSize="10sp"
-            android:textStyle="bold"
-            android:background="@color/dark_gray"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:paddingTop="2dp"
-            android:paddingBottom="2dp"
-            android:layout_marginStart="8dp"
-            android:visibility="gone" />
+
     </LinearLayout>
 
     <TextView

@@ -346,7 +346,7 @@ public class DevicesWithinReachFragment extends Fragment {
             private final TextView deviceType;
             private final TextView profileDescription;
             private final TextView deviceLastSeen;
-            private final TextView relayBadge;
+
             private final android.widget.LinearLayout channelIndicators;
             private final android.widget.ImageView profileImage;
 
@@ -356,7 +356,7 @@ public class DevicesWithinReachFragment extends Fragment {
                 deviceType = itemView.findViewById(R.id.device_type);
                 profileDescription = itemView.findViewById(R.id.profile_description);
                 deviceLastSeen = itemView.findViewById(R.id.device_last_seen);
-                relayBadge = itemView.findViewById(R.id.relay_badge);
+
                 channelIndicators = itemView.findViewById(R.id.channel_indicators);
                 profileImage = itemView.findViewById(R.id.profile_image);
             }
@@ -400,12 +400,7 @@ public class DevicesWithinReachFragment extends Fragment {
                 // Fetch profile data if WiFi is available and not yet fetched
                 fetchProfileIfAvailable(device);
 
-                // Show relay badge for IGate devices
-                if (device.deviceType == DeviceType.INTERNET_IGATE) {
-                    relayBadge.setVisibility(View.VISIBLE);
-                } else {
-                    relayBadge.setVisibility(View.GONE);
-                }
+                // Relay badge removed - was showing "RELAY" in green for IGate devices
 
                 // Format the last seen time
                 long timestamp = device.latestTimestamp();
