@@ -383,8 +383,10 @@ public class DevicesWithinReachFragment extends Fragment {
                     // Use server icon for relay device, person icon for others
                     if (device.ID.equals("RELAY_SERVER")) {
                         profileImage.setImageResource(R.drawable.ic_tethering);
+                        profileImage.setImageTintList(android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE));
                     } else {
                         profileImage.setImageResource(R.drawable.ic_person);
+                        profileImage.clearColorFilter(); // Ensure no tint for person icon
                     }
                     profileImage.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
                     profileImage.setPadding(8, 8, 8, 8);
