@@ -352,7 +352,7 @@ public class AppConfig {
     }
 
     public String getDeviceRelayServerUrl() {
-        return deviceRelayServerUrl != null ? deviceRelayServerUrl : "wss://api.geogram.radio:45679";
+        return deviceRelayServerUrl != null ? deviceRelayServerUrl : "ws://api.geogram.radio:45679";
     }
 
     public void setDeviceRelayServerUrl(String url) {

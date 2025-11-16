@@ -86,7 +86,15 @@ public class DeviceManager {
                     // Reconstruct event history from ping records
                     List<DatabaseDevices.DevicePingRow> pings = DatabaseDevices.get().getPingsForDevice(row.callsign, 1000);
                     for (DatabaseDevices.DevicePingRow ping : pings) {
-                        EventConnected event = new EventConnected(ConnectionType.BLE, ping.geocode);
+                        // Parse connection type from database (default to BLE for old records)
+                        ConnectionType connType;
+                        try {
+                            connType = ConnectionType.valueOf(ping.connectionType);
+                        } catch (Exception e) {
+                            connType = ConnectionType.BLE;  // Fallback for invalid/old data
+                        }
+
+                        EventConnected event = new EventConnected(connType, ping.geocode);
                         // Override the auto-generated timestamp with the stored one
                         event.timestamps.clear();
                         event.timestamps.add(ping.timestamp);
@@ -209,11 +217,12 @@ public class DeviceManager {
                 null  // notes - will be added later
         );
 
-        // 3. Record this ping/detection event
+        // 3. Record this ping/detection event with connection type
         DatabaseDevices.get().enqueuePing(
                 callsign,
                 event.latestTimestamp(),
-                event.geocode
+                event.geocode,
+                event.connectionType.name()  // Save the actual connection type (BLE, WIFI, etc.)
         );
 
         // a new event happened with the device

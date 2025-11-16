@@ -161,6 +161,9 @@ public class DevicesWithinReachFragment extends Fragment {
             loadDevices();
         }
 
+        // Trigger immediate device scans when user opens the nearby devices screen
+        triggerDeviceScans();
+
         // Start periodic reachability checks
         startReachabilityChecks();
 
@@ -227,17 +230,91 @@ public class DevicesWithinReachFragment extends Fragment {
         }
     }
 
+    /**
+     * Trigger immediate device discovery scans (BLE and WiFi)
+     * Called when user navigates to the nearby devices screen
+     */
+    private void triggerDeviceScans() {
+        if (getContext() == null) {
+            return;
+        }
+
+        android.util.Log.i("DevicesFragment", "Triggering immediate device scans (BLE + WiFi)");
+
+        // Trigger BLE self-advertise/ping
+        try {
+            offgrid.geogram.ble.BluetoothSender sender =
+                offgrid.geogram.ble.BluetoothSender.getInstance(getContext());
+            sender.triggerImmediatePing();
+        } catch (Exception e) {
+            android.util.Log.e("DevicesFragment", "Error triggering BLE ping: " + e.getMessage());
+        }
+
+        // Trigger WiFi network scan
+        try {
+            offgrid.geogram.wifi.WiFiDiscoveryService wifiService =
+                offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(getContext());
+            wifiService.triggerImmediateScan();
+        } catch (Exception e) {
+            android.util.Log.e("DevicesFragment", "Error triggering WiFi scan: " + e.getMessage());
+        }
+
+        // Also check relay connectivity
+        try {
+            DeviceRelayChecker relayChecker = DeviceRelayChecker.getInstance(getContext());
+            // RelayChecker runs automatically every 30 seconds, no manual trigger needed
+        } catch (Exception e) {
+            android.util.Log.e("DevicesFragment", "Error accessing relay checker: " + e.getMessage());
+        }
+    }
+
     private void checkDevicesReachability() {
         TreeSet<Device> devices = DeviceManager.getInstance().getDevicesSpotted();
         offgrid.geogram.wifi.WiFiDiscoveryService wifiService =
             offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(requireContext());
 
-        for (Device device : devices) {
-            String deviceIp = wifiService.getDeviceIp(device.ID);
+        // Remove devices that haven't been seen in 24 hours
+        long currentTime = System.currentTimeMillis();
+        long twentyFourHoursInMillis = 24 * 60 * 60 * 1000; // 24 hours
+        java.util.List<Device> devicesToRemove = new java.util.ArrayList<>();
 
+        for (Device device : devices) {
+            // Skip the relay server device (special device)
+            if (device.ID.equals("RELAY_SERVER")) {
+                continue;
+            }
+
+            // Check if device is too old
+            long deviceAge = currentTime - device.latestTimestamp();
+            if (deviceAge > twentyFourHoursInMillis) {
+                devicesToRemove.add(device);
+                android.util.Log.d("DevicesFragment", "Marking device for removal: " + device.ID + " (age: " + (deviceAge / 3600000) + " hours)");
+                continue;
+            }
+
+            // Check WiFi reachability for devices with IP addresses
+            String deviceIp = wifiService.getDeviceIp(device.ID);
             if (deviceIp != null) {
                 // Device has WiFi - check if it's reachable
                 checkDeviceReachability(device, deviceIp);
+            }
+        }
+
+        // Remove old devices from DeviceManager
+        if (!devicesToRemove.isEmpty()) {
+            for (Device device : devicesToRemove) {
+                DeviceManager.getInstance().removeDevice(device);
+                android.util.Log.d("DevicesFragment", "Removed old device: " + device.ID);
+            }
+            // Refresh the UI after cleanup
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    loadDevices();
+                    // Update device count badge in MainActivity
+                    if (getActivity() instanceof MainActivity) {
+                        ((MainActivity) getActivity()).updateDeviceCount();
+                    }
+                });
             }
         }
     }
@@ -319,14 +396,15 @@ public class DevicesWithinReachFragment extends Fragment {
 
             // Set click listener to navigate to device profile
             holder.itemView.setOnClickListener(v -> {
-                if (device.ID.equals("RELAY_SERVER")) {
-                    // Relay server - show empty panel (functionality to be added later)
-                    android.widget.Toast.makeText(v.getContext(), "Device Relay - Functionality coming soon", android.widget.Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
                 if (getActivity() != null) {
-                    DeviceProfileFragment fragment = DeviceProfileFragment.newInstance(device.ID);
+                    androidx.fragment.app.Fragment fragment;
+                    if (device.ID.equals("RELAY_SERVER")) {
+                        // Relay server - open relay device panel
+                        fragment = new RelayDeviceFragment();
+                    } else {
+                        // Regular device - open device profile
+                        fragment = DeviceProfileFragment.newInstance(device.ID);
+                    }
                     getActivity().getSupportFragmentManager()
                             .beginTransaction()
                             .replace(R.id.fragment_container, fragment)
@@ -463,39 +541,63 @@ public class DevicesWithinReachFragment extends Fragment {
                 // Add channel indicators (BLE, WIFI, P2P)
                 channelIndicators.removeAllViews();
 
-                // Check which connection types this device has (only recent connections - last 5 minutes)
+                // Check which connection types this device has (only show CURRENT connection methods)
+                // Strategy: show BLE only if the most recent connection was BLE, not just if there are old BLE events
                 boolean hasBLE = false;
                 boolean hasWiFi = false;
                 long now = System.currentTimeMillis();
                 long fiveMinutesAgo = now - 300000; // 5 minutes in milliseconds
 
+                // Find the most recent connection event
+                offgrid.geogram.devices.EventConnected mostRecentEvent = null;
+                long mostRecentTimestamp = 0;
+
                 for (offgrid.geogram.devices.EventConnected event : device.connectedEvents) {
-                    // Only count recent connections (within last 5 minutes)
-                    // Check the most recent timestamp in the event's timestamps list
                     if (!event.timestamps.isEmpty()) {
                         long latestTimestamp = event.timestamps.get(event.timestamps.size() - 1);
-                        if (latestTimestamp >= fiveMinutesAgo) {
-                            if (event.connectionType == offgrid.geogram.devices.ConnectionType.BLE) {
-                                hasBLE = true;
-                            } else if (event.connectionType == offgrid.geogram.devices.ConnectionType.WIFI) {
-                                hasWiFi = true;
-                            }
+                        // Only consider recent events (within last 5 minutes)
+                        if (latestTimestamp >= fiveMinutesAgo && latestTimestamp > mostRecentTimestamp) {
+                            mostRecentTimestamp = latestTimestamp;
+                            mostRecentEvent = event;
                         }
                     }
                 }
 
+                // Set connection type based on the MOST RECENT connection
+                if (mostRecentEvent != null) {
+                    if (mostRecentEvent.connectionType == offgrid.geogram.devices.ConnectionType.BLE) {
+                        hasBLE = true;
+                    } else if (mostRecentEvent.connectionType == offgrid.geogram.devices.ConnectionType.WIFI) {
+                        hasWiFi = true;
+                    }
+                }
+
                 // Also check WiFi discovery service for current WiFi availability
+                // Only show WIFI tag if device is currently reachable
                 if (!hasWiFi) {
                     offgrid.geogram.wifi.WiFiDiscoveryService wifiService =
                         offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(itemView.getContext());
-                    // Check if device has an IP address in WiFi discovery
-                    if (wifiService.getDeviceIp(device.ID) != null) {
+                    // Check if device has an IP address AND is reachable
+                    if (wifiService.getDeviceIp(device.ID) != null && device.isWiFiReachable()) {
                         hasWiFi = true;
                     }
                 }
 
                 // Add BLE badge (avoid duplicates)
-                if (hasBLE && !badgeExists(channelIndicators, "BLE")) {
+                // CRITICAL: Only show BLE badge if Bluetooth is actually enabled on THIS device
+                // Otherwise we show stale BLE events from before Bluetooth was disabled
+                boolean isBluetoothEnabled = false;
+                try {
+                    android.bluetooth.BluetoothManager btManager =
+                        (android.bluetooth.BluetoothManager) itemView.getContext().getSystemService(android.content.Context.BLUETOOTH_SERVICE);
+                    if (btManager != null && btManager.getAdapter() != null) {
+                        isBluetoothEnabled = btManager.getAdapter().isEnabled();
+                    }
+                } catch (Exception e) {
+                    android.util.Log.e("DevicesFragment", "Error checking Bluetooth status: " + e.getMessage());
+                }
+
+                if (hasBLE && isBluetoothEnabled && !badgeExists(channelIndicators, "BLE")) {
                     TextView bleBadge = new TextView(itemView.getContext());
                     bleBadge.setText("BLE");
                     bleBadge.setTextSize(10);
@@ -512,7 +614,8 @@ public class DevicesWithinReachFragment extends Fragment {
                 }
 
                 // Add WiFi badge (avoid duplicates)
-                if (hasWiFi && !badgeExists(channelIndicators, "WIFI")) {
+                // Only show WIFI tag if device is currently reachable
+                if (hasWiFi && device.isWiFiReachable() && !badgeExists(channelIndicators, "WIFI")) {
                     TextView wifiBadge = new TextView(itemView.getContext());
                     wifiBadge.setText("WIFI");
                     wifiBadge.setTextSize(10);
@@ -526,23 +629,7 @@ public class DevicesWithinReachFragment extends Fragment {
                     params.setMargins(0, 0, 8, 0);
                     wifiBadge.setLayoutParams(params);
                     channelIndicators.addView(wifiBadge);
-
-                    // Add "Not reachable" indicator if WiFi device is unreachable
-                    if (!device.isWiFiReachable()) {
-                        TextView unreachableBadge = new TextView(itemView.getContext());
-                        unreachableBadge.setText("NOT REACHABLE");
-                        unreachableBadge.setTextSize(10);
-                        unreachableBadge.setTextColor(Color.WHITE);
-                        unreachableBadge.setBackgroundColor(0xFFCC0000); // Red background
-                        unreachableBadge.setPadding(8, 4, 8, 4);
-                        android.widget.LinearLayout.LayoutParams unreachableParams = new android.widget.LinearLayout.LayoutParams(
-                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-                        );
-                        unreachableParams.setMargins(8, 0, 0, 0);
-                        unreachableBadge.setLayoutParams(unreachableParams);
-                        channelIndicators.addView(unreachableBadge);
-                     }
+                    // Note: Removed "NOT REACHABLE" tag - if not reachable, we simply don't show the WIFI tag
                  }
 
                  // Add relay connection status badge for relay server

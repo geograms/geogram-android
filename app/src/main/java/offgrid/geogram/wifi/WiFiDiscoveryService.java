@@ -124,6 +124,21 @@ public class WiFiDiscoveryService {
     }
 
     /**
+     * Trigger an immediate scan of the WiFi network
+     * (useful when user manually refreshes the device list)
+     */
+    public void triggerImmediateScan() {
+        Log.i(TAG, "Triggering immediate WiFi scan (user-requested)");
+        // Run in background thread to avoid blocking UI
+        new Thread(() -> {
+            // Quick ping previously discovered devices first (fast)
+            quickPingPreviousDevices();
+            // Then do full network scan (slower, finds new devices)
+            scanNetwork();
+        }, "ImmediateWiFiScan").start();
+    }
+
+    /**
      * Check if a device with given IP is already discovered
      */
     public synchronized boolean isDiscovered(String ipAddress) {

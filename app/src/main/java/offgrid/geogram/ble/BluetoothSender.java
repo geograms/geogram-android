@@ -463,6 +463,19 @@ public class BluetoothSender {
         }
     }
 
+    /**
+     * Trigger an immediate self-advertisement/ping
+     * (useful when user manually refreshes the device list)
+     */
+    public void triggerImmediatePing() {
+        if (isRunning && !isPaused && selfMessage != null) {
+            Log.i(TAG, "Triggering immediate BLE self-advertise (user-requested)");
+            handler.post(selfAdvertiseTask);
+        } else {
+            Log.w(TAG, "Cannot trigger immediate ping - sender not running or no self message set");
+        }
+    }
+
     private void stopAdvertising() {
         if (advertiser != null && advertiseCallback != null) {
             if (!hasAdvertisePermission()) {

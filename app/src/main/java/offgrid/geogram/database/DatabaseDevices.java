@@ -71,11 +71,21 @@ public final class DatabaseDevices {
 
     // ------------------- Public API -------------------
 
+    // Migration from version 1 to 2: Add connectionType column to device_pings table
+    private static final androidx.room.migration.Migration MIGRATION_1_2 = new androidx.room.migration.Migration(1, 2) {
+        @Override
+        public void migrate(@NonNull androidx.sqlite.db.SupportSQLiteDatabase database) {
+            // Add connectionType column with default value "BLE" for backward compatibility
+            database.execSQL("ALTER TABLE device_pings ADD COLUMN connectionType TEXT NOT NULL DEFAULT 'BLE'");
+        }
+    };
+
     /** Initialize once; safe to call multiple times. */
     public synchronized void init(@NonNull Context context) {
         if (initialized) return;
         this.appCtx = context.getApplicationContext();
         this.db = Room.databaseBuilder(appCtx, DevicesDb.class, "devices.db")
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build();
         this.deviceDao = db.deviceDao();
@@ -200,13 +210,15 @@ public final class DatabaseDevices {
      * @param callsign Device callsign
      * @param timestamp When detected
      * @param geocode Optional location code (null for ping-only)
+     * @param connectionType Connection type ("BLE", "WIFI", "INTERNET", etc.)
      */
-    public void enqueuePing(@NonNull String callsign, long timestamp, @Nullable String geocode) {
+    public void enqueuePing(@NonNull String callsign, long timestamp, @Nullable String geocode, @NonNull String connectionType) {
         ensureInit();
         DevicePingRow ping = new DevicePingRow();
         ping.callsign = callsign;
         ping.timestamp = timestamp;
         ping.geocode = geocode;
+        ping.connectionType = connectionType;
         pendingPings.add(ping);
     }
 
@@ -316,6 +328,10 @@ public final class DatabaseDevices {
         @Nullable
         @ColumnInfo(collate = ColumnInfo.NOCASE)
         public String geocode;    // "LLLL-LLLL" or null for ping-only
+
+        @NonNull
+        @ColumnInfo(defaultValue = "BLE")
+        public String connectionType;  // "BLE", "WIFI", "INTERNET", etc.
     }
 
     // ------------------- DAOs -------------------
@@ -371,7 +387,7 @@ public final class DatabaseDevices {
 
     // ------------------- Database -------------------
 
-    @Database(entities = {DeviceRow.class, DevicePingRow.class}, version = 1, exportSchema = false)
+    @Database(entities = {DeviceRow.class, DevicePingRow.class}, version = 2, exportSchema = false)
     public abstract static class DevicesDb extends RoomDatabase {
         public abstract DeviceDao deviceDao();
         public abstract PingDao pingDao();
