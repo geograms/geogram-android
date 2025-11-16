@@ -542,10 +542,30 @@ public class DevicesWithinReachFragment extends Fragment {
                         unreachableParams.setMargins(8, 0, 0, 0);
                         unreachableBadge.setLayoutParams(unreachableParams);
                         channelIndicators.addView(unreachableBadge);
-                    }
-                }
+                     }
+                 }
 
-                // Ping device via relay to check if reachable over internet
+                 // Add relay connection status badge for relay server
+                 if (device.ID.equals("RELAY_SERVER") && !badgeExists(channelIndicators, "Connected") && !badgeExists(channelIndicators, "Disconnected")) {
+                     offgrid.geogram.p2p.DeviceRelayClient relayClient = offgrid.geogram.p2p.DeviceRelayClient.getInstance(itemView.getContext());
+                     boolean isConnected = relayClient.isConnected();
+
+                     TextView statusBadge = new TextView(itemView.getContext());
+                     statusBadge.setText(isConnected ? "Connected" : "Disconnected");
+                     statusBadge.setTextSize(10);
+                     statusBadge.setTextColor(Color.WHITE);
+                     statusBadge.setBackgroundColor(isConnected ? 0xFF00AA00 : 0xFF666666); // Green for connected, grey for disconnected
+                     statusBadge.setPadding(8, 4, 8, 4);
+                     android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(
+                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                     );
+                     params.setMargins(0, 0, 8, 0);
+                     statusBadge.setLayoutParams(params);
+                     channelIndicators.addView(statusBadge);
+                 }
+
+                 // Ping device via relay to check if reachable over internet
                 // Use callsign if available, otherwise use ID
                 String callsignToCheck = (device.callsign != null && !device.callsign.isEmpty())
                     ? device.callsign
