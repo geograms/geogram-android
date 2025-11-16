@@ -379,8 +379,13 @@ public class DevicesWithinReachFragment extends Fragment {
                     profileImage.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
                     profileImage.setPadding(2, 2, 2, 2);
                     profileImage.setBackgroundColor(0); // Remove background
-                } else {
-                    profileImage.setImageResource(R.drawable.ic_person);
+                 } else {
+                    // Use server icon for relay device, person icon for others
+                    if (device.ID.equals("RELAY_SERVER")) {
+                        profileImage.setImageResource(R.drawable.ic_relay);
+                    } else {
+                        profileImage.setImageResource(R.drawable.ic_person);
+                    }
                     profileImage.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
                     profileImage.setPadding(8, 8, 8, 8);
                     profileImage.setBackgroundColor(itemView.getContext().getResources().getColor(R.color.dark_gray, null));
