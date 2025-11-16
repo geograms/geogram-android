@@ -599,27 +599,16 @@ public class CollectionBrowserFragment extends Fragment {
     private void loadRemoteTreeData() {
         new Thread(() -> {
             try {
-                String treeDataUrl = "http://" + remoteIp + ":45678/api/collections/" +
-                        collection.getId() + "/file/extra/tree-data.js";
-                URL url = new URL(treeDataUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(10000);
+                // Use P2PHttpClient to properly route the request through WiFi or P2P
+                offgrid.geogram.p2p.P2PHttpClient httpClient = new offgrid.geogram.p2p.P2PHttpClient(getContext());
+                String path = "/api/collections/" + collection.getId() + "/file/extra/tree-data.js";
 
-                int responseCode = conn.getResponseCode();
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                    StringBuilder response = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        response.append(line);
-                    }
-                    reader.close();
+                offgrid.geogram.p2p.P2PHttpClient.HttpResponse response =
+                    httpClient.get(deviceId, remoteIp, path, 10000);
 
+                if (response.isSuccess()) {
                     // Parse tree-data.js content
-                    String treeDataContent = response.toString();
-                    parseTreeData(treeDataContent);
+                    parseTreeData(response.body);
 
                     // Update UI on main thread
                     if (getActivity() != null) {
@@ -628,10 +617,8 @@ public class CollectionBrowserFragment extends Fragment {
                         });
                     }
                 } else {
-                    showRemoteError("Failed to load file list (HTTP " + responseCode + ")");
+                    showRemoteError("Failed to load file list (HTTP " + response.statusCode + ")");
                 }
-
-                conn.disconnect();
             } catch (Exception e) {
                 android.util.Log.e("CollectionBrowser", "Error loading remote tree-data: " + e.getMessage());
                 showRemoteError("Failed to load file list: " + e.getMessage());
@@ -1330,63 +1317,66 @@ public class CollectionBrowserFragment extends Fragment {
                     parentDir.mkdirs();
                 }
 
-                // Download the file
-                String fileUrl = "http://" + remoteIp + ":45678/api/collections/" +
-                        collection.getId() + "/file/" + filePath;
+                // Download the file using P2PHttpClient
+                String path = "/api/collections/" + collection.getId() + "/file/" + filePath;
 
-                URL url = new URL(fileUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(30000);
-                conn.setReadTimeout(30000);
+                offgrid.geogram.p2p.P2PHttpClient httpClient = new offgrid.geogram.p2p.P2PHttpClient(getContext());
+                offgrid.geogram.p2p.P2PHttpClient.InputStreamResponse streamResponse =
+                    httpClient.getInputStream(deviceId, remoteIp, path, 30000);
 
-                int responseCode = conn.getResponseCode();
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    // Download file
-                    try (InputStream in = conn.getInputStream();
-                         java.io.FileOutputStream out = new java.io.FileOutputStream(targetFile)) {
+                if (streamResponse.isSuccess()) {
+                    try {
+                        // Download file
+                        try (InputStream in = streamResponse.stream;
+                             java.io.FileOutputStream out = new java.io.FileOutputStream(targetFile)) {
 
-                        byte[] buffer = new byte[8192];
-                        int bytesRead;
-                        while ((bytesRead = in.read(buffer)) != -1) {
-                            out.write(buffer, 0, bytesRead);
-                        }
-                    }
-
-                    // Update collection storage path
-                    collection.setStoragePath(collectionFolder.getAbsolutePath());
-
-                    // Update local tree-data.js with downloaded file
-                    updateLocalTreeData(collectionFolder, file);
-
-                    // Log collection structure for debugging
-                    android.util.Log.i("CollectionBrowser", "Collection folder: " + collectionFolder.getAbsolutePath());
-                    android.util.Log.i("CollectionBrowser", "Files in collection folder:");
-                    logDirectoryContents(collectionFolder, "  ");
-
-                    // Open the downloaded file on main thread
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(() -> {
-                            Toast.makeText(getContext(), "Download complete", Toast.LENGTH_SHORT).show();
-                            openLocalFile(file);
-
-                            // If this was a new collection, notify that it's now available locally
-                            if (isNewCollection) {
-                                Toast.makeText(getContext(), "Collection added to your device", Toast.LENGTH_SHORT).show();
-
-                                // Broadcast that a new collection was added
-                                Intent intent = new Intent("offgrid.geogram.COLLECTION_ADDED");
-                                intent.putExtra("collection_id", collection.getId());
-                                androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
-                                    .sendBroadcast(intent);
+                            byte[] buffer = new byte[8192];
+                            int bytesRead;
+                            while ((bytesRead = in.read(buffer)) != -1) {
+                                out.write(buffer, 0, bytesRead);
                             }
-                        });
+                        } finally {
+                            // Close the connection
+                            streamResponse.close();
+                        }
+
+                        // Update collection storage path
+                        collection.setStoragePath(collectionFolder.getAbsolutePath());
+
+                        // Update local tree-data.js with downloaded file
+                        updateLocalTreeData(collectionFolder, file);
+
+                        // Log collection structure for debugging
+                        android.util.Log.i("CollectionBrowser", "Collection folder: " + collectionFolder.getAbsolutePath());
+                        android.util.Log.i("CollectionBrowser", "Files in collection folder:");
+                        logDirectoryContents(collectionFolder, "  ");
+
+                        // Open the downloaded file on main thread
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                Toast.makeText(getContext(), "Download complete", Toast.LENGTH_SHORT).show();
+                                openLocalFile(file);
+
+                                // If this was a new collection, notify that it's now available locally
+                                if (isNewCollection) {
+                                    Toast.makeText(getContext(), "Collection added to your device", Toast.LENGTH_SHORT).show();
+
+                                    // Broadcast that a new collection was added
+                                    Intent intent = new Intent("offgrid.geogram.COLLECTION_ADDED");
+                                    intent.putExtra("collection_id", collection.getId());
+                                    androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(requireContext())
+                                        .sendBroadcast(intent);
+                                }
+                            });
+                        }
+                    } catch (Exception e) {
+                        streamResponse.close();
+                        throw e;
                     }
                 } else {
-                    showDownloadError("Failed to download file (HTTP " + responseCode + ")");
+                    String errorMsg = streamResponse.errorMessage != null ? streamResponse.errorMessage : "Unknown error";
+                    showDownloadError("Failed to download file (HTTP " + streamResponse.statusCode + "): " + errorMsg);
                 }
-
-                conn.disconnect();
             } catch (Exception e) {
                 android.util.Log.e("CollectionBrowser", "Error downloading file: " + e.getMessage());
                 showDownloadError("Download failed: " + e.getMessage());

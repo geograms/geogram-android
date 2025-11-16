@@ -48,7 +48,9 @@ import offgrid.geogram.devices.EventDeviceUpdated;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
 import offgrid.geogram.fragments.AboutFragment;
+import offgrid.geogram.fragments.BackupFragment;
 import offgrid.geogram.fragments.CollectionsFragment;
+import offgrid.geogram.fragments.ConnectionsFragment;
 import offgrid.geogram.fragments.DebugFragment;
 import offgrid.geogram.fragments.DevicesFragment;
 import offgrid.geogram.fragments.DevicesWithinReachFragment;
@@ -321,10 +323,9 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        TextView batteryLevelText = batteryFooter.findViewById(R.id.tv_battery_level);
         TextView batteryTimeText = batteryFooter.findViewById(R.id.tv_battery_time_remaining);
 
-        if (batteryLevelText == null || batteryTimeText == null) {
+        if (batteryTimeText == null) {
             Log.w(TAG, "Battery footer views not found");
             return;
         }
@@ -337,12 +338,13 @@ public class MainActivity extends AppCompatActivity {
         batteryMonitor.setListener((currentLevel, estimatedTimeRemaining) -> {
             // Update UI on main thread
             runOnUiThread(() -> {
-                if (currentLevel >= 0) {
-                    batteryLevelText.setText(currentLevel + "%");
+                // Hide text when calculating
+                if ("Calculating...".equals(estimatedTimeRemaining)) {
+                    batteryFooter.setVisibility(View.GONE);
                 } else {
-                    batteryLevelText.setText("--");
+                    batteryFooter.setVisibility(View.VISIBLE);
+                    batteryTimeText.setText("Device can run for " + estimatedTimeRemaining);
                 }
-                batteryTimeText.setText(estimatedTimeRemaining);
             });
         });
 
@@ -435,6 +437,10 @@ public class MainActivity extends AppCompatActivity {
 
             if (item.getItemId() == R.id.nav_settings) {
                 transaction.replace(R.id.fragment_container, SettingsFragment.getInstance()).addToBackStack(null);
+            } else if (item.getItemId() == R.id.nav_connections) {
+                transaction.replace(R.id.fragment_container, new ConnectionsFragment()).addToBackStack(null);
+            } else if (item.getItemId() == R.id.nav_backup) {
+                transaction.replace(R.id.fragment_container, new BackupFragment()).addToBackStack(null);
             // Relay menu removed - relay accessible via main action bar relay button
             // } else if (item.getItemId() == R.id.nav_relay) {
             //     transaction.replace(R.id.fragment_container, new RelayFragment()).addToBackStack(null);

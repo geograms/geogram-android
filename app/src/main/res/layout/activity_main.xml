@@ -203,13 +203,30 @@
 -->
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- Navigation Drawer -->
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/navigation_view"
+    <!-- Navigation Drawer with Battery Footer -->
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        android:background="@color/dark_gray_background"
-        app:menu="@menu/navigation_menu" />
+        android:orientation="vertical"
+        android:background="@color/dark_gray_background">
+
+        <!-- Navigation Menu -->
+        <com.google.android.material.navigation.NavigationView
+            android:id="@+id/navigation_view"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@color/dark_gray_background"
+            app:menu="@menu/navigation_menu" />
+
+        <!-- Battery Footer -->
+        <include
+            android:id="@+id/battery_footer"
+            layout="@layout/drawer_battery_footer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+    </LinearLayout>
 
 </androidx.drawerlayout.widget.DrawerLayout>

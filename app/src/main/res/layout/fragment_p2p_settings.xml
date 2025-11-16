@@ -246,6 +246,60 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
+        <!-- Discovered Peers -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#353535"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Discovered Peers"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:paddingBottom="12dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Peers found via APRS-IS announcements"
+                android:textColor="#666666"
+                android:textSize="12sp"
+                android:paddingBottom="12dp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_discovered_peers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:nestedScrollingEnabled="false" />
+
+            <TextView
+                android:id="@+id/tv_no_peers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="No peers discovered yet"
+                android:textColor="#888888"
+                android:textSize="13sp"
+                android:gravity="center"
+                android:padding="16dp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/btn_clear_peer_cache"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Clear Peer Cache"
+                android:textColor="@color/white"
+                android:backgroundTint="#FF5722"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+
         <!-- P2P Information -->
         <LinearLayout
             android:layout_width="match_parent"

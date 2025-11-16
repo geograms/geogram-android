@@ -23,17 +23,6 @@ public class RemoteProfileCache {
     public static void saveProfile(Context context, String deviceId,
                                    String nickname, String description,
                                    Bitmap profilePicture, String preferredColor, String npub) {
-        saveProfile(context, deviceId, nickname, description, profilePicture,
-                   preferredColor, npub, null, false, false);
-    }
-
-    /**
-     * Save a device profile to cache with P2P information
-     */
-    public static void saveProfile(Context context, String deviceId,
-                                   String nickname, String description,
-                                   Bitmap profilePicture, String preferredColor, String npub,
-                                   String p2pPeerId, boolean p2pEnabled, boolean p2pReady) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = prefs.edit();
 
@@ -54,14 +43,6 @@ public class RemoteProfileCache {
         if (npub != null) {
             editor.putString(prefix + "npub", npub);
         }
-
-        // Save P2P information
-        if (p2pPeerId != null) {
-            editor.putString(prefix + "p2p_peer_id", p2pPeerId);
-        }
-        editor.putBoolean(prefix + "p2p_enabled", p2pEnabled);
-        editor.putBoolean(prefix + "p2p_ready", p2pReady);
-        editor.putLong(prefix + "p2p_last_seen", System.currentTimeMillis());
 
         // Save profile picture as Base64 encoded string
         if (profilePicture != null) {
@@ -113,38 +94,6 @@ public class RemoteProfileCache {
     public static String getNpub(Context context, String deviceId) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         return prefs.getString("device_" + deviceId + "_npub", null);
-    }
-
-    /**
-     * Get cached P2P peer ID for a device
-     */
-    public static String getP2PPeerId(Context context, String deviceId) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getString("device_" + deviceId + "_p2p_peer_id", null);
-    }
-
-    /**
-     * Get cached P2P enabled status for a device
-     */
-    public static boolean isP2PEnabled(Context context, String deviceId) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getBoolean("device_" + deviceId + "_p2p_enabled", false);
-    }
-
-    /**
-     * Get cached P2P ready status for a device
-     */
-    public static boolean isP2PReady(Context context, String deviceId) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getBoolean("device_" + deviceId + "_p2p_ready", false);
-    }
-
-    /**
-     * Get cached P2P last seen timestamp for a device
-     */
-    public static long getP2PLastSeen(Context context, String deviceId) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getLong("device_" + deviceId + "_p2p_last_seen", 0);
     }
 
     /**
@@ -204,10 +153,6 @@ public class RemoteProfileCache {
         editor.remove(prefix + "npub");
         editor.remove(prefix + "picture");
         editor.remove(prefix + "timestamp");
-        editor.remove(prefix + "p2p_peer_id");
-        editor.remove(prefix + "p2p_enabled");
-        editor.remove(prefix + "p2p_ready");
-        editor.remove(prefix + "p2p_last_seen");
 
         editor.apply();
         Log.d(TAG, "Cleared cached profile for device: " + deviceId);

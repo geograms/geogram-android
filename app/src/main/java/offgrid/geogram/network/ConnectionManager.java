@@ -3,23 +3,20 @@ package offgrid.geogram.network;
 import android.content.Context;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.devices.Device;
-import offgrid.geogram.p2p.P2PService;
 import offgrid.geogram.wifi.WiFiDiscoveryService;
 
 /**
- * Manages connection routing between WiFi, P2P, and BLE.
+ * Manages connection routing between WiFi and BLE.
  *
  * Connection priority:
  * 1. WiFi (fastest, lowest latency)
- * 2. P2P (global reach via libp2p)
- * 3. BLE (local only, discovery only)
+ * 2. BLE (local only, discovery only)
  */
 public class ConnectionManager {
     private static final String TAG = "ConnectionManager";
     private static ConnectionManager instance;
 
     private Context context;
-    private P2PService p2pService;
     private WiFiDiscoveryService wifiService;
 
     /**
@@ -27,14 +24,12 @@ public class ConnectionManager {
      */
     public enum ConnectionMethod {
         WIFI,
-        P2P,
         BLE,
         NONE
     }
 
     private ConnectionManager(Context context) {
         this.context = context.getApplicationContext();
-        this.p2pService = P2PService.getInstance(context);
         this.wifiService = WiFiDiscoveryService.getInstance(context);
     }
 
@@ -50,9 +45,8 @@ public class ConnectionManager {
      *
      * Priority:
      * 1. WiFi - if device has WiFi IP and is reachable
-     * 2. P2P - if device has peer ID and our P2P node is ready
-     * 3. BLE - if device is in BLE range (discovery only)
-     * 4. NONE - no connection available
+     * 2. BLE - if device is in BLE range (discovery only)
+     * 3. NONE - no connection available
      *
      * @param device The device to connect to
      * @return Best available connection method
@@ -68,13 +62,7 @@ public class ConnectionManager {
             return ConnectionMethod.WIFI;
         }
 
-        // Priority 2: P2P (if device has peer ID and our P2P is ready)
-        if (hasP2PConnection(device)) {
-            Log.d(TAG, "Selected P2P for device " + device.ID);
-            return ConnectionMethod.P2P;
-        }
-
-        // Priority 3: BLE (local discovery only, not for collections)
+        // Priority 2: BLE (local discovery only, not for collections)
         if (hasBLEConnection(device)) {
             Log.d(TAG, "Selected BLE for device " + device.ID);
             return ConnectionMethod.BLE;
@@ -90,24 +78,6 @@ public class ConnectionManager {
     private boolean hasWiFiConnection(Device device) {
         String wifiIp = wifiService.getDeviceIp(device.ID);
         return wifiIp != null && !wifiIp.isEmpty();
-    }
-
-    /**
-     * Check if device has P2P connection
-     */
-    private boolean hasP2PConnection(Device device) {
-        // Check if device has peer ID
-        if (!device.hasP2PPeerId() || !device.isP2PEnabled()) {
-            return false;
-        }
-
-        // Check if our P2P node is ready
-        if (!p2pService.isP2PReady()) {
-            Log.d(TAG, "Device " + device.ID + " has P2P but our P2P node is not ready");
-            return false;
-        }
-
-        return true;
     }
 
     /**
@@ -136,19 +106,6 @@ public class ConnectionManager {
     }
 
     /**
-     * Get P2P peer ID for device (if available)
-     *
-     * @param device The device
-     * @return Peer ID (Base58), or null if not available
-     */
-    public String getP2PPeerId(Device device) {
-        if (device == null) {
-            return null;
-        }
-        return device.getP2PPeerId();
-    }
-
-    /**
      * Check if device is reachable via any method
      *
      * @param device The device to check
@@ -169,8 +126,6 @@ public class ConnectionManager {
         switch (method) {
             case WIFI:
                 return "WiFi";
-            case P2P:
-                return "P2P (Internet)";
             case BLE:
                 return "Bluetooth";
             case NONE:
@@ -190,8 +145,6 @@ public class ConnectionManager {
         switch (method) {
             case WIFI:
                 return "Fast";
-            case P2P:
-                return "Medium";
             case BLE:
                 return "Very Slow";
             case NONE:
@@ -211,8 +164,6 @@ public class ConnectionManager {
         switch (method) {
             case WIFI:
                 return 100; // ~100ms
-            case P2P:
-                return 500; // ~500ms
             case BLE:
                 return 1000; // ~1 second
             case NONE:

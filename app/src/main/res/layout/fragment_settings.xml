@@ -49,6 +49,264 @@
                     android:paddingStart="8dp" />
             </LinearLayout>
 
+            <!-- Profile Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/rounded_border_background"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginTop="16dp"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Profile"
+                    android:textColor="@color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:paddingBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Your public information and appearance"
+                    android:textColor="@color/gray"
+                    android:textSize="14sp"
+                    android:paddingBottom="12dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Display Name"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:paddingBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/edit_nickname"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Nickname (e.g., John Doe)"
+                    android:inputType="text"
+                    android:textColor="@color/white"
+                    android:textColorHint="@color/gray"
+                    android:background="@drawable/input_background"
+                    android:padding="12dp"
+                    android:textSize="14sp"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Description"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:paddingBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/edit_description"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Description (200 characters max)"
+                    android:maxLength="200"
+                    android:inputType="textMultiLine"
+                    android:textColor="@color/white"
+                    android:textColorHint="@color/gray"
+                    android:background="@drawable/input_background"
+                    android:padding="12dp"
+                    android:textSize="14sp"
+                    android:scrollHorizontally="false"
+                    android:gravity="top|start"
+                    android:minLines="3"
+                    android:layout_marginBottom="12dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Profile Picture"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:paddingBottom="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:id="@+id/img_profile_preview"
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:scaleType="centerInside"
+                        android:background="@drawable/rounded_profile_background"
+                        android:src="@drawable/ic_person"
+                        app:tint="@color/white"
+                        android:padding="12dp"
+                        android:contentDescription="Profile picture preview" />
+
+                    <Button
+                        android:id="@+id/btn_choose_profile_image"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Choose Picture"
+                        android:textColor="@color/white"
+                        android:background="@drawable/input_background"
+                        android:layout_marginStart="16dp"
+                        android:padding="12dp"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Identity Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/rounded_border_background"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginTop="16dp"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Identity"
+                    android:textColor="@color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:paddingBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Your unique identifier and cryptographic keys"
+                    android:textColor="@color/gray"
+                    android:textSize="14sp"
+                    android:paddingBottom="12dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Callsign"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:paddingBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/edit_callsign"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Callsign (e.g., X1ABCD)"
+                    android:inputType="none"
+                    android:focusable="false"
+                    android:cursorVisible="false"
+                    android:textColor="@color/white"
+                    android:textColorHint="@color/gray"
+                    android:background="@drawable/input_background"
+                    android:padding="12dp"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="NOSTR Keys"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="4dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:background="@drawable/input_background"
+                    android:padding="8dp"
+                    android:layout_marginBottom="8dp">
+
+                    <EditText
+                        android:id="@+id/edit_nsec"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="NSEC (Private Key)"
+                        android:inputType="none"
+                        android:focusable="false"
+                        android:cursorVisible="false"
+                        android:textColor="@color/white"
+                        android:textColorHint="@color/gray"
+                        android:backgroundTint="@color/dark_gray"
+                        android:background="@android:color/transparent"
+                        android:padding="4dp"
+                        android:textSize="12sp" />
+
+                    <ImageButton
+                        android:id="@+id/btn_copy_nsec"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:contentDescription="Copy NSEC"
+                        android:src="@drawable/ic_copy"
+                        app:tint="@color/white"
+                        android:background="@android:color/transparent"
+                        android:padding="4dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:background="@drawable/input_background"
+                    android:padding="8dp">
+
+                    <EditText
+                        android:id="@+id/edit_npub"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="NPUB (Public Key)"
+                        android:inputType="none"
+                        android:textColor="@color/white"
+                        android:textColorHint="@color/gray"
+                        android:backgroundTint="@color/dark_gray"
+                        android:background="@android:color/transparent"
+                        android:padding="4dp"
+                        android:textSize="12sp"
+                        android:focusable="false"
+                        android:cursorVisible="false" />
+
+                    <ImageButton
+                        android:id="@+id/btn_copy_npub"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:contentDescription="Copy NPUB"
+                        android:src="@drawable/ic_copy"
+                        app:tint="@color/white"
+                        android:background="@android:color/transparent"
+                        android:padding="4dp" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btn_reset_identity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Reset Identity"
+                    android:textColor="@color/white"
+                    android:background="@drawable/input_background"
+                    android:layout_marginTop="12dp"
+                    android:padding="12dp"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
             <!-- Privacy Options
             <TextView
                 android:layout_width="match_parent"
@@ -79,364 +337,61 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
             -->
-            <!-- Callsign -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Callsign"
-                android:textColor="@color/white"
-                android:textStyle="bold"
-                android:paddingTop="16dp"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp" />
 
-            <EditText
-                android:id="@+id/edit_callsign"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Callsign (e.g., X1ABCD)"
-                android:inputType="none"
-                android:focusable="false"
-                android:cursorVisible="false"
-                android:textColor="@color/white"
-                android:textColorHint="@color/gray"
-                android:backgroundTint="@color/dark_gray"
-                android:padding="8dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp" />
 
-            <!-- Profile Section -->
-            <TextView
+            <!-- Appearance Section -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Profile"
-                android:textColor="@color/white"
-                android:textStyle="bold"
-                android:paddingTop="16dp"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp" />
-
-            <EditText
-                android:id="@+id/edit_nickname"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Nickname (e.g., John Doe)"
-                android:inputType="text"
-                android:textColor="@color/white"
-                android:textColorHint="@color/gray"
-                android:backgroundTint="@color/dark_gray"
-                android:padding="8dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp" />
-
-            <EditText
-                android:id="@+id/edit_description"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Description (200 letters max)"
-                android:maxLength="200"
-                android:inputType="textMultiLine"
-                android:textColor="@color/white"
-                android:textColorHint="@color/gray"
-                android:backgroundTint="@color/dark_gray"
-                android:padding="8dp"
-                android:layout_marginTop="8dp"
+                android:orientation="vertical"
+                android:background="@drawable/rounded_border_background"
                 android:layout_marginStart="16dp"
                 android:layout_marginEnd="16dp"
-                android:scrollHorizontally="false"
-                android:gravity="top|start"
-                android:minLines="3" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="8dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp">
-
-                <ImageView
-                    android:id="@+id/img_profile_preview"
-                    android:layout_width="80dp"
-                    android:layout_height="80dp"
-                    android:scaleType="centerInside"
-                    android:background="@drawable/rounded_profile_background"
-                    android:src="@drawable/ic_person"
-                    app:tint="@color/white"
-                    android:padding="12dp"
-                    android:contentDescription="Profile picture preview" />
-
-                <Button
-                    android:id="@+id/btn_choose_profile_image"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Choose Profile Picture"
-                    android:textColor="@color/white"
-                    android:backgroundTint="@color/gray"
-                    android:layout_marginStart="16dp" />
-            </LinearLayout>
-
-            <!--
-            <EditText
-                android:id="@+id/edit_intro"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Intro (200 letters max)"
-                android:maxLength="200"
-                android:inputType="textMultiLine"
-                android:textColor="@color/white"
-                android:textColorHint="@color/gray"
-                android:backgroundTint="@color/dark_gray"
-                android:padding="8dp"
-                android:layout_marginTop="8dp"
-                android:scrollHorizontally="false"
-                android:gravity="top|start"
-                android:minLines="3" />
-                -->
-
-            <!-- Preferred Color -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:gravity="center_vertical">
+                android:layout_marginTop="16dp"
+                android:padding="16dp">
 
                 <TextView
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Preferred Color"
+                    android:text="Appearance"
                     android:textColor="@color/white"
-                    android:textSize="16sp" />
-
-                <Spinner
-                    android:id="@+id/spinner_preferred_color"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:entries="@array/color_options"
-                    android:backgroundTint="@color/dark_gray"
-                    android:padding="8dp" />
-            </LinearLayout>
-
-            <!-- P2P Settings Navigation -->
-            <LinearLayout
-                android:id="@+id/btn_i2p_settings"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:paddingTop="16dp"
-                android:paddingBottom="8dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="?attr/selectableItemBackground">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="P2P Network Settings"
-                    android:textColor="@color/white"
+                    android:textSize="18sp"
                     android:textStyle="bold"
-                    android:textSize="16sp" />
-
-                <ImageButton
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:src="@drawable/ic_right"
-                    android:background="@android:color/transparent"
-                    android:contentDescription="Open P2P settings"
-                    app:tint="@color/white"
-                    android:padding="4dp"
-                    android:clickable="false"
-                    android:focusable="false" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Configure anonymous internet connectivity"
-                android:textColor="@color/gray"
-                android:textSize="14sp"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:paddingBottom="8dp" />
-
-            <!-- HTTP API Settings -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="HTTP API Server"
-                android:textColor="@color/white"
-                android:textStyle="bold"
-                android:paddingTop="16dp"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:paddingTop="8dp">
+                    android:paddingBottom="8dp" />
 
                 <TextView
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Enable HTTP API"
-                    android:textColor="@color/white"
-                    android:textSize="16sp" />
-
-                <androidx.appcompat.widget.SwitchCompat
-                    android:id="@+id/switch_http_api"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp">
-
-                <TextView
-                    android:id="@+id/text_http_api_url"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Server: Not available"
+                    android:text="Customize your visual preferences"
                     android:textColor="@color/gray"
                     android:textSize="14sp"
-                    android:fontFamily="monospace" />
+                    android:paddingBottom="12dp" />
 
-                <ImageButton
-                    android:id="@+id/btn_copy_http_url"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:contentDescription="Copy URL"
-                    android:src="@drawable/ic_copy"
-                    app:tint="@color/white"
-                    android:background="@android:color/transparent"
-                    android:padding="4dp"
-                    android:layout_marginStart="8dp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                <ImageButton
-                    android:id="@+id/btn_share_http_url"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:contentDescription="Share URL"
-                    android:src="@drawable/ic_share"
-                    app:tint="@color/white"
-                    android:background="@android:color/transparent"
-                    android:padding="4dp"
-                    android:layout_marginStart="4dp" />
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Preferred Color"
+                        android:textColor="@color/white"
+                        android:textSize="16sp" />
+
+                    <Spinner
+                        android:id="@+id/spinner_preferred_color"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:entries="@array/color_options"
+                        android:background="@drawable/input_background"
+                        android:padding="8dp" />
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- NOSTR Identity -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="NOSTR Identity"
-                android:textColor="@color/white"
-                android:textStyle="bold"
-                android:paddingTop="16dp"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp">
-
-                <EditText
-                    android:id="@+id/edit_nsec"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:hint="NSEC"
-                    android:inputType="none"
-                    android:focusable="false"
-                    android:cursorVisible="false"
-                    android:textColor="@color/white"
-                    android:textColorHint="@color/gray"
-                    android:backgroundTint="@color/dark_gray"
-                    android:padding="8dp" />
-
-                <ImageButton
-                    android:id="@+id/btn_copy_nsec"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:contentDescription="Copy NSEC"
-                    android:src="@drawable/ic_copy"
-                    app:tint="@color/white"
-                    android:background="@android:color/transparent"
-                    android:padding="8dp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp">
-
-                <EditText
-                    android:id="@+id/edit_npub"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:hint="NPUB"
-                    android:inputType="none"
-                    android:textColor="@color/white"
-                    android:textColorHint="@color/gray"
-                    android:backgroundTint="@color/dark_gray"
-                    android:padding="8dp"
-                    android:focusable="false"
-                    android:cursorVisible="false" />
-
-                <ImageButton
-                    android:id="@+id/btn_copy_npub"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:contentDescription="Copy NPUB"
-                    android:src="@drawable/ic_copy"
-                    app:tint="@color/white"
-                    android:background="@android:color/transparent"
-                    android:padding="8dp" />
-            </LinearLayout>
-
-            <!-- Reset Identity Button -->
-            <Button
-                android:id="@+id/btn_reset_identity"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Reset Identity (Generate New Keys)"
-                android:backgroundTint="@color/red"
-                android:textColor="@color/white"
-                android:layout_marginTop="16dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginBottom="16dp"
-                android:padding="12dp" />
 
         </LinearLayout>
     </ScrollView>

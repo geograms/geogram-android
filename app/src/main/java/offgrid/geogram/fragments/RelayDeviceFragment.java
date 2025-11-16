@@ -1,12 +1,19 @@
 package offgrid.geogram.fragments;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -68,18 +75,34 @@ public class RelayDeviceFragment extends Fragment {
         // Back button
         view.findViewById(R.id.btn_back).setOnClickListener(v -> requireActivity().onBackPressed());
 
-        // Status header
-        updateStatusHeader();
-
-        // Search section
-        EditText searchBox = view.findViewById(R.id.search_box);
-        // TODO: Implement search functionality
-
-        // Directory section
+        // Directory section - initialize adapter first
         RecyclerView deviceList = view.findViewById(R.id.device_directory_list);
         deviceList.setLayoutManager(new LinearLayoutManager(requireContext()));
         deviceAdapter = new RelayDeviceAdapter(java.util.Arrays.asList()); // Empty initially
         deviceList.setAdapter(deviceAdapter);
+
+        // Status header - call after adapter is initialized
+        updateStatusHeader();
+
+        // Search section
+        EditText searchBox = view.findViewById(R.id.search_box);
+        ImageButton searchButton = view.findViewById(R.id.search_button);
+
+        // Setup search functionality - only button triggers search (searches are expensive)
+        searchButton.setOnClickListener(v -> performSearch());
+
+        // Disable automatic search on Enter key to prevent multiple expensive searches
+        searchBox.setOnEditorActionListener((v, actionId, event) -> {
+            // Just hide keyboard, don't perform search
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                searchBox.clearFocus();
+                InputMethodManager imm = (InputMethodManager) requireContext()
+                    .getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(searchBox.getWindowToken(), 0);
+                return true;
+            }
+            return false;
+        });
     }
 
     private void updateStatusHeader() {
@@ -112,4 +135,11 @@ public class RelayDeviceFragment extends Fragment {
         // TODO: Calculate uptime
         uptimeText.setText("Uptime: checking...");
     }
+
+    private void performSearch() {
+        // TODO: Implement search functionality
+        Toast.makeText(requireContext(), "Search functionality not yet implemented", Toast.LENGTH_SHORT).show();
+    }
+
+
 }

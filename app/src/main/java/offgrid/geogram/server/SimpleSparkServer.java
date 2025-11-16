@@ -428,6 +428,25 @@ public class SimpleSparkServer implements Runnable {
             }
         });
 
+        // API endpoint for relay ping (used to check device reachability via relay)
+        get("/api/ping", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.addProperty("pong", true);
+                response.addProperty("timestamp", System.currentTimeMillis());
+
+                res.status(200);
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
         // ========== RELAY MESSAGE ENDPOINTS ==========
 
         // POST /api/relay/send - Send a message to relay storage
@@ -1394,12 +1413,6 @@ public class SimpleSparkServer implements Runnable {
                     }
                 }
 
-                // Get P2P peer ID
-                offgrid.geogram.p2p.P2PService p2pService = offgrid.geogram.p2p.P2PService.getInstance(context);
-                String p2pPeerId = p2pService.getPeerId();
-                boolean p2pEnabled = p2pService.isEnabled();
-                boolean p2pReady = p2pService.isP2PReady();
-
                 // Create response
                 JsonObject response = new JsonObject();
                 response.addProperty("success", true);
@@ -1408,14 +1421,6 @@ public class SimpleSparkServer implements Runnable {
                 response.addProperty("preferredColor", preferredColor);
                 response.addProperty("npub", npub);
                 response.addProperty("hasProfilePicture", imagePath != null && !imagePath.isEmpty() && new java.io.File(imagePath).exists());
-
-                // Add P2P information
-                JsonObject p2pInfo = new JsonObject();
-                p2pInfo.addProperty("peerId", p2pPeerId != null ? p2pPeerId : "");
-                p2pInfo.addProperty("enabled", p2pEnabled);
-                p2pInfo.addProperty("ready", p2pReady);
-                p2pInfo.addProperty("lastSeen", System.currentTimeMillis());
-                response.add("p2p", p2pInfo);
 
                 Log.i(TAG_ID, "API: Returned profile data");
 

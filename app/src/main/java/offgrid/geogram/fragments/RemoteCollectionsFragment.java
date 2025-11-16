@@ -18,10 +18,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +25,7 @@ import offgrid.geogram.MainActivity;
 import offgrid.geogram.R;
 import offgrid.geogram.adapters.CollectionAdapter;
 import offgrid.geogram.models.Collection;
+import offgrid.geogram.p2p.P2PHttpClient;
 
 public class RemoteCollectionsFragment extends Fragment {
 
@@ -105,25 +102,14 @@ public class RemoteCollectionsFragment extends Fragment {
 
         new Thread(() -> {
             try {
-                String apiUrl = "http://" + remoteIp + ":45678/api/collections";
-                URL url = new URL(apiUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(10000);
+                // Use P2P-aware HTTP client (automatically routes through P2P if available)
+                // Pass both deviceId and remoteIp - if remoteIp is local network, it will be used directly
+                P2PHttpClient httpClient = new P2PHttpClient(getContext());
+                P2PHttpClient.HttpResponse response = httpClient.get(deviceId, remoteIp, "/api/collections", 10000);
 
-                int responseCode = conn.getResponseCode();
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                    StringBuilder response = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        response.append(line);
-                    }
-                    reader.close();
-
+                if (response.isSuccess()) {
                     // Parse JSON response
-                    JsonObject jsonResponse = JsonParser.parseString(response.toString()).getAsJsonObject();
+                    JsonObject jsonResponse = JsonParser.parseString(response.body).getAsJsonObject();
                     JsonArray collectionsArray = jsonResponse.getAsJsonArray("collections");
 
                     List<Collection> collections = new ArrayList<>();
@@ -179,10 +165,8 @@ public class RemoteCollectionsFragment extends Fragment {
                         });
                     }
                 } else {
-                    showError("Failed to load collections (HTTP " + responseCode + ")");
+                    showError("Failed to load collections (HTTP " + response.statusCode + ")");
                 }
-
-                conn.disconnect();
             } catch (Exception e) {
                 android.util.Log.e("RemoteCollections", "Error: " + e.getMessage());
                 showError("Connection error: " + e.getMessage());

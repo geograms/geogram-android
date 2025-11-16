@@ -89,11 +89,6 @@ public class DeviceProfileFragment extends Fragment {
             String cachedNpub = offgrid.geogram.util.RemoteProfileCache.getNpub(getContext(), deviceId);
             android.graphics.Bitmap cachedPicture = offgrid.geogram.util.RemoteProfileCache.getProfilePicture(getContext(), deviceId);
 
-            // Load P2P information from cache
-            String cachedP2PPeerId = offgrid.geogram.util.RemoteProfileCache.getP2PPeerId(getContext(), deviceId);
-            boolean cachedP2PEnabled = offgrid.geogram.util.RemoteProfileCache.isP2PEnabled(getContext(), deviceId);
-            boolean cachedP2PReady = offgrid.geogram.util.RemoteProfileCache.isP2PReady(getContext(), deviceId);
-
             if (cachedNickname != null) {
                 device.setProfileNickname(cachedNickname);
             }
@@ -106,13 +101,6 @@ public class DeviceProfileFragment extends Fragment {
             if (cachedPicture != null) {
                 device.setProfilePicture(cachedPicture);
             }
-
-            // Set P2P information on device
-            if (cachedP2PPeerId != null) {
-                device.setP2PPeerId(cachedP2PPeerId);
-            }
-            device.setP2PEnabled(cachedP2PEnabled);
-            device.setP2PReady(cachedP2PReady);
         }
 
         // Get view references for profile section
@@ -136,15 +124,17 @@ public class DeviceProfileFragment extends Fragment {
             String npub = device.getProfileNpub();
             android.graphics.Bitmap profilePicture = device.getProfilePicture();
 
-            // Show nickname if available, otherwise just show callsign
+            // Show nickname if available, otherwise hide both (callsign already in title)
             if (nickname != null && !nickname.isEmpty()) {
                 nicknameView.setText(nickname);
                 nicknameView.setVisibility(View.VISIBLE);
                 // Show callsign in parenthesis when nickname is available
                 callsignView.setText("(" + deviceId + ")");
+                callsignView.setVisibility(View.VISIBLE);
             } else {
+                // Hide both nickname and callsign when no nickname (callsign shown in title bar)
                 nicknameView.setVisibility(View.GONE);
-                callsignView.setText(deviceId);
+                callsignView.setVisibility(View.GONE);
             }
 
             // Show description in the device type field (instead of device type)
@@ -179,6 +169,7 @@ public class DeviceProfileFragment extends Fragment {
 
             // Show profile picture if available (larger size)
             if (profilePicture != null) {
+                profileImage.setVisibility(View.VISIBLE);
                 // Scale bitmap to fit ImageView (96dp = ~288px on high-density screens)
                 int targetSize = (int) (96 * getResources().getDisplayMetrics().density);
                 android.graphics.Bitmap scaledBitmap = scaleBitmapToFit(profilePicture, targetSize, targetSize);
@@ -193,13 +184,8 @@ public class DeviceProfileFragment extends Fragment {
                 profileImage.setClickable(true);
                 profileImage.setOnClickListener(v -> showFullScreenImage(finalProfilePicture));
             } else {
-                // Default icon with padding and white tint
-                profileImage.setImageResource(R.drawable.ic_person);
-                profileImage.setPadding(16, 16, 16, 16);
-                profileImage.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-                // Apply white tint for default icon
-                profileImage.setImageTintList(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
-                profileImage.setClickable(false);
+                // Hide profile image when no picture is available
+                profileImage.setVisibility(View.GONE);
             }
 
             // First seen
@@ -340,21 +326,6 @@ public class DeviceProfileFragment extends Fragment {
                         String npub = jsonResponse.has("npub") && !jsonResponse.get("npub").isJsonNull()
                             ? jsonResponse.get("npub").getAsString() : "";
 
-                        // Extract P2P information
-                        String p2pPeerId = null;
-                        boolean p2pEnabled = false;
-                        boolean p2pReady = false;
-
-                        if (jsonResponse.has("p2p") && !jsonResponse.get("p2p").isJsonNull()) {
-                            com.google.gson.JsonObject p2pInfo = jsonResponse.getAsJsonObject("p2p");
-                            p2pPeerId = p2pInfo.has("peerId") && !p2pInfo.get("peerId").isJsonNull()
-                                ? p2pInfo.get("peerId").getAsString() : null;
-                            p2pEnabled = p2pInfo.has("enabled") && !p2pInfo.get("enabled").isJsonNull()
-                                ? p2pInfo.get("enabled").getAsBoolean() : false;
-                            p2pReady = p2pInfo.has("ready") && !p2pInfo.get("ready").isJsonNull()
-                                ? p2pInfo.get("ready").getAsBoolean() : false;
-                        }
-
                         // Update device with profile data
                         if (nickname != null && !nickname.isEmpty()) {
                             finalDevice.setProfileNickname(nickname);
@@ -369,14 +340,7 @@ public class DeviceProfileFragment extends Fragment {
                             finalDevice.setProfileNpub(npub);
                         }
 
-                        // Update device with P2P data
-                        if (p2pPeerId != null && !p2pPeerId.isEmpty()) {
-                            finalDevice.setP2PPeerId(p2pPeerId);
-                        }
-                        finalDevice.setP2PEnabled(p2pEnabled);
-                        finalDevice.setP2PReady(p2pReady);
-
-                        // Save to cache (including P2P information)
+                        // Save to cache
                         offgrid.geogram.util.RemoteProfileCache.saveProfile(
                             getContext(),
                             finalDevice.ID,
@@ -384,10 +348,7 @@ public class DeviceProfileFragment extends Fragment {
                             finalDevice.getProfileDescription(),
                             finalDevice.getProfilePicture(),
                             finalDevice.getProfilePreferredColor(),
-                            finalDevice.getProfileNpub(),
-                            p2pPeerId,
-                            p2pEnabled,
-                            p2pReady
+                            finalDevice.getProfileNpub()
                         );
 
                         android.util.Log.d("DeviceProfile", "Refreshed profile for " + deviceId);
@@ -428,9 +389,11 @@ public class DeviceProfileFragment extends Fragment {
             nicknameView.setText(nickname);
             nicknameView.setVisibility(View.VISIBLE);
             callsignView.setText("(" + deviceId + ")");
+            callsignView.setVisibility(View.VISIBLE);
         } else {
+            // Hide both nickname and callsign when no nickname (callsign shown in title bar)
             nicknameView.setVisibility(View.GONE);
-            callsignView.setText(deviceId);
+            callsignView.setVisibility(View.GONE);
         }
 
         // Update description
@@ -629,6 +592,11 @@ public class DeviceProfileFragment extends Fragment {
                                 nicknameView.setText(nickname);
                                 nicknameView.setVisibility(View.VISIBLE);
                                 callsignView.setText("(" + deviceId + ")");
+                                callsignView.setVisibility(View.VISIBLE);
+                            } else {
+                                // Hide both nickname and callsign when no nickname (callsign shown in title bar)
+                                nicknameView.setVisibility(View.GONE);
+                                callsignView.setVisibility(View.GONE);
                             }
 
                             // Show description in the device type field (instead of device type)
@@ -657,6 +625,7 @@ public class DeviceProfileFragment extends Fragment {
                             }
 
                             if (profilePicture != null) {
+                                profileImage.setVisibility(View.VISIBLE);
                                 // Scale bitmap to fit ImageView
                                 int targetSize = (int) (96 * getResources().getDisplayMetrics().density);
                                 android.graphics.Bitmap scaledBitmap = scaleBitmapToFit(profilePicture, targetSize, targetSize);
@@ -665,6 +634,9 @@ public class DeviceProfileFragment extends Fragment {
                                 profileImage.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
                                 // Remove tint to show the actual image colors
                                 profileImage.setImageTintList(null);
+                            } else {
+                                // Hide profile image when no picture is available
+                                profileImage.setVisibility(View.GONE);
                             }
                         }
 
