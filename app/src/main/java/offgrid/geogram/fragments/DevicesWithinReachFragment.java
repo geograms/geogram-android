@@ -441,15 +441,24 @@ public class DevicesWithinReachFragment extends Fragment {
                 // Add channel indicators (BLE, WIFI, P2P)
                 channelIndicators.removeAllViews();
 
-                // Check which connection types this device has
+                // Check which connection types this device has (only recent connections - last 5 minutes)
                 boolean hasBLE = false;
                 boolean hasWiFi = false;
+                long now = System.currentTimeMillis();
+                long fiveMinutesAgo = now - 300000; // 5 minutes in milliseconds
 
                 for (offgrid.geogram.devices.EventConnected event : device.connectedEvents) {
-                    if (event.connectionType == offgrid.geogram.devices.ConnectionType.BLE) {
-                        hasBLE = true;
-                    } else if (event.connectionType == offgrid.geogram.devices.ConnectionType.WIFI) {
-                        hasWiFi = true;
+                    // Only count recent connections (within last 5 minutes)
+                    // Check the most recent timestamp in the event's timestamps list
+                    if (!event.timestamps.isEmpty()) {
+                        long latestTimestamp = event.timestamps.get(event.timestamps.size() - 1);
+                        if (latestTimestamp >= fiveMinutesAgo) {
+                            if (event.connectionType == offgrid.geogram.devices.ConnectionType.BLE) {
+                                hasBLE = true;
+                            } else if (event.connectionType == offgrid.geogram.devices.ConnectionType.WIFI) {
+                                hasWiFi = true;
+                            }
+                        }
                     }
                 }
 
@@ -463,8 +472,8 @@ public class DevicesWithinReachFragment extends Fragment {
                     }
                 }
 
-                // Add BLE badge
-                if (hasBLE) {
+                // Add BLE badge (avoid duplicates)
+                if (hasBLE && !badgeExists(channelIndicators, "BLE")) {
                     TextView bleBadge = new TextView(itemView.getContext());
                     bleBadge.setText("BLE");
                     bleBadge.setTextSize(10);
@@ -480,8 +489,8 @@ public class DevicesWithinReachFragment extends Fragment {
                     channelIndicators.addView(bleBadge);
                 }
 
-                // Add WiFi badge
-                if (hasWiFi) {
+                // Add WiFi badge (avoid duplicates)
+                if (hasWiFi && !badgeExists(channelIndicators, "WIFI")) {
                     TextView wifiBadge = new TextView(itemView.getContext());
                     wifiBadge.setText("WIFI");
                     wifiBadge.setTextSize(10);
@@ -492,6 +501,7 @@ public class DevicesWithinReachFragment extends Fragment {
                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
                     );
+                    params.setMargins(0, 0, 8, 0);
                     wifiBadge.setLayoutParams(params);
                     channelIndicators.addView(wifiBadge);
 
@@ -521,41 +531,65 @@ public class DevicesWithinReachFragment extends Fragment {
 
                 // Ping via relay in background thread
                 if (callsignToCheck != null && !callsignToCheck.isEmpty()) {
+                    android.util.Log.d("Relay/DevicesFragment", "Starting relay ping check for device: " + callsignToCheck);
                     final android.widget.LinearLayout channelIndicatorsFinal = channelIndicators;
+                    final String callsignFinal = callsignToCheck;
                     new Thread(() -> {
                         try {
+                            android.util.Log.d("Relay/DevicesFragment", "Creating P2PHttpClient for relay ping: " + callsignFinal);
                             P2PHttpClient httpClient = new P2PHttpClient(itemView.getContext());
-                            boolean hasRelay = httpClient.pingViaRelay(callsignToCheck);
+                            android.util.Log.d("Relay/DevicesFragment", "Calling pingViaRelay for: " + callsignFinal);
+                            boolean hasRelay = httpClient.pingViaRelay(callsignFinal);
+                            android.util.Log.d("Relay/DevicesFragment", "Relay ping result for " + callsignFinal + ": " + hasRelay);
 
-                            // Update UI on main thread
-                            if (itemView.getContext() instanceof android.app.Activity) {
-                                ((android.app.Activity) itemView.getContext()).runOnUiThread(() -> {
-                                    if (hasRelay) {
-                                        TextView netBadge = new TextView(itemView.getContext());
-                                        netBadge.setText("NET");
-                                        netBadge.setTextSize(10);
-                                        netBadge.setTextColor(Color.WHITE);
-                                        netBadge.setBackgroundColor(0xFF0066CC); // Blue background
-                                        netBadge.setPadding(8, 4, 8, 4);
-                                        android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(
-                                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-                                        );
-                                        params.setMargins(0, 0, 8, 0);
-                                        netBadge.setLayoutParams(params);
-                                        channelIndicatorsFinal.addView(netBadge);
+                             // Update UI on main thread
+                             if (itemView.getContext() instanceof android.app.Activity) {
+                                 ((android.app.Activity) itemView.getContext()).runOnUiThread(() -> {
+                                     if (hasRelay) {
+                                         // Check if NET badge already exists to avoid duplicates
+                                         boolean netBadgeExists = false;
+                                         for (int i = 0; i < channelIndicatorsFinal.getChildCount(); i++) {
+                                             android.view.View child = channelIndicatorsFinal.getChildAt(i);
+                                             if (child instanceof TextView && "NET".equals(((TextView) child).getText().toString())) {
+                                                 netBadgeExists = true;
+                                                 break;
+                                             }
+                                         }
 
-                                        // Show channel indicators if any badges present
-                                        if (channelIndicatorsFinal.getChildCount() > 0) {
-                                            channelIndicatorsFinal.setVisibility(View.VISIBLE);
-                                        }
-                                    }
-                                });
-                            }
+                                         if (!netBadgeExists) {
+                                             android.util.Log.d("Relay/DevicesFragment", "Adding NET badge for: " + callsignFinal);
+                                             TextView netBadge = new TextView(itemView.getContext());
+                                             netBadge.setText("NET");
+                                             netBadge.setTextSize(10);
+                                             netBadge.setTextColor(Color.WHITE);
+                                             netBadge.setBackgroundColor(0xFF0066CC); // Blue background
+                                             netBadge.setPadding(8, 4, 8, 4);
+                                             android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(
+                                                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                                                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                                             );
+                                             params.setMargins(0, 0, 8, 0);
+                                             netBadge.setLayoutParams(params);
+                                             channelIndicatorsFinal.addView(netBadge);
+
+                                             // Show channel indicators if any badges present
+                                             if (channelIndicatorsFinal.getChildCount() > 0) {
+                                                 channelIndicatorsFinal.setVisibility(View.VISIBLE);
+                                             }
+                                         } else {
+                                             android.util.Log.d("Relay/DevicesFragment", "NET badge already exists for: " + callsignFinal);
+                                         }
+                                     } else {
+                                         android.util.Log.d("Relay/DevicesFragment", "No NET badge (relay ping failed) for: " + callsignFinal);
+                                     }
+                                 });
+                             }
                         } catch (Exception e) {
-                            // Ignore ping failures silently
+                            android.util.Log.e("Relay/DevicesFragment", "Error during relay ping for " + callsignFinal + ": " + e.getMessage(), e);
                         }
                     }).start();
+                } else {
+                    android.util.Log.d("Relay/DevicesFragment", "Skipping relay ping - no callsign/ID for device");
                 }
 
                 // Show/hide channel indicators based on whether any badges were added
@@ -755,5 +789,18 @@ public class DevicesWithinReachFragment extends Fragment {
                 return output;
             }
         }
+    }
+
+    /**
+     * Check if a badge with the given text already exists in the channel indicators
+     */
+    private static boolean badgeExists(android.widget.LinearLayout channelIndicators, String badgeText) {
+        for (int i = 0; i < channelIndicators.getChildCount(); i++) {
+            android.view.View child = channelIndicators.getChildAt(i);
+            if (child instanceof TextView && badgeText.equals(((TextView) child).getText().toString())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
