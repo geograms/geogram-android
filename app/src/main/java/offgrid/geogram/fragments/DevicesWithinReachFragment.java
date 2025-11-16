@@ -636,7 +636,7 @@ public class DevicesWithinReachFragment extends Fragment {
 
                 // Show/hide channel indicators based on whether any badges were added
                 // (NET badge is added asynchronously, so it will update visibility when added)
-                if (hasBLE || hasWiFi) {
+                if (hasBLE || hasWiFi || device.ID.equals("RELAY_SERVER")) {
                     channelIndicators.setVisibility(View.VISIBLE);
                 } else {
                     channelIndicators.setVisibility(View.GONE);
