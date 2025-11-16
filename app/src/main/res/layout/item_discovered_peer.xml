@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#2A2A2A"
+    android:padding="12dp"
+    android:layout_marginBottom="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <View
+            android:id="@+id/view_connection_status"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/circle_shape" />
+
+        <TextView
+            android:id="@+id/tv_peer_callsign"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="X1ABCD"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_peer_last_seen"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="2 hours ago"
+            android:textColor="#888888"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tv_peer_id"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="12D3KooWFTef23s8k1n68TtY5kzKjeDXu2NhpW3vAxJSesZH3zrz"
+        android:textColor="#666666"
+        android:textSize="11sp"
+        android:fontFamily="monospace"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:layout_marginTop="4dp" />
+</LinearLayout>
