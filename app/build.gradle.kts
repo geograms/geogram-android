@@ -43,13 +43,16 @@ android {
 
     packagingOptions {
         resources {
-            // Exclude duplicate META-INF files from I2P libraries
+            // Exclude duplicate META-INF files from BouncyCastle libraries
             excludes += listOf(
                 "META-INF/DEPENDENCIES",
                 "META-INF/LICENSE",
                 "META-INF/LICENSE.txt",
                 "META-INF/NOTICE",
-                "META-INF/NOTICE.txt"
+                "META-INF/NOTICE.txt",
+                "META-INF/INDEX.LIST",
+                "META-INF/license/*",
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
             )
         }
     }
@@ -68,15 +71,14 @@ dependencies {
     implementation(libs.spark.core)
     implementation(libs.car.ui.lib)
     implementation(libs.gson)
-    implementation(libs.bcprov.jdk15on)
-    implementation(libs.bcpkix.jdk15on)
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
     implementation(libs.viewpager2)
     implementation(libs.runner)
     implementation(libs.swiperefreshlayout)
 
-    // P2P networking - NOTE: Using stub implementation for now
-    // jvm-libp2p is not Android-compatible, need alternative solution
-    // implementation("io.libp2p:jvm-libp2p:1.2.2-RELEASE")
+    // WebSocket for relay
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // Room
     implementation(libs.room.runtime)

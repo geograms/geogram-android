@@ -88,6 +88,14 @@ public class AppConfig {
     @Expose
     private String relayMessageTypes = "text_only"; // text_only, text_and_images, everything
 
+    // ===== Device Relay Settings =====
+
+    @Expose
+    private boolean deviceRelayEnabled = true; // Default enabled
+
+    @Expose
+    private String deviceRelayServerUrl = "wss://api.geogram.radio:45679"; // Default relay server URL
+
     // ===== App Settings =====
 
     @Expose
@@ -330,6 +338,28 @@ public class AppConfig {
             this.relayMessageTypes = types;
         } else {
             throw new IllegalArgumentException("Invalid message types: " + types);
+        }
+    }
+
+    // Device Relay Settings
+
+    public boolean isDeviceRelayEnabled() {
+        return deviceRelayEnabled;
+    }
+
+    public void setDeviceRelayEnabled(boolean deviceRelayEnabled) {
+        this.deviceRelayEnabled = deviceRelayEnabled;
+    }
+
+    public String getDeviceRelayServerUrl() {
+        return deviceRelayServerUrl != null ? deviceRelayServerUrl : "wss://api.geogram.radio:45679";
+    }
+
+    public void setDeviceRelayServerUrl(String url) {
+        if (url != null && (url.startsWith("ws://") || url.startsWith("wss://"))) {
+            this.deviceRelayServerUrl = url;
+        } else {
+            throw new IllegalArgumentException("Relay server URL must start with ws:// or wss://");
         }
     }
 

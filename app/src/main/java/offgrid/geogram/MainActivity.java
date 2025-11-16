@@ -54,6 +54,8 @@ import offgrid.geogram.fragments.DevicesFragment;
 import offgrid.geogram.fragments.DevicesWithinReachFragment;
 import offgrid.geogram.fragments.MessagesFragment;
 import offgrid.geogram.fragments.RelayFragment;
+import offgrid.geogram.p2p.DeviceRelayClient;
+import offgrid.geogram.p2p.DeviceRelayChecker;
 import offgrid.geogram.settings.SettingsFragment;
 import offgrid.geogram.util.BatteryOptimizationHelper;
 
@@ -103,6 +105,9 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        // Stop battery monitor
+        offgrid.geogram.battery.BatteryMonitor.getInstance(this).stop();
+
         // Clear the weak ref if it points to this instance
         MainActivity cur = sInstance.get();
         if (cur == this) {
@@ -254,6 +259,8 @@ public class MainActivity extends AppCompatActivity {
         setupBackPressedHandler();
         setupEvents();
         setupLoops();
+        setupBatteryMonitor();
+        setupDeviceRelay();
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayShowTitleEnabled(false);
@@ -304,13 +311,57 @@ public class MainActivity extends AppCompatActivity {
         PingDevice.getInstance().start();
         // Start WiFi device discovery for local network communication
         offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(this).start();
+    }
 
-        // Initialize P2P service for internet peer connectivity via libp2p
-        offgrid.geogram.p2p.P2PService.getInstance(this).initialize();
+    private void setupBatteryMonitor() {
+        // Find battery footer views
+        View batteryFooter = findViewById(R.id.battery_footer);
+        if (batteryFooter == null) {
+            Log.w(TAG, "Battery footer not found");
+            return;
+        }
 
-        // Start battery monitor service for P2P power management
-        Intent batteryMonitorIntent = new Intent(this, offgrid.geogram.p2p.BatteryMonitorService.class);
-        startService(batteryMonitorIntent);
+        TextView batteryLevelText = batteryFooter.findViewById(R.id.tv_battery_level);
+        TextView batteryTimeText = batteryFooter.findViewById(R.id.tv_battery_time_remaining);
+
+        if (batteryLevelText == null || batteryTimeText == null) {
+            Log.w(TAG, "Battery footer views not found");
+            return;
+        }
+
+        // Initialize battery monitor
+        offgrid.geogram.battery.BatteryMonitor batteryMonitor =
+            offgrid.geogram.battery.BatteryMonitor.getInstance(this);
+
+        // Set up listener for battery updates
+        batteryMonitor.setListener((currentLevel, estimatedTimeRemaining) -> {
+            // Update UI on main thread
+            runOnUiThread(() -> {
+                if (currentLevel >= 0) {
+                    batteryLevelText.setText(currentLevel + "%");
+                } else {
+                    batteryLevelText.setText("--");
+                }
+                batteryTimeText.setText(estimatedTimeRemaining);
+            });
+        });
+
+        // Start monitoring
+        batteryMonitor.start();
+
+        Log.i(TAG, "Battery monitor initialized");
+    }
+
+    private void setupDeviceRelay() {
+        // Initialize and start device relay client
+        DeviceRelayClient relayClient = DeviceRelayClient.getInstance(this);
+        relayClient.start();
+
+        // Initialize and start relay status checker
+        DeviceRelayChecker relayChecker = DeviceRelayChecker.getInstance(this);
+        relayChecker.start();
+
+        Log.i(TAG, "Device relay client and checker initialized");
     }
 
     private void setupEvents() {

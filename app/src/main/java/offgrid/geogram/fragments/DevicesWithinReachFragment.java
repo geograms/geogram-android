@@ -28,6 +28,7 @@ import offgrid.geogram.devices.DeviceType;
 import offgrid.geogram.events.EventAction;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
+import offgrid.geogram.p2p.DeviceRelayChecker;
 
 public class DevicesWithinReachFragment extends Fragment {
 
@@ -442,7 +443,6 @@ public class DevicesWithinReachFragment extends Fragment {
                 // Check which connection types this device has
                 boolean hasBLE = false;
                 boolean hasWiFi = false;
-                boolean hasP2P = false;
 
                 for (offgrid.geogram.devices.EventConnected event : device.connectedEvents) {
                     if (event.connectionType == offgrid.geogram.devices.ConnectionType.BLE) {
@@ -460,11 +460,6 @@ public class DevicesWithinReachFragment extends Fragment {
                     if (wifiService.getDeviceIp(device.ID) != null) {
                         hasWiFi = true;
                     }
-                }
-
-                // Check if device has P2P
-                if (device.hasP2PPeerId() && device.isP2PEnabled()) {
-                    hasP2P = true;
                 }
 
                 // Add BLE badge
@@ -517,31 +512,32 @@ public class DevicesWithinReachFragment extends Fragment {
                     }
                 }
 
-                // Add P2P badge
-                if (hasP2P) {
-                    TextView p2pBadge = new TextView(itemView.getContext());
-                    p2pBadge.setText("P2P");
-                    p2pBadge.setTextSize(10);
-                    p2pBadge.setTextColor(Color.WHITE);
+                // Check if device is connected to relay server
+                boolean hasRelay = false;
+                if (itemView.getContext() != null) {
+                    DeviceRelayChecker relayChecker = DeviceRelayChecker.getInstance(itemView.getContext());
+                    hasRelay = relayChecker.isDeviceOnRelay(device.ID);
+                }
 
-                    // Color based on ready status: purple if ready, grey if not ready
-                    if (device.isP2PReady()) {
-                        p2pBadge.setBackgroundColor(0xFF9C27B0); // Purple - P2P ready
-                    } else {
-                        p2pBadge.setBackgroundColor(0xFF757575); // Grey - P2P not ready
-                    }
-
-                    p2pBadge.setPadding(8, 4, 8, 4);
-                    android.widget.LinearLayout.LayoutParams p2pParams = new android.widget.LinearLayout.LayoutParams(
+                // Add NET badge for relay-connected devices
+                if (hasRelay) {
+                    TextView netBadge = new TextView(itemView.getContext());
+                    netBadge.setText("NET");
+                    netBadge.setTextSize(10);
+                    netBadge.setTextColor(Color.WHITE);
+                    netBadge.setBackgroundColor(0xFF0066CC); // Blue background
+                    netBadge.setPadding(8, 4, 8, 4);
+                    android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(
                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                         android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
                     );
-                    p2pBadge.setLayoutParams(p2pParams);
-                    channelIndicators.addView(p2pBadge);
+                    params.setMargins(0, 0, 8, 0);
+                    netBadge.setLayoutParams(params);
+                    channelIndicators.addView(netBadge);
                 }
 
                 // Show/hide channel indicators based on whether any badges were added
-                if (hasBLE || hasWiFi || hasP2P) {
+                if (hasBLE || hasWiFi || hasRelay) {
                     channelIndicators.setVisibility(View.VISIBLE);
                 } else {
                     channelIndicators.setVisibility(View.GONE);
