@@ -70,69 +70,68 @@ public class P2PHttpClient {
         Log.i(TAG, "═══════════════════════════════════════════════════════");
         Log.i(TAG, "");
 
-        // Check if WiFi is actually connected
+        // Check WiFi status (for local network connections)
         boolean isWifiConnected = isWifiConnected();
         Log.i(TAG, "WiFi connected: " + isWifiConnected);
 
-        if (!isWifiConnected) {
-            Log.e(TAG, "✗ WiFi not connected - cannot reach device");
-            return new HttpResponse(503, "{\"success\": false, \"error\": \"WiFi not connected\"}");
-        }
-
-        // If remoteIp is provided and it's a local network address, use it directly
-        if (remoteIp != null && !remoteIp.isEmpty()) {
+        // If remoteIp is provided and WiFi is connected, try direct connection first
+        if (isWifiConnected && remoteIp != null && !remoteIp.isEmpty()) {
             boolean isLocal = isLocalNetworkAddress(remoteIp);
             Log.i(TAG, "Remote IP '" + remoteIp + "' is local network: " + isLocal);
 
             if (isLocal) {
-                Log.i(TAG, "✓ WiFi connected + local IP - using direct HTTP to: " + remoteIp);
+                Log.i(TAG, "→ Attempting direct WiFi connection to: " + remoteIp);
                 Device tempDevice = new Device(remoteIp, offgrid.geogram.devices.DeviceType.PRIMARY_STATION);
-                return getViaHttp(tempDevice, path, timeoutMs);
+                HttpResponse response = getViaHttp(tempDevice, path, timeoutMs);
+                if (response.isSuccess()) {
+                    Log.i(TAG, "✓ Direct WiFi connection successful");
+                    return response;
+                } else {
+                    Log.w(TAG, "✗ Direct WiFi connection failed, will try relay");
+                }
             }
-        }
-
-        // Find the device to determine connection method
-        DeviceManager deviceManager = DeviceManager.getInstance();
-        Device device = null;
-
-        Log.d(TAG, "Searching for device in DeviceManager...");
-        Log.d(TAG, "Total devices spotted: " + deviceManager.getDevicesSpotted().size());
-
-        // Search for device by ID
-        for (Device d : deviceManager.getDevicesSpotted()) {
-            Log.d(TAG, "  Checking device: ID=" + d.ID);
-            if (d.ID.equals(deviceId)) {
-                device = d;
-                Log.i(TAG, "✓ Found device: " + deviceId);
-                break;
-            }
-        }
-
-        if (device == null) {
-            Log.e(TAG, "✗ Device not found in DeviceManager: " + deviceId);
-            return new HttpResponse(404, "{\"success\": false, \"error\": \"Device not found: " + deviceId + "\"}");
         }
 
         // Check if device ID is a valid IP address
         boolean hasValidIp = isValidIpAddress(deviceId);
 
-        if (hasValidIp) {
-            // Device has IP address - check if it's local network
+        if (hasValidIp && isWifiConnected) {
+            // Device has IP address and WiFi is connected - try direct connection
             boolean isLocalNetwork = isLocalNetworkAddress(deviceId);
 
             if (isLocalNetwork) {
-                // Device is on local network - use direct WiFi connection
-                Log.i(TAG, "Device on local network (" + deviceId + ") - using direct WiFi");
-                return getViaHttp(device, path, timeoutMs);
-            } else {
-                // Device has public IP - try direct connection
-                Log.d(TAG, "Device has public IP (" + deviceId + ") - trying direct connection");
-                return getViaHttp(device, path, timeoutMs);
+                Log.i(TAG, "→ Attempting direct WiFi to local IP: " + deviceId);
+                Device tempDevice = new Device(deviceId, offgrid.geogram.devices.DeviceType.PRIMARY_STATION);
+                HttpResponse response = getViaHttp(tempDevice, path, timeoutMs);
+                if (response.isSuccess()) {
+                    Log.i(TAG, "✓ Direct WiFi connection successful");
+                    return response;
+                } else {
+                    Log.w(TAG, "✗ Direct WiFi connection failed, will try relay");
+                }
             }
-        } else {
-            // Device ID is not an IP (e.g., callsign like "X15RJ0")
-            Log.d(TAG, "Device ID '" + deviceId + "' is not an IP address - checking relay");
+        }
+
+        // WiFi not available or direct connection failed - try relay
+        if (!hasValidIp) {
+            // Device ID is a callsign (e.g., "X15RJ0") - use relay
+            Log.i(TAG, "→ Device ID is callsign '" + deviceId + "' - using relay");
             return tryRelayConnection(deviceId, path, timeoutMs);
+        } else {
+            // Device ID is an IP but WiFi failed/unavailable - check if callsign available
+            Log.i(TAG, "→ Direct connection not available, checking for relay");
+
+            // Try to find device's callsign
+            DeviceManager deviceManager = DeviceManager.getInstance();
+            for (Device d : deviceManager.getDevicesSpotted()) {
+                if (d.ID.equals(deviceId) && d.callsign != null && !d.callsign.isEmpty()) {
+                    Log.i(TAG, "→ Found callsign '" + d.callsign + "' for device, using relay");
+                    return tryRelayConnection(d.callsign, path, timeoutMs);
+                }
+            }
+
+            Log.e(TAG, "✗ No relay available for IP-based device: " + deviceId);
+            return new HttpResponse(503, "{\"success\": false, \"error\": \"Device not reachable via WiFi or relay\"}");
         }
     }
 

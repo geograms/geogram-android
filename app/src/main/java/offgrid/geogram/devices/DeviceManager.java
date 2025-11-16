@@ -73,7 +73,13 @@ public class DeviceManager {
                         // Create new device if not found
                         if (device == null) {
                             device = new Device(row.callsign, deviceType);
+                            device.callsign = row.callsign;  // Store callsign for relay lookups
                             devicesSpotted.add(device);
+                        } else {
+                            // Ensure callsign is set for existing devices
+                            if (device.callsign == null) {
+                                device.callsign = row.callsign;
+                            }
                         }
                     }
 
@@ -147,11 +153,16 @@ public class DeviceManager {
         // when there was no device, add one
         if(deviceFound == null){
             deviceFound = new Device(callsign, deviceType);
+            deviceFound.callsign = callsign;  // Store callsign for relay lookups
             devicesSpotted.add(deviceFound);
         } else {
             // CRITICAL FIX: Remove device from TreeSet before updating
             // TreeSets don't automatically re-sort when element's comparison value changes
             devicesSpotted.remove(deviceFound);
+            // Ensure callsign is set (for devices discovered before this field was added)
+            if (deviceFound.callsign == null) {
+                deviceFound.callsign = callsign;
+            }
         }
 
         // Update device model if provided (e.g., "APP-0.4.0")

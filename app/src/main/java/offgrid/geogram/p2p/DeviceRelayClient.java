@@ -149,73 +149,95 @@ public class DeviceRelayClient extends WebSocketListener {
 
     @Override
     public void onOpen(WebSocket webSocket, Response response) {
-        Log.d(TAG, "✓ WebSocket connected to relay server");
+        Log.i(TAG, "═══════════════════════════════════════════════════════");
+        Log.i(TAG, "✓ WEBSOCKET CONNECTED TO RELAY SERVER");
+        Log.i(TAG, "═══════════════════════════════════════════════════════");
+        Log.i(TAG, "Response code: " + response.code());
+        Log.i(TAG, "Protocol: " + response.protocol());
         isConnected = true;
 
         // Send registration message
         DeviceRelayMessage register = DeviceRelayMessage.createRegister(callsign);
-        webSocket.send(register.toJson());
-        Log.d(TAG, "→ Sent REGISTER message with callsign: " + callsign);
+        String json = register.toJson();
+        webSocket.send(json);
+        Log.i(TAG, "→ Sent REGISTER message with callsign: " + callsign);
+        Log.d(TAG, "   JSON: " + json);
     }
 
     @Override
     public void onMessage(WebSocket webSocket, String text) {
         try {
+            Log.d(TAG, "← Received WebSocket message: " + text);
             DeviceRelayMessage message = DeviceRelayMessage.fromJson(text);
             if (message == null) {
-                Log.e(TAG, "Failed to parse message: " + text);
+                Log.e(TAG, "✗ Failed to parse message: " + text);
                 return;
             }
 
-            Log.d(TAG, "← Received message type: " + message.type);
+            Log.i(TAG, "← Message type: " + message.type);
 
             switch (message.type) {
                 case REGISTER:
-                    Log.d(TAG, "✓ Registration confirmed for callsign: " + message.callsign);
+                    Log.i(TAG, "✓ REGISTRATION CONFIRMED for callsign: " + message.callsign);
                     break;
 
                 case HTTP_REQUEST:
+                    Log.i(TAG, "← HTTP_REQUEST: " + message.method + " " + message.path);
                     handleHttpRequest(webSocket, message);
                     break;
 
                 case PING:
-                    // Respond with PONG
+                    Log.d(TAG, "← PING (sending PONG)");
                     webSocket.send(DeviceRelayMessage.createPong().toJson());
                     break;
 
                 case PONG:
-                    // Heartbeat acknowledged
+                    Log.d(TAG, "← PONG");
                     break;
 
                 case ERROR:
-                    Log.e(TAG, "Server error: " + message.error);
+                    Log.e(TAG, "✗ Server error: " + message.error);
                     break;
 
                 default:
-                    Log.w(TAG, "Unknown message type: " + message.type);
+                    Log.w(TAG, "← Unknown message type: " + message.type);
                     break;
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error handling message", e);
+            Log.e(TAG, "✗ Error handling message", e);
         }
     }
 
     @Override
     public void onClosing(WebSocket webSocket, int code, String reason) {
-        Log.d(TAG, "WebSocket closing: " + code + " - " + reason);
+        Log.w(TAG, "WebSocket closing: code=" + code + ", reason='" + reason + "'");
         isConnected = false;
     }
 
     @Override
     public void onClosed(WebSocket webSocket, int code, String reason) {
-        Log.d(TAG, "WebSocket closed: " + code + " - " + reason);
+        Log.w(TAG, "═══════════════════════════════════════════════════════");
+        Log.w(TAG, "WEBSOCKET CLOSED");
+        Log.w(TAG, "═══════════════════════════════════════════════════════");
+        Log.w(TAG, "Code: " + code);
+        Log.w(TAG, "Reason: " + reason);
         isConnected = false;
         reconnect();
     }
 
     @Override
     public void onFailure(WebSocket webSocket, Throwable t, Response response) {
-        Log.e(TAG, "WebSocket error: " + t.getMessage(), t);
+        Log.e(TAG, "═══════════════════════════════════════════════════════");
+        Log.e(TAG, "✗ WEBSOCKET CONNECTION FAILED");
+        Log.e(TAG, "═══════════════════════════════════════════════════════");
+        Log.e(TAG, "Error: " + t.getClass().getSimpleName() + ": " + t.getMessage());
+        if (response != null) {
+            Log.e(TAG, "Response code: " + response.code());
+            Log.e(TAG, "Response message: " + response.message());
+        } else {
+            Log.e(TAG, "Response: null (connection failed before HTTP response)");
+        }
+        Log.e(TAG, "Stack trace:", t);
         isConnected = false;
         reconnect();
     }

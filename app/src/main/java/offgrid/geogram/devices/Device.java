@@ -10,6 +10,9 @@ public class Device implements Comparable<Device> {
     public final String ID;
     public final DeviceType deviceType;
 
+    // Callsign for relay server identification (e.g., X1SQYS)
+    public String callsign = null;
+
     // Device model code and version (e.g., APP-0.4.0)
     private DeviceModel deviceModel = null;
     private String deviceVersion = null;
@@ -22,12 +25,6 @@ public class Device implements Comparable<Device> {
     private android.graphics.Bitmap profilePicture = null;
     private boolean profileFetched = false;
     private long profileFetchTimestamp = 0; // Timestamp when profile was last fetched
-
-    // P2P information (fetched via WiFi API, used for internet connectivity)
-    private String p2pPeerId = null;                // libp2p Peer ID (Base58)
-    private boolean p2pEnabled = false;             // Whether remote device has P2P enabled
-    private boolean p2pReady = false;               // Whether remote device P2P is ready
-    private long p2pLastSeen = 0;                   // Timestamp of last P2P info update
 
     // WiFi reachability
     private boolean isWiFiReachable = true; // Assume reachable by default
@@ -108,47 +105,6 @@ public class Device implements Comparable<Device> {
     /** Set profile npub. */
     public void setProfileNpub(String npub) {
         this.profileNpub = npub;
-    }
-
-    /** Get P2P peer ID (libp2p Base58). */
-    public String getP2PPeerId() {
-        return p2pPeerId;
-    }
-
-    /** Set P2P peer ID. */
-    public void setP2PPeerId(String peerId) {
-        this.p2pPeerId = peerId;
-        this.p2pLastSeen = System.currentTimeMillis();
-    }
-
-    /** Check if device has P2P peer ID. */
-    public boolean hasP2PPeerId() {
-        return p2pPeerId != null && !p2pPeerId.isEmpty();
-    }
-
-    /** Check if remote device has P2P enabled. */
-    public boolean isP2PEnabled() {
-        return p2pEnabled;
-    }
-
-    /** Set P2P enabled status. */
-    public void setP2PEnabled(boolean enabled) {
-        this.p2pEnabled = enabled;
-    }
-
-    /** Check if remote device P2P is ready (node started). */
-    public boolean isP2PReady() {
-        return p2pReady;
-    }
-
-    /** Set P2P ready status. */
-    public void setP2PReady(boolean ready) {
-        this.p2pReady = ready;
-    }
-
-    /** Get timestamp when P2P info was last updated. */
-    public long getP2PLastSeen() {
-        return p2pLastSeen;
     }
 
     /** Get profile picture bitmap, or null if not set. */

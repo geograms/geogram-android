@@ -516,7 +516,11 @@ public class DevicesWithinReachFragment extends Fragment {
                 boolean hasRelay = false;
                 if (itemView.getContext() != null) {
                     DeviceRelayChecker relayChecker = DeviceRelayChecker.getInstance(itemView.getContext());
-                    hasRelay = relayChecker.isDeviceOnRelay(device.ID);
+                    // Check using callsign field if available, otherwise use ID
+                    String callsignToCheck = (device.callsign != null && !device.callsign.isEmpty())
+                        ? device.callsign
+                        : device.ID;
+                    hasRelay = relayChecker.isDeviceOnRelay(callsignToCheck);
                 }
 
                 // Add NET badge for relay-connected devices
