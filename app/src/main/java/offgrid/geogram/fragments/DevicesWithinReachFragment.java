@@ -382,7 +382,7 @@ public class DevicesWithinReachFragment extends Fragment {
                  } else {
                     // Use server icon for relay device, person icon for others
                     if (device.ID.equals("RELAY_SERVER")) {
-                        profileImage.setImageResource(R.drawable.ic_relay);
+                        profileImage.setImageResource(R.drawable.ic_tethering);
                     } else {
                         profileImage.setImageResource(R.drawable.ic_person);
                     }
