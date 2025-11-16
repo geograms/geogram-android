@@ -29,6 +29,7 @@ import offgrid.geogram.events.EventAction;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
 import offgrid.geogram.p2p.DeviceRelayChecker;
+import offgrid.geogram.p2p.P2PHttpClient;
 
 public class DevicesWithinReachFragment extends Fragment {
 
@@ -512,36 +513,54 @@ public class DevicesWithinReachFragment extends Fragment {
                     }
                 }
 
-                // Check if device is connected to relay server
-                boolean hasRelay = false;
-                if (itemView.getContext() != null) {
-                    DeviceRelayChecker relayChecker = DeviceRelayChecker.getInstance(itemView.getContext());
-                    // Check using callsign field if available, otherwise use ID
-                    String callsignToCheck = (device.callsign != null && !device.callsign.isEmpty())
-                        ? device.callsign
-                        : device.ID;
-                    hasRelay = relayChecker.isDeviceOnRelay(callsignToCheck);
-                }
+                // Ping device via relay to check if reachable over internet
+                // Use callsign if available, otherwise use ID
+                String callsignToCheck = (device.callsign != null && !device.callsign.isEmpty())
+                    ? device.callsign
+                    : device.ID;
 
-                // Add NET badge for relay-connected devices
-                if (hasRelay) {
-                    TextView netBadge = new TextView(itemView.getContext());
-                    netBadge.setText("NET");
-                    netBadge.setTextSize(10);
-                    netBadge.setTextColor(Color.WHITE);
-                    netBadge.setBackgroundColor(0xFF0066CC); // Blue background
-                    netBadge.setPadding(8, 4, 8, 4);
-                    android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(
-                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-                    );
-                    params.setMargins(0, 0, 8, 0);
-                    netBadge.setLayoutParams(params);
-                    channelIndicators.addView(netBadge);
+                // Ping via relay in background thread
+                if (callsignToCheck != null && !callsignToCheck.isEmpty()) {
+                    final android.widget.LinearLayout channelIndicatorsFinal = channelIndicators;
+                    new Thread(() -> {
+                        try {
+                            P2PHttpClient httpClient = new P2PHttpClient(itemView.getContext());
+                            boolean hasRelay = httpClient.pingViaRelay(callsignToCheck);
+
+                            // Update UI on main thread
+                            if (itemView.getContext() instanceof android.app.Activity) {
+                                ((android.app.Activity) itemView.getContext()).runOnUiThread(() -> {
+                                    if (hasRelay) {
+                                        TextView netBadge = new TextView(itemView.getContext());
+                                        netBadge.setText("NET");
+                                        netBadge.setTextSize(10);
+                                        netBadge.setTextColor(Color.WHITE);
+                                        netBadge.setBackgroundColor(0xFF0066CC); // Blue background
+                                        netBadge.setPadding(8, 4, 8, 4);
+                                        android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(
+                                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                                            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                                        );
+                                        params.setMargins(0, 0, 8, 0);
+                                        netBadge.setLayoutParams(params);
+                                        channelIndicatorsFinal.addView(netBadge);
+
+                                        // Show channel indicators if any badges present
+                                        if (channelIndicatorsFinal.getChildCount() > 0) {
+                                            channelIndicatorsFinal.setVisibility(View.VISIBLE);
+                                        }
+                                    }
+                                });
+                            }
+                        } catch (Exception e) {
+                            // Ignore ping failures silently
+                        }
+                    }).start();
                 }
 
                 // Show/hide channel indicators based on whether any badges were added
-                if (hasBLE || hasWiFi || hasRelay) {
+                // (NET badge is added asynchronously, so it will update visibility when added)
+                if (hasBLE || hasWiFi) {
                     channelIndicators.setVisibility(View.VISIBLE);
                 } else {
                     channelIndicators.setVisibility(View.GONE);

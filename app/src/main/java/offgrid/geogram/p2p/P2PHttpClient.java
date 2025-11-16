@@ -136,20 +136,53 @@ public class P2PHttpClient {
     }
 
     /**
+     * Ping a device via relay to check if it's reachable
+     * @param callsign Device callsign (e.g., X1SQYS)
+     * @return true if device responds via relay, false otherwise
+     */
+    public boolean pingViaRelay(String callsign) {
+        if (callsign == null || callsign.isEmpty()) {
+            return false;
+        }
+
+        try {
+            ConfigManager configManager = ConfigManager.getInstance(context);
+            String relayUrl = configManager.getConfig().getDeviceRelayServerUrl();
+
+            // Convert WebSocket URL to HTTP URL
+            String httpUrl = relayUrl.replace("ws://", "http://").replace("wss://", "https://");
+            if (httpUrl.contains(":45679")) {
+                httpUrl = httpUrl.replace(":45679", "");
+            }
+
+            // Try to ping the device via relay proxy
+            String apiUrl = httpUrl + "/device/" + callsign + "/api/ping";
+            Log.d(TAG, "Relay ping: " + apiUrl);
+
+            URL url = new URL(apiUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(3000);  // Short timeout for ping
+            conn.setReadTimeout(3000);
+
+            int responseCode = conn.getResponseCode();
+            conn.disconnect();
+
+            boolean reachable = (responseCode >= 200 && responseCode < 300);
+            Log.d(TAG, "Relay ping " + callsign + ": " + (reachable ? "✓ SUCCESS" : "✗ FAILED (" + responseCode + ")"));
+            return reachable;
+
+        } catch (Exception e) {
+            Log.d(TAG, "Relay ping " + callsign + ": ✗ FAILED (" + e.getMessage() + ")");
+            return false;
+        }
+    }
+
+    /**
      * Try to connect to device via relay server
      */
     private HttpResponse tryRelayConnection(String deviceId, String path, int timeoutMs) {
-        // Check if device is connected to relay
-        DeviceRelayChecker relayChecker = DeviceRelayChecker.getInstance(context);
-
-        if (!relayChecker.isDeviceOnRelay(deviceId)) {
-            Log.e(TAG, "✗ Device '" + deviceId + "' is not connected to relay server");
-            return new HttpResponse(503,
-                "{\"success\": false, \"error\": \"Device '" + deviceId +
-                "' is not reachable via WiFi or relay\"}");
-        }
-
-        Log.i(TAG, "✓ Device found on relay server, using relay connection");
+        Log.i(TAG, "→ Attempting relay connection to: " + deviceId);
         return getViaRelay(deviceId, path, timeoutMs);
     }
 
