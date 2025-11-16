@@ -366,7 +366,14 @@ public class DevicesWithinReachFragment extends Fragment {
                 if (device.getProfileNickname() != null && !device.getProfileNickname().isEmpty()) {
                     deviceName.setText(device.getProfileNickname() + " (" + device.ID + ")");
                 } else {
-                    deviceName.setText(device.ID);
+                    // Special handling for relay server - show server URL instead of ID
+                    if (device.ID.equals("RELAY_SERVER")) {
+                        String serverUrl = offgrid.geogram.settings.ConfigManager.getInstance(itemView.getContext()).getConfig().getDeviceRelayServerUrl();
+                        String displayUrl = extractServerHost(serverUrl);
+                        deviceName.setText(displayUrl);
+                    } else {
+                        deviceName.setText(device.ID);
+                    }
                 }
 
                 // Display profile picture if available
@@ -833,6 +840,27 @@ public class DevicesWithinReachFragment extends Fragment {
         } catch (Exception e) {
             android.util.Log.e("DevicesFragment", "Error creating relay device", e);
             return null;
+        }
+    }
+
+    /**
+     * Extract server host from WebSocket URL, omitting protocol and port
+     */
+    private static String extractServerHost(String wsUrl) {
+        if (wsUrl == null || wsUrl.isEmpty()) {
+            return "unknown";
+        }
+        try {
+            // Remove protocol prefix
+            String withoutProtocol = wsUrl.replaceFirst("^(ws://|wss://)", "");
+            // Remove port if present
+            int colonIndex = withoutProtocol.lastIndexOf(':');
+            if (colonIndex > 0) {
+                return withoutProtocol.substring(0, colonIndex);
+            }
+            return withoutProtocol;
+        } catch (Exception e) {
+            return "unknown";
         }
     }
 
