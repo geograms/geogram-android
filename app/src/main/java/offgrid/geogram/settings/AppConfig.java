@@ -94,7 +94,7 @@ public class AppConfig {
     private boolean deviceRelayEnabled = true; // Default enabled
 
     @Expose
-    private String deviceRelayServerUrl = "wss://api.geogram.radio:45679"; // Default relay server URL
+    private String deviceRelayServerUrl = "ws://api.geogram.radio:45679"; // Default relay server URL (plain WebSocket - server doesn't have SSL on this port)
 
     // ===== App Settings =====
 
