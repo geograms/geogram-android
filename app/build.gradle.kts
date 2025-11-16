@@ -71,8 +71,9 @@ dependencies {
     implementation(libs.spark.core)
     implementation(libs.car.ui.lib)
     implementation(libs.gson)
-    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
+    // BouncyCastle removed - causes System.exit(100) crash on Android due to Uptime access
+    // implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+    // implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
     implementation(libs.viewpager2)
     implementation(libs.runner)
     implementation(libs.swiperefreshlayout)

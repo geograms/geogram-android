@@ -52,13 +52,15 @@ public class BackgroundService extends Service {
         }
 
         // Start background web server if enabled in settings
-        if (Central.getInstance().getSettings() != null &&
+        // DISABLED: Spark/Jetty has incompatibility with Android causing System.exit(100)
+        // TODO: Replace with Android-compatible web server (e.g., NanoHTTPD)
+        if (false && Central.getInstance().getSettings() != null &&
             Central.getInstance().getSettings().isHttpApiEnabled()) {
             server = new SimpleSparkServer(this.getApplicationContext());
             new Thread(server).start();
             log(TAG, "HTTP API server started");
         } else {
-            log(TAG, "HTTP API server disabled in settings");
+            log(TAG, "HTTP API server disabled (Spark incompatible with Android)");
         }
 
         // Start Bluetooth stack if allowed
