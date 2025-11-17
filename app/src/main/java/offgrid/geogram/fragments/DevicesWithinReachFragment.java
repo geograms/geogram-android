@@ -43,6 +43,7 @@ public class DevicesWithinReachFragment extends Fragment {
     private android.os.Handler reachabilityHandler;
     private Runnable reachabilityCheckRunnable;
     private android.content.BroadcastReceiver wifiDiscoveryReceiver;
+    private android.content.BroadcastReceiver relayStatusReceiver;
 
     @Nullable
     @Override
@@ -185,6 +186,29 @@ public class DevicesWithinReachFragment extends Fragment {
             androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(getContext())
                     .registerReceiver(wifiDiscoveryReceiver, filter);
         }
+
+        // Register relay status broadcast receiver for immediate UI updates
+        if (relayStatusReceiver == null) {
+            relayStatusReceiver = new android.content.BroadcastReceiver() {
+                @Override
+                public void onReceive(android.content.Context context, android.content.Intent intent) {
+                    boolean isConnected = intent.getBooleanExtra(
+                            offgrid.geogram.p2p.DeviceRelayClient.EXTRA_IS_CONNECTED, false);
+                    android.util.Log.d("DevicesFragment", "Relay status changed: " +
+                            (isConnected ? "CONNECTED" : "DISCONNECTED") + " - refreshing UI");
+                    if (adapter != null) {
+                        adapter.notifyDataSetChanged();
+                    }
+                }
+            };
+        }
+
+        // Register relay status receiver
+        if (getContext() != null) {
+            android.content.IntentFilter relayFilter = new android.content.IntentFilter(
+                    offgrid.geogram.p2p.DeviceRelayClient.ACTION_RELAY_STATUS_CHANGED);
+            getContext().registerReceiver(relayStatusReceiver, relayFilter);
+        }
     }
 
     @Override
@@ -199,6 +223,11 @@ public class DevicesWithinReachFragment extends Fragment {
         if (wifiDiscoveryReceiver != null && getContext() != null) {
             androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(getContext())
                     .unregisterReceiver(wifiDiscoveryReceiver);
+        }
+
+        // Unregister relay status broadcast receiver
+        if (relayStatusReceiver != null && getContext() != null) {
+            getContext().unregisterReceiver(relayStatusReceiver);
         }
     }
 

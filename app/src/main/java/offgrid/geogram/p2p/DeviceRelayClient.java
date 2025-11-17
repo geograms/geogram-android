@@ -5,6 +5,7 @@
 package offgrid.geogram.p2p;
 
 import android.content.Context;
+import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -32,6 +33,10 @@ public class DeviceRelayClient extends WebSocketListener {
     private static final String TAG = "Relay/Client";
     private static final int PING_INTERVAL_MS = 60000; // 1 minute
     private static final int RECONNECT_DELAY_MS = 5000; // 5 seconds
+
+    // Broadcast action for relay connection status changes
+    public static final String ACTION_RELAY_STATUS_CHANGED = "offgrid.geogram.RELAY_STATUS_CHANGED";
+    public static final String EXTRA_IS_CONNECTED = "is_connected";
 
     private static DeviceRelayClient instance;
 
@@ -156,6 +161,9 @@ public class DeviceRelayClient extends WebSocketListener {
         Log.i(TAG, "Protocol: " + response.protocol());
         isConnected = true;
 
+        // Broadcast connection status change
+        broadcastStatusChange(true);
+
         // Send registration message
         DeviceRelayMessage register = DeviceRelayMessage.createRegister(callsign);
         String json = register.toJson();
@@ -222,6 +230,10 @@ public class DeviceRelayClient extends WebSocketListener {
         Log.w(TAG, "Code: " + code);
         Log.w(TAG, "Reason: " + reason);
         isConnected = false;
+
+        // Broadcast connection status change
+        broadcastStatusChange(false);
+
         reconnect();
     }
 
@@ -239,6 +251,10 @@ public class DeviceRelayClient extends WebSocketListener {
         }
         Log.e(TAG, "Stack trace:", t);
         isConnected = false;
+
+        // Broadcast connection status change
+        broadcastStatusChange(false);
+
         reconnect();
     }
 
@@ -286,8 +302,32 @@ public class DeviceRelayClient extends WebSocketListener {
 
                 try (Response response = localClient.newCall(requestBuilder.build()).execute()) {
                     int statusCode = response.code();
-                    String responseBody = response.body() != null ? response.body().string() : "";
-                    String responseHeaders = encodeHeaders(response.headers().toMultimap());
+                    String responseBody;
+                    String responseHeaders;
+
+                    // Check if response is binary (image, video, etc.)
+                    String contentType = response.header("Content-Type", "");
+                    boolean isBinary = contentType.startsWith("image/") ||
+                                      contentType.startsWith("video/") ||
+                                      contentType.startsWith("audio/") ||
+                                      contentType.startsWith("application/octet-stream");
+
+                    if (isBinary && response.body() != null) {
+                        // For binary responses, Base64 encode to prevent corruption
+                        byte[] bytes = response.body().bytes();
+                        responseBody = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+
+                        // Add header to indicate Base64 encoding
+                        java.util.Map<String, java.util.List<String>> headers = response.headers().toMultimap();
+                        headers.put("X-Binary-Encoded", java.util.Arrays.asList("base64"));
+                        responseHeaders = encodeHeaders(headers);
+
+                        Log.d(TAG, "← Encoded binary response (" + bytes.length + " bytes) as Base64");
+                    } else {
+                        // Text responses can be sent as-is
+                        responseBody = response.body() != null ? response.body().string() : "";
+                        responseHeaders = encodeHeaders(response.headers().toMultimap());
+                    }
 
                     // Send response back to server
                     DeviceRelayMessage relayResponse = DeviceRelayMessage.createHttpResponse(
@@ -368,5 +408,15 @@ public class DeviceRelayClient extends WebSocketListener {
         } else {
             return "Disconnected";
         }
+    }
+
+    /**
+     * Broadcast relay connection status change
+     */
+    private void broadcastStatusChange(boolean isConnected) {
+        Intent intent = new Intent(ACTION_RELAY_STATUS_CHANGED);
+        intent.putExtra(EXTRA_IS_CONNECTED, isConnected);
+        context.sendBroadcast(intent);
+        Log.d(TAG, "Broadcasted relay status change: " + (isConnected ? "CONNECTED" : "DISCONNECTED"));
     }
 }
