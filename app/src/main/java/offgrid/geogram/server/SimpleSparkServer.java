@@ -65,6 +65,15 @@ public class SimpleSparkServer implements Runnable {
             return;
         }
 
+        // Pre-initialize SecureRandom to avoid Jetty's Uptime access issue on Android
+        try {
+            java.security.SecureRandom secureRandom = new java.security.SecureRandom();
+            secureRandom.nextBytes(new byte[20]); // Force initialization
+            Log.i(TAG_ID, "SecureRandom pre-initialized for Android compatibility");
+        } catch (Exception e) {
+            Log.w(TAG_ID, "Failed to pre-initialize SecureRandom: " + e.getMessage());
+        }
+
         ipAddress("0.0.0.0"); // Allow access from all network interfaces
         port(SERVER_PORT); // Set the port to SERVER_PORT
 
