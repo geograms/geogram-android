@@ -317,6 +317,16 @@ public class DevicesWithinReachFragment extends Fragment {
                 });
             }
         }
+
+        // Always refresh UI to update relay connection status badge
+        // (relay device is skipped in the loop above, so we need to refresh here)
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                if (adapter != null) {
+                    adapter.notifyDataSetChanged();
+                }
+            });
+        }
     }
 
     private void checkDeviceReachability(Device device, String deviceIp) {
