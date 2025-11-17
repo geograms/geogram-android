@@ -38,7 +38,9 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.ViewHolder> {
     private String collectionStoragePath;
     private boolean isRemoteMode = false;
     private String remoteIp;
+    private String deviceId;
     private String collectionNpub;
+    private android.content.Context context;
 
     public FileAdapter(OnFileClickListener listener) {
         this.files = new ArrayList<>();
@@ -49,10 +51,12 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.ViewHolder> {
         this.collectionStoragePath = path;
     }
 
-    public void setRemoteMode(boolean isRemote, String ip, String npub) {
+    public void setRemoteMode(boolean isRemote, String ip, String deviceId, String npub, android.content.Context context) {
         this.isRemoteMode = isRemote;
         this.remoteIp = ip;
+        this.deviceId = deviceId;
         this.collectionNpub = npub;
+        this.context = context;
     }
 
     public void setOnFileLongClickListener(OnFileLongClickListener listener) {
@@ -70,7 +74,7 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.ViewHolder> {
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         CollectionFile file = files.get(position);
-        holder.bind(file, listener, longClickListener, collectionStoragePath, isRemoteMode, remoteIp, collectionNpub);
+        holder.bind(file, listener, longClickListener, collectionStoragePath, isRemoteMode, remoteIp, deviceId, collectionNpub, context);
     }
 
     @Override
@@ -98,7 +102,15 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.ViewHolder> {
         }
 
         public void bind(CollectionFile file, OnFileClickListener listener, OnFileLongClickListener longClickListener,
-                         String storagePath, boolean isRemote, String remoteIp, String collectionNpub) {
+                         String storagePath, boolean isRemote, String remoteIp, String deviceId, String collectionNpub, android.content.Context context) {
+            android.util.Log.d("FileAdapter", "═══════════════════════════════════════");
+            android.util.Log.d("FileAdapter", "bind() called for: " + file.getName());
+            android.util.Log.d("FileAdapter", "  filePath=" + file.getPath());
+            android.util.Log.d("FileAdapter", "  isRemote=" + isRemote);
+            android.util.Log.d("FileAdapter", "  storagePath=" + storagePath);
+            android.util.Log.d("FileAdapter", "  remoteIp=" + remoteIp);
+            android.util.Log.d("FileAdapter", "  deviceId=" + deviceId);
+            android.util.Log.d("FileAdapter", "  collectionNpub=" + collectionNpub);
             fileName.setText(file.getName());
 
             // Set icon based on type
@@ -109,19 +121,29 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.ViewHolder> {
                 fileDetails.setText("Folder");
             } else {
                 // Check if it's an image file and load thumbnail
-                if (isImageFile(file.getName())) {
-                    if (isRemote && remoteIp != null && collectionNpub != null) {
-                        // Load thumbnail from remote device
-                        loadRemoteThumbnail(file.getPath(), remoteIp, collectionNpub);
+                boolean isImage = isImageFile(file.getName());
+                android.util.Log.d("FileAdapter", "  isImage=" + isImage);
+                if (isImage) {
+                    if (isRemote && (remoteIp != null || deviceId != null) && collectionNpub != null && context != null) {
+                        // Load thumbnail from remote device (via WiFi or relay)
+                        android.util.Log.d("FileAdapter", "  → Loading REMOTE thumbnail");
+                        loadRemoteThumbnail(file.getPath(), remoteIp, deviceId, collectionNpub, context);
                     } else if (storagePath != null) {
                         // Load local thumbnail
+                        android.util.Log.d("FileAdapter", "  → Loading LOCAL thumbnail");
+                        android.util.Log.d("FileAdapter", "     storagePath=" + storagePath);
+                        android.util.Log.d("FileAdapter", "     filePath=" + file.getPath());
                         loadThumbnail(file.getPath(), storagePath);
                     } else {
+                        android.util.Log.w("FileAdapter", "  ✗ No storage path available - cannot load thumbnail");
+                        android.util.Log.w("FileAdapter", "     isRemote=" + isRemote);
+                        android.util.Log.w("FileAdapter", "     storagePath=" + storagePath);
                         fileIcon.setImageResource(R.drawable.ic_file);
                         fileIcon.setImageTintList(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
                         fileIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     }
                 } else {
+                    android.util.Log.d("FileAdapter", "  → File is not an image, using generic icon");
                     fileIcon.setImageResource(R.drawable.ic_file);
                     fileIcon.setImageTintList(android.content.res.ColorStateList.valueOf(0xFFFFFFFF)); // White tint for file icon
                     fileIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -173,14 +195,24 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.ViewHolder> {
         }
 
         private void loadThumbnail(String filePath, String storagePath) {
+            android.util.Log.d("FileAdapter", "loadThumbnail() START");
+            android.util.Log.d("FileAdapter", "  storagePath=" + storagePath);
+            android.util.Log.d("FileAdapter", "  filePath=" + filePath);
+
             File imageFile = new File(storagePath, filePath);
+            String fullPath = imageFile.getAbsolutePath();
+            android.util.Log.d("FileAdapter", "  fullPath=" + fullPath);
+            android.util.Log.d("FileAdapter", "  file.exists()=" + imageFile.exists());
+
             if (!imageFile.exists()) {
+                android.util.Log.w("FileAdapter", "  ✗ Image file does not exist!");
                 fileIcon.setImageResource(R.drawable.ic_file);
                 fileIcon.setImageTintList(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
                 fileIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
                 return;
             }
 
+            android.util.Log.d("FileAdapter", "  → File exists, decoding...");
             try {
                 // Load image with downsampling to save memory
                 BitmapFactory.Options options = new BitmapFactory.Options();
@@ -193,23 +225,29 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.ViewHolder> {
                 options.inJustDecodeBounds = false;
 
                 Bitmap thumbnail = BitmapFactory.decodeFile(imageFile.getAbsolutePath(), options);
+                android.util.Log.d("FileAdapter", "  thumbnail=" + (thumbnail != null ? (thumbnail.getWidth() + "x" + thumbnail.getHeight()) : "null"));
+
                 if (thumbnail != null) {
+                    android.util.Log.d("FileAdapter", "  ✓ Thumbnail decoded successfully, displaying...");
                     fileIcon.setImageTintList(null); // Remove tint for actual images
                     fileIcon.setImageBitmap(thumbnail);
                     fileIcon.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 } else {
+                    android.util.Log.w("FileAdapter", "  ✗ Thumbnail decode returned null");
                     fileIcon.setImageResource(R.drawable.ic_file);
                     fileIcon.setImageTintList(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
                     fileIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
                 }
             } catch (Exception e) {
+                android.util.Log.e("FileAdapter", "  ✗ Exception loading thumbnail: " + e.getMessage(), e);
                 fileIcon.setImageResource(R.drawable.ic_file);
                 fileIcon.setImageTintList(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
                 fileIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
             }
+            android.util.Log.d("FileAdapter", "loadThumbnail() END");
         }
 
-        private void loadRemoteThumbnail(String filePath, String remoteIp, String collectionNpub) {
+        private void loadRemoteThumbnail(String filePath, String remoteIp, String deviceId, String collectionNpub, android.content.Context context) {
             // Set placeholder while loading
             fileIcon.setImageResource(R.drawable.ic_file);
             fileIcon.setImageTintList(android.content.res.ColorStateList.valueOf(0xFFFFFFFF));
@@ -218,33 +256,43 @@ public class FileAdapter extends RecyclerView.Adapter<FileAdapter.ViewHolder> {
             // Load thumbnail in background thread
             new Thread(() -> {
                 try {
-                    String thumbnailUrl = "http://" + remoteIp + ":45678/api/collections/" +
-                            collectionNpub + "/thumbnail/" + filePath;
+                    String path = "/api/collections/" + collectionNpub + "/thumbnail/" + filePath;
+                    android.util.Log.d("FileAdapter", "Loading remote thumbnail: " + path + " (deviceId=" + deviceId + ", remoteIp=" + remoteIp + ")");
 
-                    URL url = new URL(thumbnailUrl);
-                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                    conn.setConnectTimeout(5000);
-                    conn.setReadTimeout(5000);
+                    // Use P2PHttpClient to route through WiFi or relay
+                    // Increased timeout to 15s for relay routing + image processing
+                    offgrid.geogram.p2p.P2PHttpClient httpClient = new offgrid.geogram.p2p.P2PHttpClient(context);
+                    offgrid.geogram.p2p.P2PHttpClient.InputStreamResponse streamResponse =
+                        httpClient.getInputStream(deviceId, remoteIp, path, 15000);
 
-                    int responseCode = conn.getResponseCode();
-                    if (responseCode == HttpURLConnection.HTTP_OK) {
-                        InputStream inputStream = conn.getInputStream();
-                        Bitmap thumbnail = BitmapFactory.decodeStream(inputStream);
-                        inputStream.close();
+                    if (streamResponse.isSuccess()) {
+                        android.util.Log.d("FileAdapter", "Thumbnail request successful, decoding image...");
+                        try {
+                            InputStream inputStream = streamResponse.stream;
 
-                        if (thumbnail != null) {
-                            // Update UI on main thread
-                            fileIcon.post(() -> {
-                                fileIcon.setImageTintList(null); // Remove tint for actual images
-                                fileIcon.setImageBitmap(thumbnail);
-                                fileIcon.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                            });
+                            // Decode image directly from stream
+                            Bitmap thumbnail = BitmapFactory.decodeStream(inputStream);
+
+                            if (thumbnail != null) {
+                                android.util.Log.d("FileAdapter", "Thumbnail decoded successfully: " + thumbnail.getWidth() + "x" + thumbnail.getHeight());
+                                // Update UI on main thread
+                                fileIcon.post(() -> {
+                                    fileIcon.setImageTintList(null); // Remove tint for actual images
+                                    fileIcon.setImageBitmap(thumbnail);
+                                    fileIcon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                                });
+                            } else {
+                                android.util.Log.w("FileAdapter", "Failed to decode thumbnail bitmap - stream might be empty or invalid format");
+                            }
+                        } finally {
+                            streamResponse.close();
                         }
+                    } else {
+                        android.util.Log.e("FileAdapter", "Thumbnail request failed: HTTP " + streamResponse.statusCode +
+                            (streamResponse.errorMessage != null ? " - " + streamResponse.errorMessage : ""));
                     }
-
-                    conn.disconnect();
                 } catch (Exception e) {
-                    android.util.Log.e("FileAdapter", "Error loading remote thumbnail: " + e.getMessage());
+                    android.util.Log.e("FileAdapter", "Error loading remote thumbnail: " + e.getMessage(), e);
                     // Keep default file icon on error
                 }
             }).start();

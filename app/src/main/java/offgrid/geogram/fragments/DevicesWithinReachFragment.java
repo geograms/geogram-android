@@ -633,7 +633,11 @@ public class DevicesWithinReachFragment extends Fragment {
                  }
 
                  // Add relay connection status badge for relay server
-                 if (device.ID.equals("RELAY_SERVER") && !badgeExists(channelIndicators, "Connected") && !badgeExists(channelIndicators, "Disconnected")) {
+                 if (device.ID.equals("RELAY_SERVER")) {
+                     // Remove old status badges to ensure we show current status
+                     removeBadge(channelIndicators, "Connected");
+                     removeBadge(channelIndicators, "Disconnected");
+
                      offgrid.geogram.p2p.DeviceRelayClient relayClient = offgrid.geogram.p2p.DeviceRelayClient.getInstance(itemView.getContext());
                      boolean isConnected = relayClient.isConnected();
 
@@ -982,5 +986,14 @@ public class DevicesWithinReachFragment extends Fragment {
             }
         }
         return false;
+    }
+
+    private static void removeBadge(android.widget.LinearLayout channelIndicators, String badgeText) {
+        for (int i = channelIndicators.getChildCount() - 1; i >= 0; i--) {
+            android.view.View child = channelIndicators.getChildAt(i);
+            if (child instanceof TextView && badgeText.equals(((TextView) child).getText().toString())) {
+                channelIndicators.removeViewAt(i);
+            }
+        }
     }
 }
