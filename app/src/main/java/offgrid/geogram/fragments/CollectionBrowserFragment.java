@@ -51,6 +51,7 @@ import offgrid.geogram.adapters.FileAdapter;
 import offgrid.geogram.models.Collection;
 import offgrid.geogram.models.CollectionFile;
 import offgrid.geogram.util.CollectionLoader;
+import offgrid.geogram.util.DownloadProgress;
 import offgrid.geogram.util.TorrentGenerator;
 
 import java.text.SimpleDateFormat;
@@ -77,6 +78,7 @@ public class CollectionBrowserFragment extends Fragment {
     private RecyclerView recyclerView;
     private FileAdapter adapter;
     private LinearLayout emptyState;
+    private TextView emptyStateText;
     private TextView collectionTitle;
     private TextView breadcrumbPath;
     private LinearLayout breadcrumbContainer;
@@ -163,6 +165,7 @@ public class CollectionBrowserFragment extends Fragment {
 
         recyclerView = view.findViewById(R.id.files_recycler);
         emptyState = view.findViewById(R.id.empty_state);
+        emptyStateText = view.findViewById(R.id.empty_state_text);
         collectionTitle = view.findViewById(R.id.collection_title);
         breadcrumbPath = view.findViewById(R.id.breadcrumb_path);
         breadcrumbContainer = view.findViewById(R.id.breadcrumb_container);
@@ -219,8 +222,8 @@ public class CollectionBrowserFragment extends Fragment {
         // In remote mode, we don't rescan - files are loaded from remote API
         if (collection.getStoragePath() != null && !isRemoteMode) {
             rescanCollection();
-        } else if (isRemoteMode && remoteIp != null && collection.getId() != null) {
-            // Load tree-data.js from remote device
+        } else if (isRemoteMode && (remoteIp != null || deviceId != null) && collection.getId() != null) {
+            // Load tree-data.js from remote device via WiFi or relay
             loadRemoteTreeData();
         }
 
@@ -293,14 +296,16 @@ public class CollectionBrowserFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         adapter = new FileAdapter(this::onFileClick);
         adapter.setOnFileLongClickListener(this::onFileLongClick);
+        adapter.setOnFileDownloadListener(this::onFileDownload);
+        adapter.setOnFolderDownloadListener(this::onFolderDownload);
         recyclerView.setAdapter(adapter);
     }
 
     private void updateAdapterStoragePath() {
         if (adapter != null && collection != null) {
             if (isRemoteMode) {
-                // Set remote mode in adapter
-                adapter.setRemoteMode(true, remoteIp, collection.getId());
+                // Set remote mode in adapter - pass both remoteIp and deviceId for WiFi/relay routing
+                adapter.setRemoteMode(true, remoteIp, deviceId, collection.getId(), getContext());
             } else {
                 // Set local storage path
                 adapter.setCollectionStoragePath(collection.getStoragePath());
@@ -597,9 +602,49 @@ public class CollectionBrowserFragment extends Fragment {
     }
 
     private void loadRemoteTreeData() {
+        android.util.Log.i("CollectionBrowser", "═══════════════════════════════════════");
+        android.util.Log.i("CollectionBrowser", "loadRemoteTreeData STARTED");
+        android.util.Log.i("CollectionBrowser", "  Collection ID: " + collection.getId());
+        android.util.Log.i("CollectionBrowser", "  Device ID: " + deviceId);
+        android.util.Log.i("CollectionBrowser", "  Remote IP: " + remoteIp);
+        android.util.Log.i("CollectionBrowser", "═══════════════════════════════════════");
+
         new Thread(() -> {
             try {
-                // Use P2PHttpClient to properly route the request through WiFi or P2P
+                // Check if we have a cached tree-data.js
+                File collectionsDir = new File(requireContext().getFilesDir(), "collections");
+                File collectionFolder = new File(collectionsDir, collection.getId());
+                File cachedTreeData = new File(new File(collectionFolder, "extra"), "tree-data.js");
+
+                String cachedSha1 = null;
+                if (cachedTreeData.exists()) {
+                    // Calculate SHA1 of cached file
+                    cachedSha1 = calculateSHA1(cachedTreeData);
+                    android.util.Log.i("CollectionBrowser", "Found cached tree-data.js (SHA1: " + cachedSha1 + ")");
+                }
+
+                // Get tree-data SHA1 from config.json (if available)
+                String remoteSha1 = getTreeDataSha1FromConfig(deviceId, remoteIp);
+
+                // Check if cache is valid
+                boolean useCached = cachedTreeData.exists() &&
+                                   cachedSha1 != null &&
+                                   remoteSha1 != null &&
+                                   cachedSha1.equals(remoteSha1);
+
+                if (useCached) {
+                    android.util.Log.i("CollectionBrowser", "✓ Using cached tree-data.js (SHA1 matches)");
+                    String cachedContent = readFileContent(cachedTreeData);
+                    parseTreeData(cachedContent);
+
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> loadDirectory(currentPath));
+                    }
+                    return;
+                }
+
+                // Cache miss or outdated - download fresh copy
+                android.util.Log.i("CollectionBrowser", "Downloading tree-data.js (cache miss or outdated)");
                 offgrid.geogram.p2p.P2PHttpClient httpClient = new offgrid.geogram.p2p.P2PHttpClient(getContext());
                 String path = "/api/collections/" + collection.getId() + "/file/extra/tree-data.js";
 
@@ -607,42 +652,64 @@ public class CollectionBrowserFragment extends Fragment {
                     httpClient.get(deviceId, remoteIp, path, 10000);
 
                 if (response.isSuccess()) {
+                    android.util.Log.d("CollectionBrowser", "✓ Received tree-data.js: " + response.body.length() + " bytes");
+
+                    // Cache the downloaded tree-data.js
+                    cacheTreeData(collectionFolder, response.body);
+
                     // Parse tree-data.js content
                     parseTreeData(response.body);
 
                     // Update UI on main thread
                     if (getActivity() != null) {
-                        getActivity().runOnUiThread(() -> {
-                            loadDirectory(currentPath);
-                        });
+                        getActivity().runOnUiThread(() -> loadDirectory(currentPath));
                     }
                 } else {
+                    android.util.Log.e("CollectionBrowser", "✗ HTTP request failed with status: " + response.statusCode);
                     showRemoteError("Failed to load file list (HTTP " + response.statusCode + ")");
                 }
             } catch (Exception e) {
-                android.util.Log.e("CollectionBrowser", "Error loading remote tree-data: " + e.getMessage());
+                android.util.Log.e("CollectionBrowser", "Error loading remote tree-data", e);
                 showRemoteError("Failed to load file list: " + e.getMessage());
             }
         }).start();
     }
 
     private void parseTreeData(String treeDataContent) {
+        android.util.Log.i("CollectionBrowser", "═══════════════════════════════════════");
+        android.util.Log.i("CollectionBrowser", "parseTreeData STARTED");
+        android.util.Log.i("CollectionBrowser", "  Content length: " + treeDataContent.length() + " bytes");
+        android.util.Log.i("CollectionBrowser", "  Content preview (first 150 chars): " + treeDataContent.substring(0, Math.min(150, treeDataContent.length())));
+        android.util.Log.i("CollectionBrowser", "═══════════════════════════════════════");
+
         try {
             // Extract JSON array from "window.TREE_DATA = [...];"
+            android.util.Log.d("CollectionBrowser", "Searching for '[' and ']' in content...");
             int startIdx = treeDataContent.indexOf('[');
             int endIdx = treeDataContent.lastIndexOf(']');
+            android.util.Log.d("CollectionBrowser", "Found '[' at index: " + startIdx + ", ']' at index: " + endIdx);
+
             if (startIdx == -1 || endIdx == -1) {
-                android.util.Log.e("CollectionBrowser", "Invalid tree-data.js format");
+                android.util.Log.e("CollectionBrowser", "✗ Invalid tree-data.js format - missing '[' or ']'");
                 return;
             }
 
             String jsonArrayStr = treeDataContent.substring(startIdx, endIdx + 1);
+            android.util.Log.d("CollectionBrowser", "Extracted JSON array: " + jsonArrayStr.length() + " chars");
+            android.util.Log.d("CollectionBrowser", "JSON preview: " + jsonArrayStr.substring(0, Math.min(200, jsonArrayStr.length())));
 
             // Parse JSON array
+            android.util.Log.d("CollectionBrowser", "Parsing JSON array...");
             JsonArray filesArray = JsonParser.parseString(jsonArrayStr).getAsJsonArray();
+            android.util.Log.i("CollectionBrowser", "✓ JSON parsed successfully: " + filesArray.size() + " entries");
 
             // Clear existing files and repopulate
+            int previousFileCount = collection.getFiles().size();
             collection.getFiles().clear();
+            android.util.Log.d("CollectionBrowser", "Cleared " + previousFileCount + " existing files from collection");
+
+            int fileCount = 0;
+            int dirCount = 0;
 
             for (int i = 0; i < filesArray.size(); i++) {
                 JsonObject fileObj = filesArray.get(i).getAsJsonObject();
@@ -670,14 +737,47 @@ public class CollectionBrowserFragment extends Fragment {
                     file.setMimeType(fileObj.getAsJsonObject("metadata").get("mime_type").getAsString());
                 }
 
+                // Set SHA1 if available
+                if (fileObj.has("sha1")) {
+                    file.setSha1(fileObj.get("sha1").getAsString());
+                }
+
                 collection.addFile(file);
+
+                // Track counts
+                if (fileType == CollectionFile.FileType.DIRECTORY) {
+                    dirCount++;
+                } else {
+                    fileCount++;
+                }
+
+                // Log first few entries for debugging
+                if (i < 5) {
+                    android.util.Log.d("CollectionBrowser", "Parsed entry " + i + ": path=" + path + ", type=" + type + ", name=" + fileName);
+                }
             }
 
-            android.util.Log.i("CollectionBrowser", "Loaded " + collection.getFiles().size() + " files from remote tree-data.js");
+            android.util.Log.i("CollectionBrowser", "Loaded " + collection.getFiles().size() + " total entries from remote tree-data.js: " + fileCount + " files, " + dirCount + " directories");
+
+            // Show error if collection is empty (no files or folders found)
+            if (collection.getFiles().isEmpty()) {
+                android.util.Log.w("CollectionBrowser", "Collection has no files or folders - this shouldn't happen");
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        showRemoteError("Collection is empty - no files or folders found");
+                    });
+                }
+            }
 
         } catch (Exception e) {
             android.util.Log.e("CollectionBrowser", "Error parsing tree-data: " + e.getMessage());
             e.printStackTrace();
+            // Show error to user
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    showRemoteError("Failed to parse collection data: " + e.getMessage());
+                });
+            }
         }
     }
 
@@ -957,6 +1057,9 @@ public class CollectionBrowserFragment extends Fragment {
     private List<CollectionFile> getFilesInPath(String path) {
         List<CollectionFile> filesInPath = new ArrayList<>();
 
+        android.util.Log.d("CollectionBrowser", "getFilesInPath called with path='" + path + "', total files in collection=" + collection.getFiles().size());
+
+        int processedCount = 0;
         for (CollectionFile file : collection.getFiles()) {
             String filePath = file.getPath();
 
@@ -965,12 +1068,18 @@ public class CollectionBrowserFragment extends Fragment {
                 int slashCount = countSlashes(filePath);
                 if (slashCount == 0 || slashCount == 1 && filePath.endsWith("/")) {
                     filesInPath.add(file);
+                    android.util.Log.d("CollectionBrowser", "  Added (root direct): " + filePath);
                 } else if (slashCount == 1 && !filePath.endsWith("/")) {
                     // It's a file in a directory, add the directory if not already added
                     String dirName = filePath.substring(0, filePath.indexOf('/'));
                     if (!containsDirectory(filesInPath, dirName)) {
                         CollectionFile dir = new CollectionFile(dirName, dirName, CollectionFile.FileType.DIRECTORY);
                         filesInPath.add(dir);
+                        android.util.Log.d("CollectionBrowser", "  Created directory for: " + dirName + " (from file: " + filePath + ")");
+                    }
+                } else {
+                    if (processedCount < 3) {
+                        android.util.Log.d("CollectionBrowser", "  Skipped (root): " + filePath + " (slashCount=" + slashCount + ")");
                     }
                 }
             } else {
@@ -980,6 +1089,7 @@ public class CollectionBrowserFragment extends Fragment {
                     if (!remainder.contains("/")) {
                         // Direct child
                         filesInPath.add(file);
+                        android.util.Log.d("CollectionBrowser", "  Added (subdir direct): " + filePath);
                     } else {
                         // File in subdirectory, add subdirectory if not exists
                         String subDirName = remainder.substring(0, remainder.indexOf('/'));
@@ -987,12 +1097,19 @@ public class CollectionBrowserFragment extends Fragment {
                         if (!containsDirectory(filesInPath, subDirName)) {
                             CollectionFile dir = new CollectionFile(fullSubDirPath, subDirName, CollectionFile.FileType.DIRECTORY);
                             filesInPath.add(dir);
+                            android.util.Log.d("CollectionBrowser", "  Created subdirectory: " + fullSubDirPath + " (from file: " + filePath + ")");
                         }
+                    }
+                } else {
+                    if (processedCount < 3) {
+                        android.util.Log.d("CollectionBrowser", "  Skipped (subdir): " + filePath + " (doesn't start with '" + path + "/')");
                     }
                 }
             }
+            processedCount++;
         }
 
+        android.util.Log.i("CollectionBrowser", "getFilesInPath result: " + filesInPath.size() + " files/dirs for path='" + path + "'");
         return filesInPath;
     }
 
@@ -1026,6 +1143,15 @@ public class CollectionBrowserFragment extends Fragment {
         if (currentFiles.isEmpty()) {
             emptyState.setVisibility(View.VISIBLE);
             recyclerView.setVisibility(View.GONE);
+
+            // Check if we're still loading data from remote device
+            if (isRemoteMode && collection != null && collection.getFiles().isEmpty()) {
+                // Still loading remote data over BLE - show loading message
+                emptyStateText.setText("Loading data..");
+            } else {
+                // Actually empty folder
+                emptyStateText.setText("Empty folder");
+            }
         } else {
             emptyState.setVisibility(View.GONE);
             recyclerView.setVisibility(View.VISIBLE);
@@ -1066,6 +1192,183 @@ public class CollectionBrowserFragment extends Fragment {
                 })
                 .create();
         dialog.show();
+    }
+
+    /**
+     * Download all files in a folder recursively
+     */
+    private void onFolderDownload(CollectionFile folder) {
+        if (!isRemoteMode || collection == null) {
+            Toast.makeText(requireContext(), "Download only available in remote mode", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (!folder.isDirectory()) {
+            Toast.makeText(requireContext(), "Not a folder", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Get all files in this folder recursively
+        List<CollectionFile> filesToDownload = new ArrayList<>();
+        String folderPath = folder.getPath();
+
+        // Add trailing slash if not present
+        if (!folderPath.endsWith("/")) {
+            folderPath += "/";
+        }
+
+        // Filter allFilesFlat to get all files under this folder path
+        for (CollectionFile file : allFilesFlat) {
+            if (!file.isDirectory() && file.getPath().startsWith(folderPath)) {
+                filesToDownload.add(file);
+            }
+        }
+
+        if (filesToDownload.isEmpty()) {
+            Toast.makeText(requireContext(), "No files found in folder", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Show confirmation
+        int fileCount = filesToDownload.size();
+        String message = "Download " + fileCount + " file" + (fileCount > 1 ? "s" : "") + " from '" + folder.getName() + "'?";
+
+        new android.app.AlertDialog.Builder(requireContext())
+            .setTitle("Download Folder")
+            .setMessage(message)
+            .setPositiveButton("Download", (dialog, which) -> {
+                // Queue all files for download
+                android.util.Log.i("CollectionBrowser", "Queueing " + fileCount + " files for download from folder: " + folder.getName());
+
+                for (CollectionFile file : filesToDownload) {
+                    onFileDownload(file);
+                }
+
+                Toast.makeText(requireContext(),
+                    fileCount + " file" + (fileCount > 1 ? "s" : "") + " queued for download",
+                    Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private void onFileDownload(CollectionFile file) {
+        if (!isRemoteMode || collection == null) {
+            Toast.makeText(requireContext(), "Download only available in remote mode", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Start chunked download in background thread
+        new Thread(() -> {
+            try {
+                // Call chunked download API endpoint
+                String serverUrl = "http://localhost:45678";
+                String endpoint = serverUrl + "/api/remote/download-file-chunked";
+
+                // Build JSON request
+                JsonObject request = new JsonObject();
+                if (deviceId != null) {
+                    request.addProperty("deviceId", deviceId);
+                } else {
+                    request.addProperty("deviceId", "");
+                }
+                if (remoteIp != null) {
+                    request.addProperty("remoteIp", remoteIp);
+                }
+                request.addProperty("collectionId", collection.getId());
+                request.addProperty("filePath", file.getPath());
+                request.addProperty("fileSize", file.getSize());
+
+                // Send POST request
+                URL url = new URL(endpoint);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+                conn.getOutputStream().write(request.toString().getBytes("UTF-8"));
+
+                int responseCode = conn.getResponseCode();
+                android.util.Log.d("CollectionBrowser", "Download API response code: " + responseCode);
+
+                BufferedReader reader = new BufferedReader(
+                    new InputStreamReader((responseCode == 200 || responseCode == 202) ? conn.getInputStream() : conn.getErrorStream())
+                );
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+                reader.close();
+
+                android.util.Log.d("CollectionBrowser", "Download API response: " + response.toString());
+
+                if (responseCode == 200 || responseCode == 202) {
+                    // Download started (202 Accepted) - begin polling for progress
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(requireContext(), "Download started", Toast.LENGTH_SHORT).show();
+                        startDownloadProgressPolling(collection.getId() + "/" + file.getPath());
+                    });
+                } else {
+                    final String errorMsg = response.toString();
+                    android.util.Log.e("CollectionBrowser", "Download failed with code " + responseCode + ": " + errorMsg);
+                    requireActivity().runOnUiThread(() -> {
+                        Toast.makeText(requireContext(), "Download failed (HTTP " + responseCode + "): " + errorMsg, Toast.LENGTH_LONG).show();
+                    });
+                }
+            } catch (Exception e) {
+                android.util.Log.e("CollectionBrowser", "Error starting download", e);
+                requireActivity().runOnUiThread(() -> {
+                    Toast.makeText(requireContext(), "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
+        }).start();
+    }
+
+    private void startDownloadProgressPolling(String fileId) {
+        // Poll download progress every 2 seconds
+        android.os.Handler handler = new android.os.Handler();
+        Runnable pollRunnable = new Runnable() {
+            @Override
+            public void run() {
+                // Check if fragment is still attached before proceeding
+                if (!isAdded() || getActivity() == null) {
+                    // Fragment detached, stop polling
+                    return;
+                }
+
+                offgrid.geogram.util.DownloadProgress.DownloadStatus status =
+                    offgrid.geogram.util.DownloadProgress.getInstance().getDownloadStatus(fileId);
+
+                if (status != null) {
+                    // Update adapter with new progress
+                    if (adapter != null) {
+                        adapter.updateDownloadProgress(fileId, status.percentComplete);
+                    }
+
+                    // Check if download is complete or failed
+                    if (status.completed) {
+                        if (isAdded() && getContext() != null) {
+                            Toast.makeText(getContext(), "Download complete", Toast.LENGTH_SHORT).show();
+                        }
+                        return; // Stop polling
+                    } else if (status.failed) {
+                        if (isAdded() && getContext() != null) {
+                            Toast.makeText(getContext(), "Download failed: " + status.errorMessage, Toast.LENGTH_LONG).show();
+                        }
+                        return; // Stop polling
+                    }
+
+                    // Continue polling
+                    handler.postDelayed(this, 2000);
+                } else {
+                    // Download not found, stop polling
+                    return;
+                }
+            }
+        };
+
+        // Start polling after 1 second delay
+        handler.postDelayed(pollRunnable, 1000);
     }
 
     private void showRenameDialog(CollectionFile file) {
@@ -1320,21 +1623,82 @@ public class CollectionBrowserFragment extends Fragment {
                 // Download the file using P2PHttpClient
                 String path = "/api/collections/" + collection.getId() + "/file/" + filePath;
 
+                // Start or resume progress tracking
+                String fileId = collection.getId() + "/" + filePath;
+                offgrid.geogram.util.DownloadProgress downloadProgress =
+                    offgrid.geogram.util.DownloadProgress.getInstance();
+
+                // Use getOrCreateDownload to resume if download already exists
+                offgrid.geogram.util.DownloadProgress.DownloadStatus downloadStatus =
+                    downloadProgress.getOrCreateDownload(fileId, file.getName(), file.getSize());
+
+                // If download is already completed, don't restart it
+                if (downloadStatus.completed) {
+                    android.util.Log.i("CollectionBrowser", "Download already completed, skipping: " + file.getName());
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            Toast.makeText(getContext(), "File already downloaded", Toast.LENGTH_SHORT).show();
+                        });
+                    }
+                    return;
+                }
+
+                // Resume if paused
+                if (downloadStatus.paused) {
+                    downloadStatus.resume();
+                    android.util.Log.i("CollectionBrowser", "Resuming paused download: " + file.getName());
+                }
+
                 offgrid.geogram.p2p.P2PHttpClient httpClient = new offgrid.geogram.p2p.P2PHttpClient(getContext());
                 offgrid.geogram.p2p.P2PHttpClient.InputStreamResponse streamResponse =
                     httpClient.getInputStream(deviceId, remoteIp, path, 30000);
 
                 if (streamResponse.isSuccess()) {
                     try {
-                        // Download file
+                        // Check if resuming a partial download
+                        boolean appendMode = targetFile.exists() && downloadStatus.downloadedBytes > 0;
+                        long existingBytes = appendMode ? targetFile.length() : 0;
+
+                        if (appendMode) {
+                            android.util.Log.i("CollectionBrowser", "Resuming download from " + existingBytes + " bytes");
+                        }
+
+                        // Download file with progress tracking
                         try (InputStream in = streamResponse.stream;
-                             java.io.FileOutputStream out = new java.io.FileOutputStream(targetFile)) {
+                             java.io.FileOutputStream out = new java.io.FileOutputStream(targetFile, appendMode)) {
 
                             byte[] buffer = new byte[8192];
                             int bytesRead;
+                            long totalBytesRead = existingBytes; // Start from existing progress
+                            int saveCounter = 0;
+
                             while ((bytesRead = in.read(buffer)) != -1) {
                                 out.write(buffer, 0, bytesRead);
+                                totalBytesRead += bytesRead;
+
+                                // Update progress every chunk
+                                downloadStatus.updateProgress(totalBytesRead);
+
+                                // Save progress to disk every 10 chunks (~80KB)
+                                saveCounter++;
+                                if (saveCounter >= 10) {
+                                    DownloadProgress.getInstance().save();
+                                    saveCounter = 0;
+                                }
+
+                                // Log progress every 100KB for debugging
+                                if (totalBytesRead % 102400 < 8192) {
+                                    android.util.Log.d("CollectionBrowser",
+                                        "Download progress: " + downloadStatus.percentComplete + "% (" +
+                                        downloadStatus.getFormattedProgress() + ") @ " +
+                                        downloadStatus.getFormattedSpeed());
+                                }
                             }
+
+                            // Mark as completed and save
+                            downloadStatus.markCompleted();
+                            DownloadProgress.getInstance().save();
+                            android.util.Log.i("CollectionBrowser", "Download completed: " + filePath);
                         } finally {
                             // Close the connection
                             streamResponse.close();
@@ -1370,11 +1734,15 @@ public class CollectionBrowserFragment extends Fragment {
                             });
                         }
                     } catch (Exception e) {
+                        downloadStatus.markFailed(e.getMessage());
+                        DownloadProgress.getInstance().save();
                         streamResponse.close();
                         throw e;
                     }
                 } else {
                     String errorMsg = streamResponse.errorMessage != null ? streamResponse.errorMessage : "Unknown error";
+                    downloadStatus.markFailed("HTTP " + streamResponse.statusCode + ": " + errorMsg);
+                    DownloadProgress.getInstance().save();
                     showDownloadError("Failed to download file (HTTP " + streamResponse.statusCode + "): " + errorMsg);
                 }
             } catch (Exception e) {
@@ -1526,6 +1894,45 @@ public class CollectionBrowserFragment extends Fragment {
             }
         }
         return content.toString();
+    }
+
+    private String getTreeDataSha1FromConfig(String deviceId, String remoteIp) {
+        try {
+            offgrid.geogram.p2p.P2PHttpClient httpClient = new offgrid.geogram.p2p.P2PHttpClient(getContext());
+            String path = "/api/collections/" + collection.getId() + "/file/config.json";
+
+            offgrid.geogram.p2p.P2PHttpClient.HttpResponse response =
+                httpClient.get(deviceId, remoteIp, path, 5000);
+
+            if (response.isSuccess()) {
+                JsonObject config = JsonParser.parseString(response.body).getAsJsonObject();
+                if (config.has("treeDataSha1")) {
+                    String sha1 = config.get("treeDataSha1").getAsString();
+                    android.util.Log.i("CollectionBrowser", "Remote tree-data.js SHA1: " + sha1);
+                    return sha1;
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.w("CollectionBrowser", "Could not get tree-data SHA1 from config: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private void cacheTreeData(File collectionFolder, String content) {
+        try {
+            File extraDir = new File(collectionFolder, "extra");
+            if (!extraDir.exists()) {
+                extraDir.mkdirs();
+            }
+
+            File treeDataFile = new File(extraDir, "tree-data.js");
+            try (java.io.FileWriter writer = new java.io.FileWriter(treeDataFile)) {
+                writer.write(content);
+            }
+            android.util.Log.i("CollectionBrowser", "Cached tree-data.js to: " + treeDataFile.getAbsolutePath());
+        } catch (Exception e) {
+            android.util.Log.e("CollectionBrowser", "Error caching tree-data.js: " + e.getMessage());
+        }
     }
 
     private void downloadCollectionMetadata(File collectionFolder) {

@@ -39,6 +39,7 @@ public class DevicesWithinReachFragment extends Fragment {
     private RecyclerView recyclerView;
     private DeviceAdapter adapter;
     private TextView emptyMessage;
+    private androidx.swiperefreshlayout.widget.SwipeRefreshLayout swipeRefresh;
     private EventAction deviceUpdateListener;
     private android.os.Handler reachabilityHandler;
     private Runnable reachabilityCheckRunnable;
@@ -55,6 +56,21 @@ public class DevicesWithinReachFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
         emptyMessage = view.findViewById(R.id.empty_message);
+
+        // Initialize SwipeRefreshLayout
+        swipeRefresh = view.findViewById(R.id.swipe_refresh);
+        swipeRefresh.setColorSchemeColors(Color.WHITE);
+        swipeRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#404040"));
+        swipeRefresh.setOnRefreshListener(() -> {
+            // Reload device list and update reachability status
+            loadDevices();
+            // Update device count badge in MainActivity
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).updateDeviceCount();
+            }
+            // Stop refreshing animation
+            swipeRefresh.setRefreshing(false);
+        });
 
         // Initialize Clear List button
         Button btnClearList = view.findViewById(R.id.btn_clear_list);
@@ -523,8 +539,20 @@ public class DevicesWithinReachFragment extends Fragment {
                     profileImage.setBackgroundColor(itemView.getContext().getResources().getColor(R.color.dark_gray, null));
                 }
 
-                // Display custom device model if available, otherwise show device type
-                deviceType.setText(device.getDisplayName());
+                // Display device info:
+                // - For relay server: show "Internet Relay"
+                // - For devices with model: show model (e.g., "Geogram v0.4.0")
+                // - For regular phones without model: show empty (don't show generic type)
+                if (device.ID.equals("RELAY_SERVER")) {
+                    // This is the actual relay server
+                    deviceType.setText("Internet Relay");
+                } else if (device.getDeviceModel() != null) {
+                    // Device has a proper model string from the app
+                    deviceType.setText(device.getDisplayName());
+                } else {
+                    // Regular device without model - don't show generic device type
+                    deviceType.setText("");
+                }
 
                 // Display profile description if available
                 if (device.getProfileDescription() != null && !device.getProfileDescription().isEmpty()) {

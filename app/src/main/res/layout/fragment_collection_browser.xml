@@ -177,6 +177,7 @@
                 android:visibility="gone">
 
                 <TextView
+                    android:id="@+id/empty_state_text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Empty folder"

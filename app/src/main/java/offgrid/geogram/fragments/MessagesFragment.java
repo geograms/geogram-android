@@ -324,12 +324,8 @@ public class MessagesFragment extends Fragment {
                 Log.e(TAG, "Network error loading conversations: " + e.getMessage());
                 handler.post(() -> {
                     swipeRefreshLayout.setRefreshing(false);
-                    // Only show error if we don't have cached data
-                    if (cachedConversations.isEmpty()) {
-                        Toast.makeText(getContext(), "Offline - No cached conversations", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(getContext(), "Offline - Showing cached conversations", Toast.LENGTH_SHORT).show();
-                    }
+                    // Silently show cached data or empty state - being offline is normal for offgrid app
+                    Log.d(TAG, "Offline - showing cached conversations (if available)");
                 });
             } catch (JSONException e) {
                 Log.e(TAG, "JSON error loading conversations: " + e.getMessage());

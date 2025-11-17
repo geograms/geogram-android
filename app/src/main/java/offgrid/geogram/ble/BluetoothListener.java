@@ -91,9 +91,9 @@ public class BluetoothListener {
             // Start cleanup task
             handler.post(cleanupTask);
 
-            Log.i("BluetoothListener", "BLE scan started (GATT-enabled)");
+            Log.i("BluetoothListener", "[Bluetooth] BLE scan started (GATT-enabled)");
         } catch (SecurityException e) {
-            Log.e("BluetoothListener", "Permission denied: cannot start BLE scan. " + e.getMessage());
+            Log.e("BluetoothListener", "[Bluetooth] Permission denied: cannot start BLE scan. " + e.getMessage());
         }
     }
 
@@ -102,7 +102,7 @@ public class BluetoothListener {
             try {
                 scanner.stopScan(scanCallback);
             } catch (SecurityException e) {
-                Log.e("BluetoothListener", "Permission denied: cannot stop BLE scan. " + e.getMessage());
+                Log.e("BluetoothListener", "[Bluetooth] Permission denied: cannot stop BLE scan. " + e.getMessage());
             }
             isListening = false;
             isPaused = false;
@@ -110,7 +110,7 @@ public class BluetoothListener {
             // Stop cleanup task
             handler.removeCallbacks(cleanupTask);
 
-            Log.i("BluetoothListener", "Stopped BLE scan.");
+            Log.i("BluetoothListener", "[Bluetooth] Stopped BLE scan.");
         }
     }
 
@@ -119,7 +119,7 @@ public class BluetoothListener {
             try {
                 scanner.stopScan(scanCallback);
             } catch (SecurityException e) {
-                Log.e("BluetoothListener", "Permission denied: cannot pause BLE scan. " + e.getMessage());
+                Log.e("BluetoothListener", "[Bluetooth] Permission denied: cannot pause BLE scan. " + e.getMessage());
             }
             isListening = false;
             isPaused = true;
@@ -191,7 +191,7 @@ public class BluetoothListener {
                 EventControl.startEvent(EventType.BLUETOOTH_MESSAGE_RECEIVED, textPayload);
 
                 Log.i(TAG, String.format(Locale.US,
-                        "%s: %s",
+                        "[Bluetooth] %s: %s",
                         deviceAddress,
                         textPayload
                 ));
@@ -213,12 +213,17 @@ public class BluetoothListener {
             return;
         }
 
+        // Extract and map callsign from beacon to MAC address
+        // This enables HTTP-over-GATT and relay sync to find devices by callsign
+        BluetoothSender sender = BluetoothSender.getInstance(context);
+        sender.extractAndMapCallsign(beacon, address);
+
         // Update discovered device
         DiscoveredDevice discovered = discoveredDevices.get(address);
         if (discovered == null) {
             discovered = new DiscoveredDevice(address, System.currentTimeMillis());
             discoveredDevices.put(address, discovered);
-            Log.i("BluetoothListener", "Geogram device discovered: " + address + " (" + beacon.substring(0, Math.min(20, beacon.length())) + "...)");
+            Log.i("BluetoothListener", "[Bluetooth] Geogram device discovered: " + address + " (" + beacon.substring(0, Math.min(20, beacon.length())) + "...)");
 
             // Attempt GATT connection to Geogram device
             attemptGattConnection(device);
@@ -228,12 +233,11 @@ public class BluetoothListener {
 
             // Check if GATT connection exists - if not, retry connection
             // This handles cases where connection was lost (app restart, BT toggle, etc.)
-            BluetoothSender sender = BluetoothSender.getInstance(context);
             if (!sender.hasActiveConnection(address)) {
                 // Only retry if we haven't attempted recently (avoid connection storms)
                 long timeSinceLastAttempt = System.currentTimeMillis() - discovered.lastConnectionAttempt;
                 if (timeSinceLastAttempt > 30000) { // Retry every 30 seconds
-                    Log.i("BluetoothListener", "No GATT connection to known device " + address + ", retrying");
+                    Log.i("BluetoothListener", "[Bluetooth] No GATT connection to known device " + address + ", retrying");
                     discovered.lastConnectionAttempt = System.currentTimeMillis();
                     attemptGattConnection(device);
                 }
@@ -298,7 +302,7 @@ public class BluetoothListener {
         BluetoothSender sender = BluetoothSender.getInstance(context);
         handler.postDelayed(() -> {
             sender.connectToDevice(device);
-        }, 500); // Small delay to avoid connection storms
+        }, 500); // 500ms delay - quick enough to connect before MAC rotation, but allows server initialization
     }
 
     /**
@@ -311,13 +315,13 @@ public class BluetoothListener {
         // Check if duplicate
         Long lastSeen = recentMessages.get(parcel);
         if (lastSeen != null && now - lastSeen < DUPLICATE_INTERVAL_MS) {
-            Log.d("BluetoothListener", "Duplicate GATT parcel ignored: " + parcel.substring(0, Math.min(15, parcel.length())));
+            Log.d("BluetoothListener", "[Bluetooth] Duplicate GATT parcel ignored: " + parcel.substring(0, Math.min(15, parcel.length())));
             return;
         }
 
         // Process parcel (fire event)
         Log.i(TAG, String.format(Locale.US,
-                "%s (GATT): %s",
+                "[Bluetooth] %s (GATT): %s",
                 deviceAddress,
                 parcel
         ));
@@ -349,7 +353,7 @@ public class BluetoothListener {
         while (deviceIter.hasNext()) {
             Map.Entry<String, DiscoveredDevice> entry = deviceIter.next();
             if (now - entry.getValue().lastSeen > DEVICE_EXPIRY_MS) {
-                Log.d("BluetoothListener", "Device expired: " + entry.getKey());
+                Log.d("BluetoothListener", "[Bluetooth] Device expired: " + entry.getKey());
                 deviceIter.remove();
             }
         }

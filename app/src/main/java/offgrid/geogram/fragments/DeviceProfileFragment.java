@@ -40,6 +40,8 @@ public class DeviceProfileFragment extends Fragment {
     private View rootView;
     private String deviceId;
     private android.content.BroadcastReceiver wifiDiscoveryReceiver;
+    private androidx.swiperefreshlayout.widget.SwipeRefreshLayout swipeRefresh;
+    private volatile boolean isLoadingCollections = false;
 
     public static DeviceProfileFragment newInstance(String deviceId) {
         DeviceProfileFragment fragment = new DeviceProfileFragment();
@@ -71,6 +73,13 @@ public class DeviceProfileFragment extends Fragment {
             if (getActivity() != null) {
                 getActivity().getSupportFragmentManager().popBackStack();
             }
+        });
+
+        // Setup pull-to-refresh
+        swipeRefresh = view.findViewById(R.id.swipe_refresh);
+        swipeRefresh.setOnRefreshListener(() -> {
+            // Refresh connection data
+            refreshConnectionData();
         });
 
         // Find device in DeviceManager
@@ -432,36 +441,48 @@ public class DeviceProfileFragment extends Fragment {
                 offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(getContext());
         String deviceIp = wifiService.getDeviceIp(deviceId);
 
-        android.util.Log.d("DeviceProfile", "setupCollectionsCard for " + deviceId + ", WiFi IP: " + deviceIp);
+        // Check if device has callsign (for relay connection)
+        String callsign = (device != null && device.callsign != null && !device.callsign.isEmpty())
+                ? device.callsign : null;
 
-        if (deviceIp != null && !deviceIp.isEmpty()) {
-            // Device has WiFi - show collections card and fetch count
+        android.util.Log.d("DeviceProfile", "setupCollectionsCard for " + deviceId +
+                ", WiFi IP: " + deviceIp + ", Callsign: " + callsign);
+
+        // Show collections card if device is reachable via WiFi OR relay
+        if ((deviceIp != null && !deviceIp.isEmpty()) || (callsign != null)) {
+            // Device is reachable - show collections card
             android.util.Log.d("DeviceProfile", "Showing collections card for " + deviceId);
             collectionsCard.setVisibility(View.VISIBLE);
+
+            // Don't start a new load if already loading - keep existing UI state
+            if (isLoadingCollections) {
+                android.util.Log.d("DeviceProfile", "Already loading collections, keeping current UI state");
+                return;
+            }
+
+            // Start loading
+            isLoadingCollections = true;
             collectionsCount.setText("Loading...");
+            collectionsInfo.setText("Fetching collections...");
+            collectionsCard.setClickable(false);
+
+            // Prioritize WiFi over relay: use deviceId (not callsign) when WiFi IP is available
+            // This prevents P2PHttpClient from trying relay as a fallback when WiFi is available
+            final String targetId = (deviceIp != null && !deviceIp.isEmpty()) ? deviceId :
+                                    (callsign != null) ? callsign : deviceId;
 
             // Fetch collections list in background thread (we need the full list to filter owned ones)
             new Thread(() -> {
                 try {
-                    String apiUrl = "http://" + deviceIp + ":45678/api/collections";
-                    URL url = new URL(apiUrl);
-                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestMethod("GET");
-                    conn.setConnectTimeout(5000); // 5 second timeout
-                    conn.setReadTimeout(5000);
+                    // Use P2PHttpClient which handles both WiFi and relay routing
+                    offgrid.geogram.p2p.P2PHttpClient httpClient =
+                            new offgrid.geogram.p2p.P2PHttpClient(getContext());
+                    offgrid.geogram.p2p.P2PHttpClient.HttpResponse response =
+                            httpClient.get(targetId, deviceIp, "/api/collections", 10000);
 
-                    int responseCode = conn.getResponseCode();
-                    if (responseCode == HttpURLConnection.HTTP_OK) {
-                        BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                        StringBuilder response = new StringBuilder();
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            response.append(line);
-                        }
-                        reader.close();
-
+                    if (response.isSuccess()) {
                         // Parse JSON response and filter out owned collections
-                        JsonObject jsonResponse = JsonParser.parseString(response.toString()).getAsJsonObject();
+                        JsonObject jsonResponse = JsonParser.parseString(response.body).getAsJsonObject();
                         com.google.gson.JsonArray collectionsArray = jsonResponse.getAsJsonArray("collections");
 
                         int filteredCount = 0;
@@ -477,9 +498,10 @@ public class DeviceProfileFragment extends Fragment {
 
                         final int count = filteredCount;
 
-                        // Update UI on main thread
+                        // Update UI on main thread - use view references directly (they persist even if fragment is paused)
                         if (getActivity() != null) {
                             getActivity().runOnUiThread(() -> {
+                                isLoadingCollections = false;
                                 if (count > 0) {
                                     collectionsCount.setText(count + " collection" + (count != 1 ? "s" : ""));
                                     collectionsInfo.setText("Tap to browse collections");
@@ -488,7 +510,7 @@ public class DeviceProfileFragment extends Fragment {
                                     collectionsCard.setOnClickListener(v -> {
                                         if (getActivity() != null) {
                                             RemoteCollectionsFragment fragment =
-                                                    RemoteCollectionsFragment.newInstance(deviceId, deviceIp);
+                                                    RemoteCollectionsFragment.newInstance(targetId, deviceIp);
                                             getActivity().getSupportFragmentManager()
                                                     .beginTransaction()
                                                     .replace(R.id.fragment_container, fragment)
@@ -502,34 +524,147 @@ public class DeviceProfileFragment extends Fragment {
                                     collectionsCard.setClickable(false);
                                 }
                             });
+                        } else {
+                            // Fragment detached - just clear the loading flag
+                            isLoadingCollections = false;
                         }
                     } else {
-                        // API call failed
+                        // API call failed - update UI even if fragment is detached
+                        isLoadingCollections = false;
                         if (getActivity() != null) {
                             getActivity().runOnUiThread(() -> {
                                 collectionsCount.setText("Unable to fetch collections");
-                                collectionsInfo.setText("Device may not support collections");
+                                collectionsInfo.setText("HTTP " + response.statusCode + ": Could not fetch collections");
                                 collectionsCard.setClickable(false);
                             });
+                        } else {
+                            // Fragment detached - update views directly on current thread (might fail but that's ok)
+                            try {
+                                collectionsCount.post(() -> {
+                                    collectionsCount.setText("Unable to fetch collections");
+                                    collectionsInfo.setText("Connection error - please refresh");
+                                    collectionsCard.setClickable(false);
+                                });
+                            } catch (Exception ex) {
+                                android.util.Log.d("DeviceProfile", "Could not update UI (fragment detached)");
+                            }
                         }
                     }
-
-                    conn.disconnect();
                 } catch (Exception e) {
                     android.util.Log.e("DeviceProfile", "Error fetching collections count: " + e.getMessage());
+                    isLoadingCollections = false;
                     if (getActivity() != null) {
                         getActivity().runOnUiThread(() -> {
                             collectionsCount.setText("Connection error");
                             collectionsInfo.setText("Could not connect to device");
                             collectionsCard.setClickable(false);
                         });
+                    } else {
+                        // Fragment detached - update views directly
+                        try {
+                            collectionsCount.post(() -> {
+                                collectionsCount.setText("Connection error");
+                                collectionsInfo.setText("Could not connect to device");
+                                collectionsCard.setClickable(false);
+                            });
+                        } catch (Exception ex) {
+                            android.util.Log.d("DeviceProfile", "Could not update UI (fragment detached)");
+                        }
                     }
                 }
             }).start();
         } else {
-            // No WiFi connection - hide collections card
+            // No WiFi or relay connection - hide collections card
+            android.util.Log.d("DeviceProfile", "Hiding collections card - no WiFi or relay available");
             collectionsCard.setVisibility(View.GONE);
         }
+    }
+
+    /**
+     * Refresh connection data (called by pull-to-refresh)
+     */
+    private void refreshConnectionData() {
+        if (deviceId == null || getContext() == null) {
+            if (swipeRefresh != null) {
+                swipeRefresh.setRefreshing(false);
+            }
+            return;
+        }
+
+        android.util.Log.d("DeviceProfile", "Refreshing connection data for " + deviceId);
+
+        // Get device from DeviceManager
+        Device device = null;
+        for (Device d : DeviceManager.getInstance().getDevicesSpotted()) {
+            if (d.ID.equals(deviceId)) {
+                device = d;
+                break;
+            }
+        }
+
+        // Trigger WiFi rediscovery to refresh IP addresses
+        offgrid.geogram.wifi.WiFiDiscoveryService wifiService =
+                offgrid.geogram.wifi.WiFiDiscoveryService.getInstance(getContext());
+        wifiService.scanNow();
+
+        // Attempt to reconnect BLE GATT if this is a Geogram device
+        if (device != null) {
+            offgrid.geogram.ble.BluetoothSender bleService =
+                    offgrid.geogram.ble.BluetoothSender.getInstance(getContext());
+
+            // Check if we have a MAC address for this device
+            String macAddress = bleService.getMacAddress(deviceId);
+            if (macAddress != null) {
+                android.util.Log.d("DeviceProfile", "Attempting to refresh BLE GATT connection to " + deviceId + " (" + macAddress + ")");
+                // Note: BLE connections are automatically maintained by BluetoothListener
+                // We just need to ensure the device is in range and will be rediscovered
+            }
+        }
+
+        // Refresh profile data
+        refreshProfileDataInBackground();
+
+        // Refresh collections card after a short delay (allow WiFi discovery to complete)
+        new android.os.Handler().postDelayed(() -> {
+            if (rootView != null && deviceId != null && getActivity() != null) {
+                // Find device (must be done on this thread before posting to UI thread)
+                Device finalRefreshedDevice = null;
+                for (Device d : DeviceManager.getInstance().getDevicesSpotted()) {
+                    if (d.ID.equals(deviceId)) {
+                        finalRefreshedDevice = d;
+                        break;
+                    }
+                }
+
+                // Make final for lambda capture
+                final Device deviceForLambda = finalRefreshedDevice;
+
+                // Reset loading state and reload collections on UI thread
+                getActivity().runOnUiThread(() -> {
+                    setupCollectionsCard(rootView, deviceId, deviceForLambda);
+
+                    // Update connection method display
+                    TextView connectionMethodView = rootView.findViewById(R.id.tv_connection_method);
+                    if (deviceForLambda != null) {
+                        ConnectionManager connectionManager = ConnectionManager.getInstance(getContext());
+                        ConnectionManager.ConnectionMethod method = connectionManager.selectConnectionMethod(deviceForLambda);
+                        String methodDescription = ConnectionManager.getConnectionDescription(method);
+                        String speedDescription = ConnectionManager.getConnectionSpeed(method);
+                        connectionMethodView.setText(methodDescription + " (" + speedDescription + ")");
+                    }
+
+                    // Stop refresh animation
+                    if (swipeRefresh != null) {
+                        swipeRefresh.setRefreshing(false);
+                    }
+                });
+            } else {
+                // Stop refresh animation even if we couldn't refresh
+                if (swipeRefresh != null && getActivity() != null) {
+                    getActivity().runOnUiThread(() -> swipeRefresh.setRefreshing(false));
+                }
+            }
+        }, 1500); // 1.5 second delay to allow WiFi discovery to complete
     }
 
     @Override
@@ -661,6 +796,9 @@ public class DeviceProfileFragment extends Fragment {
         if (getActivity() instanceof MainActivity) {
             ((MainActivity) getActivity()).setTopActionBarVisible(true);
         }
+
+        // Reset loading flag to prevent stuck state
+        isLoadingCollections = false;
 
         // Unregister WiFi discovery broadcast receiver
         if (wifiDiscoveryReceiver != null && getContext() != null) {

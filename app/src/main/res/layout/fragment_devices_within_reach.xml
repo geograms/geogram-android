@@ -11,14 +11,22 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Device List -->
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/devices_recycler_view"
+        <!-- Pull to Refresh -->
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipe_refresh"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
-            android:paddingBottom="72dp"
-            android:clipToPadding="false"/>
+            android:layout_weight="1">
+
+            <!-- Device List -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/devices_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingBottom="72dp"
+                android:clipToPadding="false"/>
+
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
         <!-- Empty State Message -->
         <TextView

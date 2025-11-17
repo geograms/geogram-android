@@ -239,12 +239,8 @@ public class ConversationChatFragment extends Fragment {
                 e.printStackTrace();
                 handler.post(() -> {
                     if (getContext() != null) {
-                        // Only show error if we don't have cached data
-                        if (cachedMarkdown == null || cachedMarkdown.isEmpty()) {
-                            Toast.makeText(getContext(), "Offline - No cached messages", Toast.LENGTH_SHORT).show();
-                        } else {
-                            Toast.makeText(getContext(), "Offline - Showing cached messages", Toast.LENGTH_SHORT).show();
-                        }
+                        // Silently show cached data or empty state - being offline is normal for offgrid app
+                        Log.d(TAG, "Offline - showing cached messages (if available)");
                     }
                 });
             } catch (JSONException e) {

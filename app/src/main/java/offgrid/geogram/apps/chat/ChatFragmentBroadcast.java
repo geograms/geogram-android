@@ -971,13 +971,7 @@ public class ChatFragmentBroadcast extends Fragment {
 
             } catch (Exception e) {
                 Log.e(TAG, "Error fetching internet messages", e);
-                requireActivity().runOnUiThread(() -> {
-                    if (isAdded()) {
-                        Toast.makeText(getContext(),
-                                "Failed to fetch internet messages: " + e.getMessage(),
-                                Toast.LENGTH_SHORT).show();
-                    }
-                });
+                // Toast removed - silent fail when no internet available
             }
         }).start();
     }

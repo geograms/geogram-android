@@ -17,6 +17,7 @@ public class CollectionFile implements Serializable {
     private String mimeType;
     private String description;
     private int views;
+    private String sha1;
 
     public CollectionFile() {
         this.type = FileType.FILE;
@@ -82,6 +83,14 @@ public class CollectionFile implements Serializable {
 
     public void setViews(int views) {
         this.views = views;
+    }
+
+    public String getSha1() {
+        return sha1;
+    }
+
+    public void setSha1(String sha1) {
+        this.sha1 = sha1;
     }
 
     public boolean isDirectory() {

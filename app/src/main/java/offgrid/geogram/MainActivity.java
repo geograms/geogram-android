@@ -54,6 +54,7 @@ import offgrid.geogram.fragments.ConnectionsFragment;
 import offgrid.geogram.fragments.DebugFragment;
 import offgrid.geogram.fragments.DevicesFragment;
 import offgrid.geogram.fragments.DevicesWithinReachFragment;
+import offgrid.geogram.fragments.DownloadQueueFragment;
 import offgrid.geogram.fragments.MessagesFragment;
 import offgrid.geogram.fragments.RelayFragment;
 import offgrid.geogram.p2p.DeviceRelayClient;
@@ -249,6 +250,11 @@ public class MainActivity extends AppCompatActivity {
         // Initialize DeviceManager with context for relay sync
         DeviceManager.getInstance().initialize(this);
 
+        // Initialize DownloadProgress with context for persistence
+        offgrid.geogram.util.DownloadProgress downloadProgress =
+            offgrid.geogram.util.DownloadProgress.getInstance();
+        downloadProgress.initialize(this);
+
         beacons = findViewById(R.id.lv_beacons);
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
@@ -439,6 +445,8 @@ public class MainActivity extends AppCompatActivity {
                 transaction.replace(R.id.fragment_container, SettingsFragment.getInstance()).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_connections) {
                 transaction.replace(R.id.fragment_container, new ConnectionsFragment()).addToBackStack(null);
+            } else if (item.getItemId() == R.id.nav_download_queue) {
+                transaction.replace(R.id.fragment_container, new DownloadQueueFragment()).addToBackStack(null);
             } else if (item.getItemId() == R.id.nav_backup) {
                 transaction.replace(R.id.fragment_container, new BackupFragment()).addToBackStack(null);
             // Relay menu removed - relay accessible via main action bar relay button

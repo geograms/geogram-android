@@ -181,7 +181,8 @@ public class RemoteCollectionsFragment extends Fragment {
                 emptyMessage.setText(message);
                 emptyMessage.setVisibility(View.VISIBLE);
                 recyclerView.setVisibility(View.GONE);
-                Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
+                // Don't show toast - on-screen error message is sufficient
+                // Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
             });
         }
     }

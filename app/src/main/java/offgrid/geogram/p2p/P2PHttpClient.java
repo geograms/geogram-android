@@ -1,8 +1,10 @@
 package offgrid.geogram.p2p;
 
+import android.bluetooth.BluetoothDevice;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import offgrid.geogram.ble.BluetoothSender;
 import offgrid.geogram.core.Log;
 import offgrid.geogram.devices.Device;
 import offgrid.geogram.devices.DeviceManager;
@@ -114,24 +116,46 @@ public class P2PHttpClient {
 
         // WiFi not available or direct connection failed - try relay
         if (!hasValidIp) {
-            // Device ID is a callsign (e.g., "X15RJ0") - use relay
-            Log.i(TAG, "→ Device ID is callsign '" + deviceId + "' - using relay");
-            return tryRelayConnection(deviceId, path, timeoutMs);
+            // Device ID is a callsign (e.g., "X15RJ0") - try relay first
+            Log.i(TAG, "→ Device ID is callsign '" + deviceId + "' - trying relay");
+            HttpResponse relayResponse = tryRelayConnection(deviceId, path, timeoutMs);
+            if (relayResponse.isSuccess()) {
+                return relayResponse;
+            }
+
+            // Relay failed - try GATT as last resort
+            Log.w(TAG, "✗ Relay connection failed, trying BLE GATT");
+            return tryGattConnection(deviceId, path, timeoutMs);
         } else {
             // Device ID is an IP but WiFi failed/unavailable - check if callsign available
             Log.i(TAG, "→ Direct connection not available, checking for relay");
 
             // Try to find device's callsign
+            String callsign = null;
             DeviceManager deviceManager = DeviceManager.getInstance();
             for (Device d : deviceManager.getDevicesSpotted()) {
                 if (d.ID.equals(deviceId) && d.callsign != null && !d.callsign.isEmpty()) {
-                    Log.i(TAG, "→ Found callsign '" + d.callsign + "' for device, using relay");
-                    return tryRelayConnection(d.callsign, path, timeoutMs);
+                    callsign = d.callsign;
+                    break;
                 }
             }
 
-            Log.e(TAG, "✗ No relay available for IP-based device: " + deviceId);
-            return new HttpResponse(503, "{\"success\": false, \"error\": \"Device not reachable via WiFi or relay\"}");
+            if (callsign != null) {
+                // Try relay first
+                Log.i(TAG, "→ Found callsign '" + callsign + "' for device, trying relay");
+                HttpResponse relayResponse = tryRelayConnection(callsign, path, timeoutMs);
+                if (relayResponse.isSuccess()) {
+                    return relayResponse;
+                }
+
+                // Relay failed - try GATT
+                Log.w(TAG, "✗ Relay connection failed, trying BLE GATT");
+                return tryGattConnection(callsign, path, timeoutMs);
+            }
+
+            // No callsign - try GATT with device ID (might be MAC address)
+            Log.i(TAG, "→ No callsign found, trying BLE GATT directly");
+            return tryGattConnection(deviceId, path, timeoutMs);
         }
     }
 
@@ -184,6 +208,72 @@ public class P2PHttpClient {
     private HttpResponse tryRelayConnection(String deviceId, String path, int timeoutMs) {
         Log.i(TAG, "→ Attempting relay connection to: " + deviceId);
         return getViaRelay(deviceId, path, timeoutMs);
+    }
+
+    /**
+     * Try to connect to device via BLE GATT
+     */
+    private HttpResponse tryGattConnection(String deviceId, String path, int timeoutMs) {
+        try {
+            Log.i(TAG, "→ Attempting BLE GATT connection to: " + deviceId);
+
+            // Get BluetoothSender instance
+            offgrid.geogram.ble.BluetoothSender sender =
+                offgrid.geogram.ble.BluetoothSender.getInstance(context);
+
+            // Check if we have an active GATT connection
+            if (!sender.hasActiveConnection(deviceId)) {
+                Log.i(TAG, "No active GATT connection to " + deviceId + ", attempting to connect...");
+
+                // Get BluetoothDevice from deviceId (callsign or MAC)
+                BluetoothDevice device = sender.getBluetoothDevice(deviceId);
+                if (device == null) {
+                    Log.e(TAG, "✗ Cannot find BluetoothDevice for: " + deviceId);
+                    return new HttpResponse(503, "{\"success\": false, \"error\": \"Cannot find device\"}");
+                }
+
+                // Try to establish connection
+                sender.connectToDevice(device);
+
+                // Wait a bit for connection to establish
+                Thread.sleep(2000);
+
+                // Verify connection was established
+                if (!sender.hasActiveConnection(deviceId)) {
+                    Log.e(TAG, "✗ Failed to establish GATT connection to: " + deviceId);
+                    return new HttpResponse(503, "{\"success\": false, \"error\": \"No active GATT connection to device\"}");
+                }
+            }
+
+            Log.i(TAG, "Using active GATT connection for HTTP request");
+
+            // Send HTTP request over GATT
+            java.util.concurrent.CompletableFuture<HttpResponse> future =
+                sender.sendHttpRequestOverGatt(deviceId, "GET", path, timeoutMs);
+
+            // Wait for response
+            HttpResponse response = future.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+
+            if (response.isSuccess()) {
+                Log.i(TAG, "✓ BLE GATT request successful: status=" + response.statusCode + ", body length=" + response.body.length() + " bytes");
+                if (response.body.length() > 0) {
+                    Log.d(TAG, "Response body preview (first 200 chars): " + response.body.substring(0, Math.min(200, response.body.length())));
+                } else {
+                    Log.w(TAG, "⚠ Response body is EMPTY!");
+                }
+            } else {
+                Log.w(TAG, "BLE GATT request returned error: " + response.statusCode);
+            }
+
+            return response;
+
+        } catch (java.util.concurrent.TimeoutException e) {
+            Log.e(TAG, "✗ BLE GATT request timeout after " + timeoutMs + "ms");
+            return new HttpResponse(504, "{\"success\": false, \"error\": \"BLE GATT request timeout\"}");
+        } catch (Exception e) {
+            Log.e(TAG, "✗ BLE GATT request failed: " + e.getMessage(), e);
+            return new HttpResponse(503, "{\"success\": false, \"error\": \"BLE GATT error: " + e.getMessage() + "\"}");
+        }
     }
 
     /**
@@ -271,24 +361,106 @@ public class P2PHttpClient {
         boolean isWifiConnected = isWifiConnected();
         Log.i(TAG, "WiFi connected: " + isWifiConnected);
 
-        if (!isWifiConnected) {
-            Log.w(TAG, "✗ WiFi NOT connected");
-            return new InputStreamResponse(null, null, 503, "WiFi not connected");
-        }
-
-        // If remoteIp is provided and it's a local network address, use it directly
-        if (remoteIp != null && !remoteIp.isEmpty()) {
+        // If WiFi is connected and remoteIp is provided and local, try direct connection first
+        if (isWifiConnected && remoteIp != null && !remoteIp.isEmpty()) {
             boolean isLocal = isLocalNetworkAddress(remoteIp);
             Log.i(TAG, "Remote IP '" + remoteIp + "' is local network: " + isLocal);
 
             if (isLocal) {
-                Log.i(TAG, "✓ WiFi connected + local IP - using direct HTTP to: " + remoteIp);
-                return getInputStreamViaHttp(remoteIp, path, timeoutMs);
+                Log.i(TAG, "✓ WiFi connected + local IP - trying direct HTTP to: " + remoteIp);
+                InputStreamResponse response = getInputStreamViaHttp(remoteIp, path, timeoutMs);
+                if (response.isSuccess()) {
+                    return response;
+                }
+                Log.w(TAG, "✗ Direct HTTP failed, will try relay");
             }
         }
 
-        Log.e(TAG, "✗ No valid remote IP provided");
-        return new InputStreamResponse(null, null, 400, "No valid remote IP provided");
+        // Try WiFi direct connection by IP if deviceId looks like an IP
+        if (isWifiConnected && deviceId != null && deviceId.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) {
+            Log.i(TAG, "Device ID is an IP address, trying direct connection: " + deviceId);
+            InputStreamResponse response = getInputStreamViaHttp(deviceId, path, timeoutMs);
+            if (response.isSuccess()) {
+                return response;
+            }
+            Log.w(TAG, "✗ Direct HTTP to device IP failed, will try relay");
+        }
+
+        // Use relay if deviceId is a callsign (not an IP address)
+        if (deviceId != null && !deviceId.isEmpty() && !deviceId.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) {
+            Log.i(TAG, "Trying relay for callsign: " + deviceId);
+            InputStreamResponse relayResponse = getInputStreamViaRelay(deviceId, path, timeoutMs);
+            if (relayResponse.isSuccess()) {
+                return relayResponse;
+            }
+
+            // Relay failed - try GATT
+            Log.w(TAG, "✗ Relay failed, trying BLE GATT for inputstream");
+            return getInputStreamViaGatt(deviceId, path, timeoutMs);
+        }
+
+        // Try GATT as last resort
+        Log.i(TAG, "No other options available, trying BLE GATT");
+        return getInputStreamViaGatt(deviceId, path, timeoutMs);
+    }
+
+    /**
+     * Get InputStream with Range request support (for chunked downloads)
+     *
+     * @param deviceId Device to connect to
+     * @param remoteIp Optional remote IP address
+     * @param path The API path
+     * @param startByte Start byte offset (inclusive)
+     * @param endByte End byte offset (inclusive)
+     * @param timeoutMs Connection timeout in milliseconds
+     * @return InputStreamResponse containing the stream and connection to close after use
+     */
+    public InputStreamResponse getInputStreamWithRange(String deviceId, String remoteIp, String path,
+                                                       long startByte, long endByte, int timeoutMs) {
+        Log.i(TAG, "HTTP GET INPUTSTREAM WITH RANGE: bytes=" + startByte + "-" + endByte);
+
+        // Check if WiFi is connected
+        boolean isWifiConnected = isWifiConnected();
+
+        // If WiFi is connected and remoteIp is provided and local, try direct connection first
+        if (isWifiConnected && remoteIp != null && !remoteIp.isEmpty()) {
+            boolean isLocal = isLocalNetworkAddress(remoteIp);
+            if (isLocal) {
+                Log.i(TAG, "✓ WiFi connected + local IP - trying direct HTTP with Range");
+                InputStreamResponse response = getInputStreamViaHttpWithRange(remoteIp, path, startByte, endByte, timeoutMs);
+                if (response.isSuccess()) {
+                    return response;
+                }
+                Log.w(TAG, "✗ Direct HTTP with Range failed, will try relay");
+            }
+        }
+
+        // Try WiFi direct connection by IP if deviceId looks like an IP
+        if (isWifiConnected && deviceId != null && deviceId.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) {
+            Log.i(TAG, "Device ID is an IP address, trying direct connection with Range");
+            InputStreamResponse response = getInputStreamViaHttpWithRange(deviceId, path, startByte, endByte, timeoutMs);
+            if (response.isSuccess()) {
+                return response;
+            }
+            Log.w(TAG, "✗ Direct HTTP to device IP with Range failed, will try relay");
+        }
+
+        // Use relay if deviceId is a callsign
+        if (deviceId != null && !deviceId.isEmpty() && !deviceId.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) {
+            Log.i(TAG, "Trying relay with Range for callsign: " + deviceId);
+            InputStreamResponse relayResponse = getInputStreamViaRelayWithRange(deviceId, path, startByte, endByte, timeoutMs);
+            if (relayResponse.isSuccess()) {
+                return relayResponse;
+            }
+
+            // Relay failed - try GATT
+            Log.w(TAG, "✗ Relay with Range failed, trying BLE GATT");
+            return getInputStreamViaGattWithRange(deviceId, path, startByte, endByte, timeoutMs);
+        }
+
+        // Try GATT as last resort
+        Log.i(TAG, "No other options available, trying BLE GATT with Range");
+        return getInputStreamViaGattWithRange(deviceId, path, startByte, endByte, timeoutMs);
     }
 
     /**
@@ -332,6 +504,320 @@ public class P2PHttpClient {
         } catch (Exception e) {
             Log.e(TAG, "HTTP InputStream request failed: " + e.getMessage());
             return new InputStreamResponse(null, null, 500, "Request failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Get InputStream via relay server
+     */
+    private InputStreamResponse getInputStreamViaRelay(String callsign, String path, int timeoutMs) {
+        try {
+            // Get relay server URL from settings
+            ConfigManager configManager = ConfigManager.getInstance(context);
+            String relayUrl = configManager.getConfig().getDeviceRelayServerUrl();
+
+            // Convert WebSocket URL to HTTP URL
+            String httpUrl = relayUrl.replace("ws://", "http://").replace("wss://", "https://");
+            // Remove WebSocket port
+            if (httpUrl.contains(":45679")) {
+                httpUrl = httpUrl.replace(":45679", "");
+            }
+
+            // Build relay proxy URL
+            String apiUrl = httpUrl + "/device/" + callsign + path;
+            Log.d(TAG, "Relay GET InputStream: " + apiUrl);
+
+            URL url = new URL(apiUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(timeoutMs);
+            conn.setReadTimeout(timeoutMs);
+
+            int responseCode = conn.getResponseCode();
+            Log.d(TAG, "Relay response code: " + responseCode);
+
+            if (responseCode >= 200 && responseCode < 300) {
+                InputStream inputStream = conn.getInputStream();
+                Log.i(TAG, "✓ Relay InputStream request successful");
+                return new InputStreamResponse(inputStream, conn, responseCode, null);
+            } else {
+                InputStream errorStream = conn.getErrorStream();
+                String errorMsg = "";
+                if (errorStream != null) {
+                    BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(errorStream, StandardCharsets.UTF_8));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    errorMsg = sb.toString();
+                    reader.close();
+                }
+                conn.disconnect();
+                return new InputStreamResponse(null, null, responseCode, errorMsg);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Relay InputStream request failed: " + e.getMessage());
+            return new InputStreamResponse(null, null, 500, "Relay request failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Get InputStream via BLE GATT connection
+     */
+    private InputStreamResponse getInputStreamViaGatt(String deviceId, String path, int timeoutMs) {
+        try {
+            Log.i(TAG, "→ Attempting BLE GATT InputStream request to: " + deviceId);
+
+            // Get BluetoothSender instance
+            BluetoothSender sender = BluetoothSender.getInstance(context);
+
+            // Check if we have an active GATT connection
+            if (!sender.hasActiveConnection(deviceId)) {
+                Log.i(TAG, "No active GATT connection, attempting to connect...");
+
+                // Get BluetoothDevice from deviceId (callsign or MAC)
+                BluetoothDevice device = sender.getBluetoothDevice(deviceId);
+                if (device == null) {
+                    Log.e(TAG, "✗ Cannot find BluetoothDevice for: " + deviceId);
+                    return new InputStreamResponse(null, null, 503, "Cannot find device");
+                }
+
+                // Try to establish connection
+                sender.connectToDevice(device);
+
+                // Wait for connection to establish
+                Thread.sleep(2000);
+
+                // Verify connection was established
+                if (!sender.hasActiveConnection(deviceId)) {
+                    Log.e(TAG, "✗ Failed to establish GATT connection");
+                    return new InputStreamResponse(null, null, 503, "No active GATT connection");
+                }
+            }
+
+            // Send HTTP request over GATT
+            java.util.concurrent.CompletableFuture<HttpResponse> future =
+                sender.sendHttpRequestOverGatt(deviceId, "GET", path, timeoutMs);
+
+            // Wait for response
+            HttpResponse response = future.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+
+            if (response.isSuccess()) {
+                Log.i(TAG, "✓ BLE GATT InputStream request successful");
+
+                // Convert response body to InputStream
+                // For binary data that was Base64 encoded, we need to decode it
+                byte[] data;
+                if (response.body.startsWith("{") || response.body.startsWith("[")) {
+                    // JSON response - use as-is
+                    data = response.body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                } else {
+                    // Assume it might be Base64-encoded binary data
+                    try {
+                        data = android.util.Base64.decode(response.body, android.util.Base64.NO_WRAP);
+                        Log.d(TAG, "Decoded Base64 response (" + data.length + " bytes)");
+                    } catch (IllegalArgumentException e) {
+                        // Not Base64 - treat as plain text
+                        data = response.body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    }
+                }
+
+                InputStream stream = new java.io.ByteArrayInputStream(data);
+                return new InputStreamResponse(stream, null, response.statusCode, null);
+            } else {
+                Log.e(TAG, "✗ BLE GATT request failed with status: " + response.statusCode);
+                return new InputStreamResponse(null, null, response.statusCode, response.body);
+            }
+
+        } catch (java.util.concurrent.TimeoutException e) {
+            Log.e(TAG, "BLE GATT request timeout", e);
+            return new InputStreamResponse(null, null, 504, "BLE GATT request timeout");
+        } catch (Exception e) {
+            Log.e(TAG, "BLE GATT InputStream request failed", e);
+            return new InputStreamResponse(null, null, 503, "BLE GATT error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Get InputStream via direct HTTP with Range header
+     */
+    private InputStreamResponse getInputStreamViaHttpWithRange(String remoteIp, String path,
+                                                               long startByte, long endByte, int timeoutMs) {
+        try {
+            String apiUrl = "http://" + remoteIp + ":45678" + path;
+            Log.d(TAG, "HTTP GET InputStream with Range: " + apiUrl + " (bytes=" + startByte + "-" + endByte + ")");
+
+            URL url = new URL(apiUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(timeoutMs);
+            conn.setReadTimeout(timeoutMs);
+            conn.setRequestProperty("Range", "bytes=" + startByte + "-" + endByte);
+
+            int responseCode = conn.getResponseCode();
+            Log.d(TAG, "HTTP response code: " + responseCode);
+
+            // Accept both 200 (full content) and 206 (partial content)
+            if (responseCode >= 200 && responseCode < 300) {
+                InputStream inputStream = conn.getInputStream();
+                return new InputStreamResponse(inputStream, conn, responseCode, null);
+            } else {
+                InputStream errorStream = conn.getErrorStream();
+                String errorMsg = "";
+                if (errorStream != null) {
+                    BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(errorStream, StandardCharsets.UTF_8));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    errorMsg = sb.toString();
+                    reader.close();
+                }
+                conn.disconnect();
+                return new InputStreamResponse(null, null, responseCode, errorMsg);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "HTTP InputStream with Range failed: " + e.getMessage());
+            return new InputStreamResponse(null, null, 500, "Request failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Get InputStream via relay server with Range header
+     */
+    private InputStreamResponse getInputStreamViaRelayWithRange(String callsign, String path,
+                                                                long startByte, long endByte, int timeoutMs) {
+        try {
+            // Get relay server URL from settings
+            ConfigManager configManager = ConfigManager.getInstance(context);
+            String relayUrl = configManager.getConfig().getDeviceRelayServerUrl();
+
+            // Convert WebSocket URL to HTTP URL
+            String httpUrl = relayUrl.replace("ws://", "http://").replace("wss://", "https://");
+            if (httpUrl.contains(":45679")) {
+                httpUrl = httpUrl.replace(":45679", "");
+            }
+
+            // Build relay proxy URL
+            String apiUrl = httpUrl + "/device/" + callsign + path;
+            Log.d(TAG, "Relay GET InputStream with Range: " + apiUrl + " (bytes=" + startByte + "-" + endByte + ")");
+
+            URL url = new URL(apiUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(timeoutMs);
+            conn.setReadTimeout(timeoutMs);
+            conn.setRequestProperty("Range", "bytes=" + startByte + "-" + endByte);
+
+            int responseCode = conn.getResponseCode();
+            Log.d(TAG, "Relay response code: " + responseCode);
+
+            if (responseCode >= 200 && responseCode < 300) {
+                InputStream inputStream = conn.getInputStream();
+                Log.i(TAG, "✓ Relay InputStream with Range request successful");
+                return new InputStreamResponse(inputStream, conn, responseCode, null);
+            } else {
+                InputStream errorStream = conn.getErrorStream();
+                String errorMsg = "";
+                if (errorStream != null) {
+                    BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(errorStream, StandardCharsets.UTF_8));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    errorMsg = sb.toString();
+                    reader.close();
+                }
+                conn.disconnect();
+                return new InputStreamResponse(null, null, responseCode, errorMsg);
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Relay InputStream with Range failed: " + e.getMessage());
+            return new InputStreamResponse(null, null, 500, "Relay request failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Get InputStream via BLE GATT with Range header
+     * Note: This requires the server to support Range requests
+     */
+    private InputStreamResponse getInputStreamViaGattWithRange(String deviceId, String path,
+                                                               long startByte, long endByte, int timeoutMs) {
+        try {
+            Log.i(TAG, "→ Attempting BLE GATT InputStream with Range to: " + deviceId +
+                      " (bytes=" + startByte + "-" + endByte + ")");
+
+            // Get BluetoothSender instance
+            BluetoothSender sender = BluetoothSender.getInstance(context);
+
+            // Check if we have an active GATT connection
+            if (!sender.hasActiveConnection(deviceId)) {
+                Log.i(TAG, "No active GATT connection, attempting to connect...");
+
+                BluetoothDevice device = sender.getBluetoothDevice(deviceId);
+                if (device == null) {
+                    Log.e(TAG, "✗ Cannot find BluetoothDevice for: " + deviceId);
+                    return new InputStreamResponse(null, null, 503, "Cannot find device");
+                }
+
+                sender.connectToDevice(device);
+                Thread.sleep(2000);
+
+                if (!sender.hasActiveConnection(deviceId)) {
+                    Log.e(TAG, "✗ Failed to establish GATT connection");
+                    return new InputStreamResponse(null, null, 503, "No active GATT connection");
+                }
+            }
+
+            // Send HTTP GET request with Range header over GATT
+            // Add Range header to request path as query parameter (simple approach)
+            String pathWithRange = path + (path.contains("?") ? "&" : "?") +
+                                 "range=" + startByte + "-" + endByte;
+
+            java.util.concurrent.CompletableFuture<HttpResponse> future =
+                sender.sendHttpRequestOverGatt(deviceId, "GET", pathWithRange, timeoutMs);
+
+            // Wait for response
+            HttpResponse response = future.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+
+            if (response.isSuccess()) {
+                Log.i(TAG, "✓ BLE GATT InputStream with Range successful");
+
+                // Convert response body to InputStream
+                byte[] data;
+                if (response.body.startsWith("{") || response.body.startsWith("[")) {
+                    data = response.body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                } else {
+                    try {
+                        data = android.util.Base64.decode(response.body, android.util.Base64.NO_WRAP);
+                        Log.d(TAG, "Decoded Base64 chunk (" + data.length + " bytes)");
+                    } catch (IllegalArgumentException e) {
+                        data = response.body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    }
+                }
+
+                InputStream stream = new java.io.ByteArrayInputStream(data);
+                return new InputStreamResponse(stream, null, response.statusCode, null);
+            } else {
+                Log.e(TAG, "✗ BLE GATT request with Range failed: " + response.statusCode);
+                return new InputStreamResponse(null, null, response.statusCode, response.body);
+            }
+
+        } catch (java.util.concurrent.TimeoutException e) {
+            Log.e(TAG, "BLE GATT request with Range timeout", e);
+            return new InputStreamResponse(null, null, 504, "BLE GATT request timeout");
+        } catch (Exception e) {
+            Log.e(TAG, "BLE GATT InputStream with Range failed", e);
+            return new InputStreamResponse(null, null, 503, "BLE GATT error: " + e.getMessage());
         }
     }
 

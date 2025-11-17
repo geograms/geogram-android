@@ -92,6 +92,35 @@ public class BluetoothSender {
     // Key: callsign (e.g., "X1ADK0"), Value: MAC address (e.g., "6C:12:48:4A:72:C7")
     private final Map<String, String> callsignToMacMap = new ConcurrentHashMap<>();
 
+    // HTTP-over-GATT support
+    // Key: requestId, Value: CompletableFuture<HttpResponse>
+    private final Map<String, java.util.concurrent.CompletableFuture<offgrid.geogram.p2p.P2PHttpClient.HttpResponse>> pendingHttpRequests = new ConcurrentHashMap<>();
+    private static final String HTTP_REQ_PREFIX = "HTTP_REQ:";
+    private static final String HTTP_RESP_PREFIX = "HTTP_RESP:";
+    private static final int HTTP_TIMEOUT_MS = 30000; // 30 seconds
+
+    // Prepared write buffers for handling long writes (messages > MTU)
+    // Key: deviceAddress, Value: accumulated byte buffer
+    private final Map<String, java.io.ByteArrayOutputStream> preparedWriteBuffers = new ConcurrentHashMap<>();
+
+    // Multi-parcel HTTP response buffers (for responses split across multiple BT messages)
+    // Key: message ID (2-letter code from parcel header like "AB"), Value: BluetoothMessage for assembly
+    private final Map<String, BluetoothMessage> pendingMultiParcelHttpResponses = new ConcurrentHashMap<>();
+
+    // Flow control for GATT writes
+    // Key: deviceAddress, Value: true if write is pending (waiting for onCharacteristicWrite callback)
+    private final Map<String, Boolean> pendingWrites = new ConcurrentHashMap<>();
+    // Key: deviceAddress, Value: timestamp of last successful write
+    private final Map<String, Long> lastWriteTimestamp = new ConcurrentHashMap<>();
+    // Key: deviceAddress, Value: consecutive failure count (for exponential backoff)
+    private final Map<String, Integer> writeFailureCount = new ConcurrentHashMap<>();
+
+    // Flow control constants
+    private static final long MIN_WRITE_INTERVAL_MS = 100;  // Minimum 100ms between writes to same device
+    private static final long BASE_BACKOFF_MS = 200;        // Base delay for exponential backoff
+    private static final int MAX_BACKOFF_FAILURES = 5;      // Max failures before capping backoff
+    private static final long MAX_BACKOFF_MS = 3200;        // Max backoff delay (200ms * 2^4 = 3.2s)
+
     // Self-advertising for presence announcement
     private String selfMessage = null;
     private AdvertiseCallback advertiseCallback;
@@ -138,7 +167,7 @@ public class BluetoothSender {
             handler.post(selfAdvertiseTask);
         }
 
-        Log.i(TAG, "Bluetooth sender started with GATT server");
+        Log.i(TAG, "[Bluetooth] Bluetooth sender started with GATT server");
         tryToSendNext();
     }
 
@@ -152,7 +181,7 @@ public class BluetoothSender {
                 gatt.disconnect();
                 gatt.close();
             } catch (Exception e) {
-                Log.e(TAG, "Error closing active GATT connection: " + e.getMessage());
+                Log.e(TAG, "[Bluetooth] Error closing active GATT connection: " + e.getMessage());
             }
         }
         for (BluetoothGatt gatt : connectingDevices.values()) {
@@ -160,19 +189,24 @@ public class BluetoothSender {
                 gatt.disconnect();
                 gatt.close();
             } catch (Exception e) {
-                Log.e(TAG, "Error closing connecting GATT connection: " + e.getMessage());
+                Log.e(TAG, "[Bluetooth] Error closing connecting GATT connection: " + e.getMessage());
             }
         }
         activeConnections.clear();
         connectingDevices.clear();
         pendingAcks.clear();
 
+        // Clear flow control tracking
+        pendingWrites.clear();
+        lastWriteTimestamp.clear();
+        writeFailureCount.clear();
+
         // Stop GATT server
         if (gattServer != null) {
             try {
                 gattServer.close();
             } catch (Exception e) {
-                Log.e(TAG, "Error closing GATT server: " + e.getMessage());
+                Log.e(TAG, "[Bluetooth] Error closing GATT server: " + e.getMessage());
             }
             gattServer = null;
         }
@@ -182,7 +216,7 @@ public class BluetoothSender {
         messageQueue.clear();
         handler.removeCallbacks(selfAdvertiseTask);
 
-        Log.i(TAG, "BluetoothSender stopped");
+        Log.i(TAG, "[Bluetooth] BluetoothSender stopped");
     }
 
     public void pause() {
@@ -190,14 +224,14 @@ public class BluetoothSender {
             isPaused = true;
             stopAdvertising();
             handler.removeCallbacks(selfAdvertiseTask);
-            Log.i(TAG, "BluetoothSender paused");
+            Log.i(TAG, "[Bluetooth] BluetoothSender paused");
         }
     }
 
     public void resume() {
         if (isPaused) {
             isPaused = false;
-            Log.i(TAG, "BluetoothSender resumed");
+            Log.i(TAG, "[Bluetooth] BluetoothSender resumed");
             tryToSendNext();
             if (selfMessage != null) {
                 handler.post(selfAdvertiseTask);
@@ -222,7 +256,7 @@ public class BluetoothSender {
     public void sendMessage(BluetoothMessage msg) {
         // Fire event for integration
         EventControl.startEvent(EventType.BLE_BROADCAST_SENT, msg);
-        Log.i(TAG, "Queued message: " + msg.getOutput());
+        Log.i(TAG, "[Bluetooth] Queued message: " + msg.getOutput());
 
         int addedCount = 0;
         int duplicateCount = 0;
@@ -267,12 +301,12 @@ public class BluetoothSender {
             if (!isDuplicate) {
                 messageQueue.offer(queuedMsg);
                 addedCount++;
-                Log.d(TAG, "→ Queued parcel #" + addedCount + ": " + parcel.substring(0, Math.min(30, parcel.length())) + "... Queue size: " + messageQueue.size());
+                Log.d(TAG, "[Bluetooth] → Queued parcel #" + addedCount + ": " + parcel.substring(0, Math.min(30, parcel.length())) + "... Queue size: " + messageQueue.size());
             }
         }
 
         if (duplicateCount > 0) {
-            Log.i(TAG, "Queue dedup: added " + addedCount + " parcels, skipped " + duplicateCount + " duplicates. Queue size: " + messageQueue.size());
+            Log.i(TAG, "[Bluetooth] Queue dedup: added " + addedCount + " parcels, skipped " + duplicateCount + " duplicates. Queue size: " + messageQueue.size());
         }
 
         if (isRunning && !isPaused) {
@@ -288,10 +322,10 @@ public class BluetoothSender {
         final QueuedMessage queuedMsg = messageQueue.peek();
         if (queuedMsg == null) return;
 
-        Log.d(TAG, "← Sending parcel (queue size: " + messageQueue.size() + ", isSending: " + isSending + "): " + queuedMsg.parcel.substring(0, Math.min(30, queuedMsg.parcel.length())));
+        Log.d(TAG, "[Bluetooth] ← Sending parcel (queue size: " + messageQueue.size() + ", isSending: " + isSending + "): " + queuedMsg.parcel.substring(0, Math.min(30, queuedMsg.parcel.length())));
 
         if (!hasAdvertisePermission()) {
-            Log.i(TAG, "Missing BLUETOOTH permissions. Cannot send.");
+            Log.i(TAG, "[Bluetooth] Missing BLUETOOTH permissions. Cannot send.");
             return;
         }
 
@@ -300,7 +334,7 @@ public class BluetoothSender {
             sendViaGatt(queuedMsg);
         } else {
             // No GATT connections - fallback to advertising for discovery
-            Log.d(TAG, "No GATT connections, advertising parcel for discovery");
+            Log.d(TAG, "[Bluetooth] No GATT connections, advertising parcel for discovery");
             sendViaAdvertising(queuedMsg.parcel);
         }
     }
@@ -308,64 +342,134 @@ public class BluetoothSender {
     private void sendViaGatt(QueuedMessage queuedMsg) {
         isSending = true;
         boolean sent = false;
+        boolean anyDeviceReady = false;
 
-        // Send to all connected peers
+        long now = System.currentTimeMillis();
+
+        // Send to all connected peers (with flow control)
         for (Map.Entry<String, BluetoothGatt> entry : activeConnections.entrySet()) {
             String deviceAddress = entry.getKey();
             BluetoothGatt gatt = entry.getValue();
 
             try {
+                // Flow control check 1: Skip if there's already a pending write for this device
+                Boolean hasPendingWrite = pendingWrites.get(deviceAddress);
+                if (Boolean.TRUE.equals(hasPendingWrite)) {
+                    Log.d(TAG, "[Bluetooth] ⏸ Skipping write to " + deviceAddress + " - write already pending");
+                    anyDeviceReady = true; // Device exists, just busy
+                    continue;
+                }
+
+                // Flow control check 2: Rate limiting - ensure minimum interval between writes
+                Long lastWrite = lastWriteTimestamp.get(deviceAddress);
+                if (lastWrite != null) {
+                    long timeSinceLastWrite = now - lastWrite;
+                    if (timeSinceLastWrite < MIN_WRITE_INTERVAL_MS) {
+                        long waitTime = MIN_WRITE_INTERVAL_MS - timeSinceLastWrite;
+                        Log.d(TAG, "[Bluetooth] ⏸ Rate limiting - will retry in " + waitTime + "ms");
+                        // Schedule retry after minimum interval
+                        handler.postDelayed(() -> {
+                            isSending = false;
+                            tryToSendNext();
+                        }, waitTime);
+                        anyDeviceReady = true;
+                        continue;
+                    }
+                }
+
+                // Flow control check 3: Exponential backoff for devices with recent failures
+                Integer failures = writeFailureCount.get(deviceAddress);
+                if (failures != null && failures > 0) {
+                    // Calculate backoff delay: BASE_BACKOFF_MS * 2^failures, capped at MAX_BACKOFF_MS
+                    long backoffDelay = Math.min(BASE_BACKOFF_MS * (1L << Math.min(failures, MAX_BACKOFF_FAILURES)), MAX_BACKOFF_MS);
+
+                    Long lastFailTime = lastWriteTimestamp.get(deviceAddress);
+                    if (lastFailTime != null && (now - lastFailTime) < backoffDelay) {
+                        long waitTime = backoffDelay - (now - lastFailTime);
+                        Log.d(TAG, "[Bluetooth] ⏸ Backing off " + deviceAddress + " (failures: " + failures + ", wait: " + waitTime + "ms)");
+                        // Schedule retry after backoff
+                        handler.postDelayed(() -> {
+                            isSending = false;
+                            tryToSendNext();
+                        }, waitTime);
+                        anyDeviceReady = true;
+                        continue;
+                    }
+                }
+
                 BluetoothGattService service = gatt.getService(UUID.fromString(GATT_SERVICE_UUID));
                 if (service == null) {
-                    Log.w(TAG, "GATT service not found on device " + deviceAddress);
+                    Log.w(TAG, "[Bluetooth] GATT service not found on device " + deviceAddress);
                     continue;
                 }
 
                 BluetoothGattCharacteristic rxChar = service.getCharacteristic(UUID.fromString(GATT_CHARACTERISTIC_RX_UUID));
                 if (rxChar == null) {
-                    Log.w(TAG, "RX characteristic not found on device " + deviceAddress);
+                    Log.w(TAG, "[Bluetooth] RX characteristic not found on device " + deviceAddress);
                     continue;
                 }
 
                 // Write parcel to RX characteristic
                 rxChar.setValue(queuedMsg.parcel.getBytes(StandardCharsets.UTF_8));
-                Log.d(TAG, "⚡ Attempting GATT write to " + deviceAddress + " (" + queuedMsg.parcel.length() + " bytes): " + queuedMsg.parcel.substring(0, Math.min(20, queuedMsg.parcel.length())));
+                Log.d(TAG, "[Bluetooth] ⚡ Attempting GATT write to " + deviceAddress + " (" + queuedMsg.parcel.length() + " bytes): " + queuedMsg.parcel.substring(0, Math.min(20, queuedMsg.parcel.length())));
+
+                // Mark write as pending BEFORE attempting write
+                pendingWrites.put(deviceAddress, true);
                 boolean writeResult = gatt.writeCharacteristic(rxChar);
 
                 if (writeResult) {
                     sent = true;
+                    anyDeviceReady = true;
+
+                    // Update timestamp for rate limiting
+                    lastWriteTimestamp.put(deviceAddress, now);
 
                     // Set up ACK timeout
                     String ackKey = deviceAddress + ":" + queuedMsg.parcel.substring(0, Math.min(5, queuedMsg.parcel.length()));
                     PendingAck pendingAck = new PendingAck(queuedMsg, System.currentTimeMillis());
                     pendingAcks.put(ackKey, pendingAck);
-                    Log.d(TAG, "⏱ Waiting for ACK: " + ackKey + " (pending ACKs: " + pendingAcks.size() + ")");
+                    Log.d(TAG, "[Bluetooth] ⏱ Waiting for ACK: " + ackKey + " (pending ACKs: " + pendingAcks.size() + ")");
 
                     // Schedule ACK timeout
                     handler.postDelayed(() -> {
                         if (pendingAcks.containsKey(ackKey)) {
-                            Log.w(TAG, "⏰ ACK TIMEOUT for " + ackKey + " after " + GATT_ACK_TIMEOUT_MS + "ms - will retry (queue size: " + messageQueue.size() + ")");
+                            Log.w(TAG, "[Bluetooth] ⏰ ACK TIMEOUT for " + ackKey + " after " + GATT_ACK_TIMEOUT_MS + "ms - will retry (queue size: " + messageQueue.size() + ")");
                             pendingAcks.remove(ackKey);
+                            // Clear pending write flag so we can retry
+                            pendingWrites.remove(deviceAddress);
                             isSending = false;
                             tryToSendNext(); // Retry
                         }
                     }, GATT_ACK_TIMEOUT_MS);
 
-                    Log.i(TAG, "✓ GATT write queued to " + deviceAddress + ": " + queuedMsg.parcel.substring(0, Math.min(20, queuedMsg.parcel.length())) + "...");
+                    Log.i(TAG, "[Bluetooth] ✓ GATT write queued to " + deviceAddress + ": " + queuedMsg.parcel.substring(0, Math.min(20, queuedMsg.parcel.length())) + "...");
                 } else {
-                    Log.w(TAG, "✗ GATT write FAILED to " + deviceAddress);
+                    // Write failed to queue - clear pending flag and increment failure counter
+                    pendingWrites.remove(deviceAddress);
+                    int failCount = writeFailureCount.getOrDefault(deviceAddress, 0) + 1;
+                    writeFailureCount.put(deviceAddress, failCount);
+                    lastWriteTimestamp.put(deviceAddress, now);  // Record failure time for backoff
+                    Log.w(TAG, "[Bluetooth] ✗ GATT write FAILED to " + deviceAddress + " (failures: " + failCount + ")");
                 }
 
             } catch (Exception e) {
-                Log.e(TAG, "Error sending via GATT to " + deviceAddress + ": " + e.getMessage());
+                // Exception during write - clear pending flag
+                pendingWrites.remove(deviceAddress);
+                int failCount = writeFailureCount.getOrDefault(deviceAddress, 0) + 1;
+                writeFailureCount.put(deviceAddress, failCount);
+                Log.e(TAG, "[Bluetooth] Error sending via GATT to " + deviceAddress + ": " + e.getMessage());
             }
         }
 
         if (sent) {
             // Wait for ACK before removing from queue
             // ACK will be handled in onCharacteristicWrite callback
+        } else if (anyDeviceReady) {
+            // Devices exist but are rate-limited or have pending writes
+            // Retry will be scheduled by the flow control checks above
+            isSending = false;
         } else {
-            // No successful GATT writes, fallback to advertising
+            // No successful GATT writes and no devices ready, fallback to advertising
             isSending = false;
             sendViaAdvertising(queuedMsg.parcel);
         }
@@ -385,7 +489,7 @@ public class BluetoothSender {
         AdvertiseCallback callback = new AdvertiseCallback() {
             @Override
             public void onStartSuccess(AdvertiseSettings settingsInEffect) {
-                Log.i(TAG, "Started advertising parcel: " + parcel.substring(0, Math.min(20, parcel.length())));
+                Log.i(TAG, "[Bluetooth] Started advertising parcel: " + parcel.substring(0, Math.min(20, parcel.length())));
 
                 handler.postDelayed(() -> {
                     stopAdvertising();
@@ -397,7 +501,7 @@ public class BluetoothSender {
 
             @Override
             public void onStartFailure(int errorCode) {
-                Log.w(TAG, "Failed to advertise. Error code: " + errorCode);
+                Log.w(TAG, "[Bluetooth] Failed to advertise. Error code: " + errorCode);
                 stopAdvertising();
                 messageQueue.poll(); // Remove from queue anyway
                 isSending = false;
@@ -409,7 +513,7 @@ public class BluetoothSender {
         try {
             advertiser.startAdvertising(settings, data, callback);
         } catch (SecurityException e) {
-            Log.e(TAG, "SecurityException while advertising: " + e.getMessage());
+            Log.e(TAG, "[Bluetooth] SecurityException while advertising: " + e.getMessage());
             isSending = false;
         }
     }
@@ -427,19 +531,19 @@ public class BluetoothSender {
         AdvertiseCallback callback = new AdvertiseCallback() {
             @Override
             public void onStartSuccess(AdvertiseSettings settingsInEffect) {
-                Log.d(TAG, "Self-beacon advertising");
+                Log.d(TAG, "[Bluetooth] Self-beacon advertising");
             }
 
             @Override
             public void onStartFailure(int errorCode) {
-                Log.w(TAG, "Self-beacon advertising failed: " + errorCode);
+                Log.w(TAG, "[Bluetooth] Self-beacon advertising failed: " + errorCode);
             }
         };
 
         try {
             advertiser.startAdvertising(settings, data, callback);
         } catch (SecurityException e) {
-            Log.e(TAG, "SecurityException while self-advertising: " + e.getMessage());
+            Log.e(TAG, "[Bluetooth] SecurityException while self-advertising: " + e.getMessage());
         }
     }
 
@@ -448,14 +552,14 @@ public class BluetoothSender {
         if (isRunning && !isPaused) {
             handler.removeCallbacks(selfAdvertiseTask);
             handler.post(selfAdvertiseTask);
-            Log.i(TAG, "Self message set to: " + message);
+            Log.i(TAG, "[Bluetooth] Self message set to: " + message);
         }
     }
 
     public void setSelfIntervalSeconds(int seconds) {
         if (seconds <= 0) return;
         selfIntervalSeconds = seconds;
-        Log.i(TAG, "Self-advertise interval set to: " + seconds + " seconds");
+        Log.i(TAG, "[Bluetooth] Self-advertise interval set to: " + seconds + " seconds");
 
         if (isRunning && !isPaused && selfMessage != null) {
             handler.removeCallbacks(selfAdvertiseTask);
@@ -469,23 +573,23 @@ public class BluetoothSender {
      */
     public void triggerImmediatePing() {
         if (isRunning && !isPaused && selfMessage != null) {
-            Log.i(TAG, "Triggering immediate BLE self-advertise (user-requested)");
+            Log.i(TAG, "[Bluetooth] Triggering immediate BLE self-advertise (user-requested)");
             handler.post(selfAdvertiseTask);
         } else {
-            Log.w(TAG, "Cannot trigger immediate ping - sender not running or no self message set");
+            Log.w(TAG, "[Bluetooth] Cannot trigger immediate ping - sender not running or no self message set");
         }
     }
 
     private void stopAdvertising() {
         if (advertiser != null && advertiseCallback != null) {
             if (!hasAdvertisePermission()) {
-                Log.w(TAG, "Missing BLUETOOTH_ADVERTISE permission. Cannot stop advertiser.");
+                Log.w(TAG, "[Bluetooth] Missing BLUETOOTH_ADVERTISE permission. Cannot stop advertiser.");
                 return;
             }
             try {
                 advertiser.stopAdvertising(advertiseCallback);
             } catch (SecurityException e) {
-                Log.w(TAG, "SecurityException while stopping advertiser: " + e.getMessage());
+                Log.w(TAG, "[Bluetooth] SecurityException while stopping advertiser: " + e.getMessage());
             }
         }
         advertiseCallback = null;
@@ -520,7 +624,7 @@ public class BluetoothSender {
 
     private void startGattServer() {
         if (gattServer != null) {
-            Log.i(TAG, "GATT server already running");
+            Log.i(TAG, "[Bluetooth] GATT server already running");
             return;
         }
 
@@ -528,7 +632,7 @@ public class BluetoothSender {
             gattServer = bluetoothManager.openGattServer(context, gattServerCallback);
 
             if (gattServer == null) {
-                Log.e(TAG, "Failed to create GATT server");
+                Log.e(TAG, "[Bluetooth] Failed to create GATT server");
                 return;
             }
 
@@ -572,15 +676,15 @@ public class BluetoothSender {
 
             boolean added = gattServer.addService(service);
             if (added) {
-                Log.i(TAG, "GATT server started with service " + GATT_SERVICE_UUID);
+                Log.i(TAG, "[Bluetooth] GATT server started with service " + GATT_SERVICE_UUID);
             } else {
-                Log.e(TAG, "Failed to add GATT service");
+                Log.e(TAG, "[Bluetooth] Failed to add GATT service");
             }
 
         } catch (SecurityException e) {
-            Log.e(TAG, "SecurityException starting GATT server: " + e.getMessage());
+            Log.e(TAG, "[Bluetooth] SecurityException starting GATT server: " + e.getMessage());
         } catch (Exception e) {
-            Log.e(TAG, "Error starting GATT server: " + e.getMessage());
+            Log.e(TAG, "[Bluetooth] Error starting GATT server: " + e.getMessage());
         }
     }
 
@@ -590,7 +694,7 @@ public class BluetoothSender {
             super.onConnectionStateChange(device, status, newState);
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                Log.i(TAG, "GATT client connected: " + device.getAddress());
+                Log.i(TAG, "[Bluetooth] GATT client connected: " + device.getAddress());
                 // Client will discover services and subscribe to characteristics
 
                 // Establish bidirectional connection: connect back to the client as a GATT client
@@ -602,7 +706,7 @@ public class BluetoothSender {
                     }, 500); // Small delay to avoid connection storm
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                Log.i(TAG, "GATT client disconnected: " + device.getAddress());
+                Log.i(TAG, "[Bluetooth] GATT client disconnected: " + device.getAddress());
                 activeConnections.remove(device.getAddress());
             }
         }
@@ -617,29 +721,83 @@ public class BluetoothSender {
             String uuid = characteristic.getUuid().toString();
 
             if (uuid.equalsIgnoreCase(GATT_CHARACTERISTIC_RX_UUID)) {
-                // Received message parcel from peer
+                // Check if this is a prepared write (long write for messages > MTU)
+                if (preparedWrite) {
+                    // Accumulate chunks in buffer
+                    String deviceKey = device.getAddress();
+                    java.io.ByteArrayOutputStream buffer = preparedWriteBuffers.get(deviceKey);
+                    if (buffer == null) {
+                        buffer = new java.io.ByteArrayOutputStream();
+                        preparedWriteBuffers.put(deviceKey, buffer);
+                    }
+                    try {
+                        buffer.write(value);
+                        Log.d(TAG, "[Bluetooth] 📥 Prepared write chunk from " + device.getAddress() + " offset=" + offset + " size=" + value.length + " total=" + buffer.size());
+                    } catch (java.io.IOException e) {
+                        Log.e(TAG, "[Bluetooth] Error accumulating prepared write: " + e.getMessage());
+                    }
+
+                    // Send GATT protocol response for prepared write
+                    if (responseNeeded) {
+                        try {
+                            gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
+                        } catch (SecurityException e) {
+                            Log.e(TAG, "[Bluetooth] SecurityException sending GATT response: " + e.getMessage());
+                        }
+                    }
+                    return; // Wait for onExecuteWrite()
+                }
+
+                // Regular single write (not prepared) - process immediately
                 String parcel = new String(value, StandardCharsets.UTF_8);
-                Log.i(TAG, "📥 Received parcel via GATT from " + device.getAddress() + " (" + parcel.length() + " bytes): " + parcel.substring(0, Math.min(20, parcel.length())));
+                Log.i(TAG, "[Bluetooth] 📥 Received parcel via GATT from " + device.getAddress() + " (" + parcel.length() + " bytes): " + parcel.substring(0, Math.min(20, parcel.length())));
 
                 // Extract callsign from parcel and update mapping for relay sync lookup
                 // Parcel format: >+CALLSIGN@GEOCODE#MODEL or >CALLSIGN@GEOCODE#MODEL
                 extractAndMapCallsign(parcel, device.getAddress());
 
-                // Process parcel (fire event for BluetoothListener to handle)
-                BluetoothListener.getInstance(context).handleGattParcel(parcel, device.getAddress());
+                // Remove '>' prefix if present
+                String content = parcel.startsWith(">") ? parcel.substring(1) : parcel;
+
+                // Check if this is an HTTP request or response
+                if (content.startsWith(HTTP_REQ_PREFIX)) {
+                    // Handle HTTP request over GATT (always single parcel)
+                    Log.d(TAG, "[Bluetooth] 📥 Routing to HTTP request handler: " + content.substring(0, Math.min(50, content.length())));
+                    handleIncomingHttpRequest(content, device.getAddress());
+                } else if (content.startsWith(HTTP_RESP_PREFIX)) {
+                    // Handle HTTP response over GATT (may be single or start of multi-parcel)
+                    Log.d(TAG, "[Bluetooth] 📥 Routing to HTTP response handler: " + content.substring(0, Math.min(50, content.length())));
+                    handleIncomingHttpResponse(content);
+                } else if (content.contains(":") && content.length() >= 4) {
+                    // Check if this is a multi-parcel message (format: XX00:... or XX01:... with zero-padded 2-digit parcel numbers)
+                    String parcelId = content.substring(0, Math.min(4, content.length()));
+                    if (parcelId.matches("[A-Z]{2}\\d{2}")) {
+                        // This is a multi-parcel message - check if it's for an HTTP response
+                        String messageId = parcelId.substring(0, 2);
+                        handleMultiParcelMessage(content, messageId);
+                    } else {
+                        // Regular message parcel - process through BluetoothListener
+                        Log.d(TAG, "[Bluetooth] 📥 Routing to regular message handler");
+                        BluetoothListener.getInstance(context).handleGattParcel(parcel, device.getAddress());
+                    }
+                } else {
+                    // Regular message parcel - process through BluetoothListener
+                    Log.d(TAG, "[Bluetooth] 📥 Routing to regular message handler");
+                    BluetoothListener.getInstance(context).handleGattParcel(parcel, device.getAddress());
+                }
 
                 // Send GATT protocol response
                 if (responseNeeded) {
                     try {
                         gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
-                        Log.d(TAG, "✓ Sent GATT protocol response");
+                        Log.d(TAG, "[Bluetooth] ✓ Sent GATT protocol response");
                     } catch (SecurityException e) {
-                        Log.e(TAG, "SecurityException sending GATT response: " + e.getMessage());
+                        Log.e(TAG, "[Bluetooth] SecurityException sending GATT response: " + e.getMessage());
                     }
                 }
 
                 // Send application-level ACK via CONTROL characteristic
-                Log.d(TAG, "📤 Sending ACK for parcel: " + parcel.substring(0, Math.min(10, parcel.length())));
+                Log.d(TAG, "[Bluetooth] 📤 Sending ACK for parcel: " + parcel.substring(0, Math.min(10, parcel.length())));
                 sendAckToDevice(device.getAddress(), parcel);
 
             } else if (uuid.equalsIgnoreCase(GATT_CHARACTERISTIC_CONTROL_UUID)) {
@@ -651,7 +809,7 @@ public class BluetoothSender {
                     try {
                         gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
                     } catch (SecurityException e) {
-                        Log.e(TAG, "SecurityException sending GATT response: " + e.getMessage());
+                        Log.e(TAG, "[Bluetooth] SecurityException sending GATT response: " + e.getMessage());
                     }
                 }
             }
@@ -668,15 +826,82 @@ public class BluetoothSender {
             String uuid = descriptor.getUuid().toString();
             if (uuid.equalsIgnoreCase("00002902-0000-1000-8000-00805f9b34fb")) { // CCCD
                 boolean enabled = java.util.Arrays.equals(value, android.bluetooth.BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
-                Log.i(TAG, "Client " + device.getAddress() + (enabled ? " subscribed to" : " unsubscribed from") + " notifications");
+                Log.i(TAG, "[Bluetooth] Client " + device.getAddress() + (enabled ? " subscribed to" : " unsubscribed from") + " notifications");
             }
 
             if (responseNeeded) {
                 try {
                     gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, value);
                 } catch (SecurityException e) {
-                    Log.e(TAG, "SecurityException sending GATT response for descriptor: " + e.getMessage());
+                    Log.e(TAG, "[Bluetooth] SecurityException sending GATT response for descriptor: " + e.getMessage());
                 }
+            }
+        }
+
+        @Override
+        public void onExecuteWrite(BluetoothDevice device, int requestId, boolean execute) {
+            super.onExecuteWrite(device, requestId, execute);
+
+            String deviceKey = device.getAddress();
+            Log.d(TAG, "[Bluetooth] 📝 onExecuteWrite from " + deviceKey + " execute=" + execute);
+
+            if (execute) {
+                // Commit the prepared write - process accumulated buffer
+                java.io.ByteArrayOutputStream buffer = preparedWriteBuffers.remove(deviceKey);
+                if (buffer != null) {
+                    byte[] completeData = buffer.toByteArray();
+                    String parcel = new String(completeData, StandardCharsets.UTF_8);
+                    Log.i(TAG, "[Bluetooth] 📥 Completed prepared write from " + deviceKey + " (" + parcel.length() + " bytes total): " + parcel.substring(0, Math.min(20, parcel.length())));
+
+                    // Extract callsign from parcel and update mapping for relay sync lookup
+                    extractAndMapCallsign(parcel, deviceKey);
+
+                    // Remove '>' prefix if present
+                    String content = parcel.startsWith(">") ? parcel.substring(1) : parcel;
+
+                    // Check if this is an HTTP request or response
+                    if (content.startsWith(HTTP_REQ_PREFIX)) {
+                        // Handle HTTP request over GATT (always single parcel)
+                        Log.d(TAG, "[Bluetooth] 📥 Routing to HTTP request handler: " + content.substring(0, Math.min(50, content.length())));
+                        handleIncomingHttpRequest(content, deviceKey);
+                    } else if (content.startsWith(HTTP_RESP_PREFIX)) {
+                        // Handle HTTP response over GATT (may be single or start of multi-parcel)
+                        Log.d(TAG, "[Bluetooth] 📥 Routing to HTTP response handler: " + content.substring(0, Math.min(50, content.length())));
+                        handleIncomingHttpResponse(content);
+                    } else if (content.contains(":") && content.length() >= 4) {
+                        // Check if this is a multi-parcel message (format: XX00:... or XX01:... with zero-padded 2-digit parcel numbers)
+                        String parcelId = content.substring(0, Math.min(4, content.length()));
+                        if (parcelId.matches("[A-Z]{2}\\d{2}")) {
+                            // This is a multi-parcel message - check if it's for an HTTP response
+                            String messageId = parcelId.substring(0, 2);
+                            handleMultiParcelMessage(content, messageId);
+                        } else {
+                            // Regular message parcel - process through BluetoothListener
+                            Log.d(TAG, "[Bluetooth] 📥 Routing to regular message handler");
+                            BluetoothListener.getInstance(context).handleGattParcel(parcel, deviceKey);
+                        }
+                    } else {
+                        // Regular message parcel - process through BluetoothListener
+                        Log.d(TAG, "[Bluetooth] 📥 Routing to regular message handler");
+                        BluetoothListener.getInstance(context).handleGattParcel(parcel, deviceKey);
+                    }
+
+                    // Send application-level ACK via CONTROL characteristic
+                    Log.d(TAG, "[Bluetooth] 📤 Sending ACK for prepared write: " + parcel.substring(0, Math.min(10, parcel.length())));
+                    sendAckToDevice(deviceKey, parcel);
+                }
+            } else {
+                // Abort the prepared write - clear buffer
+                preparedWriteBuffers.remove(deviceKey);
+                Log.d(TAG, "[Bluetooth] ⚠ Prepared write aborted for " + deviceKey);
+            }
+
+            // Send GATT protocol response
+            try {
+                gattServer.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null);
+                Log.d(TAG, "[Bluetooth] ✓ Sent GATT execute write response");
+            } catch (SecurityException e) {
+                Log.e(TAG, "[Bluetooth] SecurityException sending execute write response: " + e.getMessage());
             }
         }
     };
@@ -685,7 +910,7 @@ public class BluetoothSender {
         if (control.startsWith("ACK:")) {
             String ackKey = deviceAddress + ":" + control.substring(4);
             if (pendingAcks.containsKey(ackKey)) {
-                Log.i(TAG, "✓ Received ACK from " + deviceAddress + " for " + ackKey + " (pending: " + pendingAcks.size() + ", queue: " + messageQueue.size() + ")");
+                Log.i(TAG, "[Bluetooth] ✓ Received ACK from " + deviceAddress + " for " + ackKey + " (pending: " + pendingAcks.size() + ", queue: " + messageQueue.size() + ")");
                 pendingAcks.remove(ackKey);
 
                 // Extract parcel prefix from ackKey (e.g., ">ZA0:" from "7E:76:02:29:6B:B9:>ZA0:")
@@ -696,7 +921,7 @@ public class BluetoothSender {
                 for (String key : pendingAcks.keySet()) {
                     if (key.endsWith(parcelPrefix)) {
                         otherDevicesWaiting = true;
-                        Log.d(TAG, "⏳ Still waiting for ACK from other device: " + key);
+                        Log.d(TAG, "[Bluetooth] ⏳ Still waiting for ACK from other device: " + key);
                         break;
                     }
                 }
@@ -704,18 +929,18 @@ public class BluetoothSender {
                 // Only remove from queue when ALL devices have ACKed this parcel
                 if (!otherDevicesWaiting) {
                     QueuedMessage completed = messageQueue.poll();
-                    Log.d(TAG, "← Completed parcel, removed from queue. New queue size: " + messageQueue.size());
+                    Log.d(TAG, "[Bluetooth] ← Completed parcel, removed from queue. New queue size: " + messageQueue.size());
                     isSending = false;
                     handler.post(() -> tryToSendNext());
                 } else {
-                    Log.d(TAG, "← Parcel ACKed by " + deviceAddress + ", but waiting for other devices before removing from queue");
+                    Log.d(TAG, "[Bluetooth] ← Parcel ACKed by " + deviceAddress + ", but waiting for other devices before removing from queue");
                 }
             } else {
-                Log.d(TAG, "⚠ Received unexpected ACK (already processed?): " + ackKey);
+                Log.d(TAG, "[Bluetooth] ⚠ Received unexpected ACK (already processed?): " + ackKey);
             }
         } else if (control.startsWith("NACK:")) {
             String nackKey = deviceAddress + ":" + control.substring(5);
-            Log.w(TAG, "✗ Received NACK from " + deviceAddress + " for " + nackKey + ", will retry");
+            Log.w(TAG, "[Bluetooth] ✗ Received NACK from " + deviceAddress + " for " + nackKey + ", will retry");
             // ACK timeout will handle retry
         }
     }
@@ -725,7 +950,7 @@ public class BluetoothSender {
         // using notifications instead of trying to write as a client
 
         if (gattServer == null) {
-            Log.w(TAG, "GATT server not available, cannot send ACK");
+            Log.w(TAG, "[Bluetooth] GATT server not available, cannot send ACK");
             return;
         }
 
@@ -733,14 +958,14 @@ public class BluetoothSender {
             // Get the GATT service from our server
             BluetoothGattService service = gattServer.getService(UUID.fromString(GATT_SERVICE_UUID));
             if (service == null) {
-                Log.w(TAG, "GATT service not found on server, cannot send ACK");
+                Log.w(TAG, "[Bluetooth] GATT service not found on server, cannot send ACK");
                 return;
             }
 
             // Get the CONTROL characteristic from our server
             BluetoothGattCharacteristic controlChar = service.getCharacteristic(UUID.fromString(GATT_CHARACTERISTIC_CONTROL_UUID));
             if (controlChar == null) {
-                Log.w(TAG, "CONTROL characteristic not found on server, cannot send ACK");
+                Log.w(TAG, "[Bluetooth] CONTROL characteristic not found on server, cannot send ACK");
                 return;
             }
 
@@ -758,15 +983,15 @@ public class BluetoothSender {
             boolean notifyResult = gattServer.notifyCharacteristicChanged(device, controlChar, false);
 
             if (notifyResult) {
-                Log.i(TAG, "✓ Sent ACK notification to " + deviceAddress + " for parcel: " + parcelPrefix);
+                Log.i(TAG, "[Bluetooth] ✓ Sent ACK notification to " + deviceAddress + " for parcel: " + parcelPrefix);
             } else {
-                Log.w(TAG, "✗ FAILED to send ACK notification to " + deviceAddress + " (client may not be subscribed or notification failed)");
+                Log.w(TAG, "[Bluetooth] ✗ FAILED to send ACK notification to " + deviceAddress + " (client may not be subscribed or notification failed)");
             }
 
         } catch (SecurityException e) {
-            Log.e(TAG, "SecurityException sending ACK to " + deviceAddress + ": " + e.getMessage());
+            Log.e(TAG, "[Bluetooth] SecurityException sending ACK to " + deviceAddress + ": " + e.getMessage());
         } catch (Exception e) {
-            Log.e(TAG, "Error sending ACK to " + deviceAddress + ": " + e.getMessage());
+            Log.e(TAG, "[Bluetooth] Error sending ACK to " + deviceAddress + ": " + e.getMessage());
         }
     }
 
@@ -775,23 +1000,23 @@ public class BluetoothSender {
         String address = device.getAddress();
 
         if (activeConnections.containsKey(address) || connectingDevices.containsKey(address)) {
-            Log.d(TAG, "Already connected or connecting to " + address);
+            Log.d(TAG, "[Bluetooth] Already connected or connecting to " + address);
             return;
         }
 
         if (activeConnections.size() + connectingDevices.size() >= MAX_GATT_CONNECTIONS) {
-            Log.w(TAG, "Max GATT connections reached, cannot connect to " + address);
+            Log.w(TAG, "[Bluetooth] Max GATT connections reached, cannot connect to " + address);
             return;
         }
 
         try {
-            Log.i(TAG, "Connecting to device: " + address);
+            Log.i(TAG, "[Bluetooth] Connecting to device: " + address);
             BluetoothGatt gatt = device.connectGatt(context, false, gattClientCallback);
             if (gatt != null) {
                 connectingDevices.put(address, gatt);  // Add to connecting, not active yet
             }
         } catch (SecurityException e) {
-            Log.e(TAG, "SecurityException connecting to device: " + e.getMessage());
+            Log.e(TAG, "[Bluetooth] SecurityException connecting to device: " + e.getMessage());
         }
     }
 
@@ -801,21 +1026,21 @@ public class BluetoothSender {
             super.onConnectionStateChange(gatt, status, newState);
 
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                Log.i(TAG, "Connected to GATT server: " + gatt.getDevice().getAddress());
+                Log.i(TAG, "[Bluetooth] Connected to GATT server: " + gatt.getDevice().getAddress());
                 try {
                     // Request MTU for larger parcels (service discovery will happen in onMtuChanged)
                     boolean mtuRequested = gatt.requestMtu(GATT_MTU_SIZE);
                     if (!mtuRequested) {
                         // MTU request failed, discover services directly
-                        Log.w(TAG, "MTU request failed, discovering services directly");
+                        Log.w(TAG, "[Bluetooth] MTU request failed, discovering services directly");
                         gatt.discoverServices();
                     }
                 } catch (SecurityException e) {
-                    Log.e(TAG, "SecurityException in onConnectionStateChange: " + e.getMessage());
+                    Log.e(TAG, "[Bluetooth] SecurityException in onConnectionStateChange: " + e.getMessage());
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 String address = gatt.getDevice().getAddress();
-                Log.i(TAG, "Disconnected from GATT server: " + address);
+                Log.i(TAG, "[Bluetooth] Disconnected from GATT server: " + address);
                 activeConnections.remove(address);
                 connectingDevices.remove(address);  // Also remove from connecting list
 
@@ -832,17 +1057,17 @@ public class BluetoothSender {
             super.onMtuChanged(gatt, mtu, status);
 
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.i(TAG, "MTU changed to " + mtu + " for " + gatt.getDevice().getAddress());
+                Log.i(TAG, "[Bluetooth] MTU changed to " + mtu + " for " + gatt.getDevice().getAddress());
             } else {
-                Log.w(TAG, "MTU change failed with status " + status + " for " + gatt.getDevice().getAddress());
+                Log.w(TAG, "[Bluetooth] MTU change failed with status " + status + " for " + gatt.getDevice().getAddress());
             }
 
             // Now discover services after MTU negotiation completes (or fails)
             try {
-                Log.i(TAG, "Discovering services on " + gatt.getDevice().getAddress());
+                Log.i(TAG, "[Bluetooth] Discovering services on " + gatt.getDevice().getAddress());
                 gatt.discoverServices();
             } catch (SecurityException e) {
-                Log.e(TAG, "SecurityException discovering services: " + e.getMessage());
+                Log.e(TAG, "[Bluetooth] SecurityException discovering services: " + e.getMessage());
             }
         }
 
@@ -853,18 +1078,18 @@ public class BluetoothSender {
             String address = gatt.getDevice().getAddress();
 
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.i(TAG, "Services discovered on " + address);
+                Log.i(TAG, "[Bluetooth] Services discovered on " + address);
 
                 BluetoothGattService service = gatt.getService(UUID.fromString(GATT_SERVICE_UUID));
                 if (service != null) {
-                    Log.i(TAG, "Found Geogram GATT service on " + address);
+                    Log.i(TAG, "[Bluetooth] Found Geogram GATT service on " + address);
 
                     // Subscribe to CONTROL characteristic for ACK notifications
                     BluetoothGattCharacteristic controlChar = service.getCharacteristic(UUID.fromString(GATT_CHARACTERISTIC_CONTROL_UUID));
                     if (controlChar != null) {
                         try {
                             boolean notifyEnabled = gatt.setCharacteristicNotification(controlChar, true);
-                            Log.i(TAG, "Enabled notifications on CONTROL characteristic: " + notifyEnabled);
+                            Log.i(TAG, "[Bluetooth] Enabled notifications on CONTROL characteristic: " + notifyEnabled);
 
                             // Also write to CCCD descriptor to enable notifications on the remote device
                             android.bluetooth.BluetoothGattDescriptor descriptor = controlChar.getDescriptor(
@@ -872,10 +1097,10 @@ public class BluetoothSender {
                             if (descriptor != null) {
                                 descriptor.setValue(android.bluetooth.BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
                                 boolean descriptorWritten = gatt.writeDescriptor(descriptor);
-                                Log.i(TAG, "Wrote CCCD descriptor for notifications: " + descriptorWritten);
+                                Log.i(TAG, "[Bluetooth] Wrote CCCD descriptor for notifications: " + descriptorWritten);
                             }
                         } catch (SecurityException e) {
-                            Log.e(TAG, "SecurityException enabling notifications: " + e.getMessage());
+                            Log.e(TAG, "[Bluetooth] SecurityException enabling notifications: " + e.getMessage());
                         }
                     }
 
@@ -886,13 +1111,20 @@ public class BluetoothSender {
                     // Ready to send messages
                     handler.post(() -> tryToSendNext());
                 } else {
-                    Log.w(TAG, "Geogram GATT service not found on " + address);
-                    // No Geogram service, disconnect
+                    Log.w(TAG, "[Bluetooth] Geogram GATT service not found on " + address);
+                    // Service might not be ready yet (race condition during startup)
+                    // Keep connection open and let BluetoothListener retry later
+                    // Close this connection attempt but allow future retries
                     connectingDevices.remove(address);
-                    gatt.disconnect();
+                    try {
+                        gatt.disconnect();
+                        gatt.close();
+                    } catch (Exception e) {
+                        Log.e(TAG, "[Bluetooth] Error closing GATT: " + e.getMessage());
+                    }
                 }
             } else {
-                Log.w(TAG, "Service discovery failed on " + address + " with status " + status);
+                Log.w(TAG, "[Bluetooth] Service discovery failed on " + address + " with status " + status);
                 // Service discovery failed, disconnect
                 connectingDevices.remove(address);
                 gatt.disconnect();
@@ -903,12 +1135,47 @@ public class BluetoothSender {
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             super.onCharacteristicWrite(gatt, characteristic, status);
 
+            String deviceAddress = gatt.getDevice().getAddress();
+
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                Log.d(TAG, "Characteristic write successful to " + gatt.getDevice().getAddress());
-                // Write succeeded, wait for ACK via control characteristic
+                Log.d(TAG, "[Bluetooth] ✓ Characteristic write successful to " + deviceAddress);
+
+                // Clear pending write flag - this device can now send again
+                pendingWrites.remove(deviceAddress);
+
+                // Reset failure counter on success
+                writeFailureCount.remove(deviceAddress);
+
+                // Trigger next send attempt (respecting rate limits)
+                handler.postDelayed(() -> {
+                    if (isRunning && !isSending && !messageQueue.isEmpty()) {
+                        tryToSendNext();
+                    }
+                }, MIN_WRITE_INTERVAL_MS);
+
             } else {
-                Log.w(TAG, "Characteristic write failed to " + gatt.getDevice().getAddress() + " with status " + status);
-                // Retry will be handled by ACK timeout
+                Log.w(TAG, "[Bluetooth] ✗ Characteristic write failed to " + deviceAddress + " with status " + status);
+
+                // Clear pending write flag so we can retry
+                pendingWrites.remove(deviceAddress);
+
+                // Increment failure counter for exponential backoff
+                int failCount = writeFailureCount.getOrDefault(deviceAddress, 0) + 1;
+                writeFailureCount.put(deviceAddress, failCount);
+
+                // Update timestamp for backoff calculation
+                lastWriteTimestamp.put(deviceAddress, System.currentTimeMillis());
+
+                // Calculate backoff delay
+                long backoffDelay = Math.min(BASE_BACKOFF_MS * (1L << Math.min(failCount, MAX_BACKOFF_FAILURES)), MAX_BACKOFF_MS);
+                Log.d(TAG, "[Bluetooth] Will retry after " + backoffDelay + "ms (failures: " + failCount + ")");
+
+                // Schedule retry with exponential backoff
+                handler.postDelayed(() -> {
+                    if (isRunning && !isSending && !messageQueue.isEmpty()) {
+                        tryToSendNext();
+                    }
+                }, backoffDelay);
             }
         }
 
@@ -921,7 +1188,7 @@ public class BluetoothSender {
                 // Received ACK notification from server
                 String control = new String(characteristic.getValue(), StandardCharsets.UTF_8);
                 String deviceAddress = gatt.getDevice().getAddress();
-                Log.i(TAG, "Received notification from " + deviceAddress + ": " + control);
+                Log.i(TAG, "[Bluetooth] Received notification from " + deviceAddress + ": " + control);
                 handleControlMessage(deviceAddress, control);
             }
         }
@@ -968,17 +1235,71 @@ public class BluetoothSender {
     }
 
     /**
-     * Extract callsign from a GATT parcel and update the callsign-to-MAC mapping.
-     * This enables relay sync to find GATT connections by callsign.
+     * Get MAC address from deviceId (which might be a callsign or MAC address)
+     * @param deviceId Callsign or MAC address
+     * @return MAC address, or null if not found
+     */
+    public String getMacAddress(String deviceId) {
+        if (deviceId == null) return null;
+
+        // Check if it's already a MAC address (format: XX:XX:XX:XX:XX:XX)
+        if (deviceId.matches("([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}")) {
+            return deviceId;
+        }
+
+        // Otherwise, look up callsign in map
+        return callsignToMacMap.get(deviceId);
+    }
+
+    /**
+     * Get callsign from MAC address (reverse lookup)
+     * @param macAddress MAC address
+     * @return Callsign, or null if not found
+     */
+    public String getCallsignFromMac(String macAddress) {
+        if (macAddress == null) return null;
+
+        // Search through the callsign->MAC map to find the callsign
+        for (Map.Entry<String, String> entry : callsignToMacMap.entrySet()) {
+            if (entry.getValue().equalsIgnoreCase(macAddress)) {
+                return entry.getKey();
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get BluetoothDevice from deviceId (which might be a callsign or MAC address)
+     * @param deviceId Callsign or MAC address
+     * @return BluetoothDevice, or null if not found or invalid
+     */
+    public BluetoothDevice getBluetoothDevice(String deviceId) {
+        String macAddress = getMacAddress(deviceId);
+        if (macAddress == null) {
+            return null;
+        }
+
+        try {
+            return bluetoothAdapter.getRemoteDevice(macAddress);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "[Bluetooth] Invalid MAC address: " + macAddress, e);
+            return null;
+        }
+    }
+
+    /**
+     * Extract callsign from a beacon/parcel and update the callsign-to-MAC mapping.
+     * This enables relay sync and HTTP-over-GATT to find devices by callsign.
      *
      * Handles both beacon formats:
      * - With location: >+CALLSIGN@GEOCODE#MODEL (e.g., >+X1ADK0@RY1A-IUZU#APP-0.4.0)
      * - Without location: >+CALLSIGN#MODEL (e.g., >+X1ADK0#APP-0.4.0)
      *
-     * @param parcel Message parcel from GATT
-     * @param macAddress MAC address of the device that sent this parcel
+     * @param parcel Beacon or message parcel
+     * @param macAddress MAC address of the device that sent this beacon/parcel
      */
-    private void extractAndMapCallsign(String parcel, String macAddress) {
+    public void extractAndMapCallsign(String parcel, String macAddress) {
         try {
             // Remove leading '>' if present
             String content = parcel.startsWith(">") ? parcel.substring(1) : parcel;
@@ -1004,10 +1325,327 @@ public class BluetoothSender {
             if (callsign != null && !callsign.isEmpty()) {
                 // Update mapping
                 callsignToMacMap.put(callsign, macAddress);
-                Log.d(TAG, "Mapped callsign " + callsign + " to MAC " + macAddress);
+                Log.d(TAG, "[Bluetooth] Mapped callsign " + callsign + " to MAC " + macAddress);
             }
         } catch (Exception e) {
-            Log.w(TAG, "Failed to extract callsign from parcel: " + parcel + " - " + e.getMessage());
+            Log.w(TAG, "[Bluetooth] Failed to extract callsign from parcel: " + parcel + " - " + e.getMessage());
+        }
+    }
+
+    // HTTP-over-GATT Methods
+
+    /**
+     * Send a message to a specific device (callsign or MAC address)
+     */
+    private void sendMessageToDevice(String message, String deviceId) {
+        // Get our callsign
+        String callsign = Central.getInstance().getSettings().getCallsign();
+        if (callsign == null || callsign.isEmpty()) {
+            callsign = Central.getInstance().getSettings().getIdDevice();
+        }
+
+        // Create message directed to specific device
+        // Use multi-parcel mode (singleMessage=false) to handle large responses (e.g., tree-data.js files)
+        // BluetoothMessage will automatically split into parcels with headers if message exceeds MTU
+        // Small messages will still fit in one parcel, large ones will be split with checksum validation
+        boolean singleMessage = (message.length() < 400); // Use single message for small responses only
+        BluetoothMessage msg = new BluetoothMessage(callsign, deviceId, message, singleMessage);
+        sendMessage(msg);
+    }
+
+    /**
+     * Send HTTP request over GATT to a device
+     * @param deviceId Callsign or MAC address of target device
+     * @param method HTTP method (GET, POST, etc.)
+     * @param path Request path
+     * @param timeoutMs Timeout in milliseconds
+     * @return CompletableFuture that completes with HttpResponse
+     */
+    public java.util.concurrent.CompletableFuture<offgrid.geogram.p2p.P2PHttpClient.HttpResponse> sendHttpRequestOverGatt(
+            String deviceId, String method, String path, int timeoutMs) {
+
+        java.util.concurrent.CompletableFuture<offgrid.geogram.p2p.P2PHttpClient.HttpResponse> future =
+            new java.util.concurrent.CompletableFuture<>();
+
+        // Check if we have an active GATT connection to this device
+        if (!hasActiveConnection(deviceId)) {
+            Log.w(TAG, "[Bluetooth] HTTP-over-GATT: No active GATT connection to " + deviceId + " - request will likely fail");
+            // Don't fail immediately - queued messages might still be delivered if connection is established soon
+        } else {
+            Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Active GATT connection confirmed to " + deviceId);
+        }
+
+        // Generate unique request ID
+        String requestId = java.util.UUID.randomUUID().toString().substring(0, 8);
+
+        // Get our callsign to include in request (so receiver can send response)
+        String callsign = Central.getInstance().getSettings().getCallsign();
+        if (callsign == null || callsign.isEmpty()) {
+            callsign = Central.getInstance().getSettings().getIdDevice();
+        }
+
+        // Format: HTTP_REQ:{requestId}:{method}:{path}:{senderCallsign}
+        String httpRequest = HTTP_REQ_PREFIX + requestId + ":" + method + ":" + path + ":" + callsign;
+
+        // Store pending request
+        pendingHttpRequests.put(requestId, future);
+
+        // Send request as GATT message to specific device
+        sendMessageToDevice(httpRequest, deviceId);
+
+        Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Sent " + method + " " + path + " to " + deviceId + " (requestId: " + requestId + ")");
+
+        // Set timeout
+        handler.postDelayed(() -> {
+            if (pendingHttpRequests.remove(requestId) != null) {
+                Log.w(TAG, "[Bluetooth] HTTP-over-GATT: Request " + requestId + " timed out after " + timeoutMs + "ms (no response received)");
+                future.completeExceptionally(new java.util.concurrent.TimeoutException(
+                    "HTTP-over-GATT request timeout after " + timeoutMs + "ms"));
+            }
+        }, timeoutMs);
+
+        return future;
+    }
+
+    /**
+     * Handle incoming HTTP request from remote device
+     */
+    private void handleIncomingHttpRequest(String parcel, String deviceAddress) {
+        try {
+            // Format: HTTP_REQ:{requestId}:{method}:{path}:{senderCallsign}
+            String content = parcel.substring(HTTP_REQ_PREFIX.length());
+            String[] parts = content.split(":", 4);
+
+            if (parts.length < 4) {
+                Log.e(TAG, "[Bluetooth] Invalid HTTP request format (expected 4 parts): " + parcel);
+                return;
+            }
+
+            String requestId = parts[0];
+            String method = parts[1];
+            String path = parts[2];
+            String senderCallsign = parts[3]; // Sender's callsign is now included in the request!
+
+            Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Received " + method + " " + path + " from " + senderCallsign + " (" + deviceAddress + ") (requestId: " + requestId + ")");
+
+            // Execute HTTP request against local server in background
+            new Thread(() -> {
+                try {
+                    offgrid.geogram.settings.ConfigManager configManager =
+                        offgrid.geogram.settings.ConfigManager.getInstance(context);
+                    int port = configManager.getConfig().getHttpApiPort();
+                    String url = "http://localhost:" + port + path;
+
+                    Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Executing local request: " + url);
+
+                    java.net.URL urlObj = new java.net.URL(url);
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) urlObj.openConnection();
+                    conn.setRequestMethod(method);
+                    conn.setConnectTimeout(5000);
+                    conn.setReadTimeout(30000);
+
+                    int statusCode = conn.getResponseCode();
+                    String contentType = conn.getContentType();
+                    String responseBody;
+                    String encoding = "text";
+
+                    Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Content-Type for " + path + ": " + contentType);
+
+                    // Check if response is binary (image, video, etc.)
+                    // IMPORTANT: JavaScript, JSON, HTML, CSS, and other text files should NEVER be base64 encoded
+                    // ALWAYS check file extension FIRST, regardless of content-type
+                    boolean isBinary = false;
+
+                    // Priority 1: Check file extension (most reliable for static files)
+                    String lowerPath = path.toLowerCase();
+                    if (lowerPath.endsWith(".js") || lowerPath.endsWith(".json") ||
+                        lowerPath.endsWith(".html") || lowerPath.endsWith(".htm") ||
+                        lowerPath.endsWith(".css") || lowerPath.endsWith(".txt") ||
+                        lowerPath.endsWith(".xml") || lowerPath.endsWith(".svg") ||
+                        lowerPath.endsWith(".csv")) {
+                        // Text file extensions - always send as text
+                        isBinary = false;
+                        Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Text file detected by extension: " + path);
+                    }
+                    else if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg") ||
+                             lowerPath.endsWith(".png") || lowerPath.endsWith(".gif") ||
+                             lowerPath.endsWith(".webp") || lowerPath.endsWith(".bmp") ||
+                             lowerPath.endsWith(".ico") ||
+                             lowerPath.endsWith(".mp4") || lowerPath.endsWith(".webm") ||
+                             lowerPath.endsWith(".mp3") || lowerPath.endsWith(".wav") ||
+                             lowerPath.endsWith(".pdf") || lowerPath.endsWith(".zip")) {
+                        // Binary file extensions - always send as base64
+                        isBinary = true;
+                        Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Binary file detected by extension: " + path);
+                    }
+                    // Priority 2: Check content-type (if extension didn't match)
+                    else if (contentType != null) {
+                        // Explicitly check for text types first (always send as text)
+                        if (contentType.startsWith("text/") ||
+                            contentType.startsWith("application/javascript") ||
+                            contentType.startsWith("application/json") ||
+                            contentType.startsWith("application/xml")) {
+                            isBinary = false;
+                            Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Text file detected by content-type: " + contentType);
+                        }
+                        // Only encode as base64 for actual binary types
+                        else if (contentType.startsWith("image/") ||
+                                 contentType.startsWith("video/") ||
+                                 contentType.startsWith("audio/") ||
+                                 contentType.startsWith("application/octet-stream") ||
+                                 contentType.startsWith("application/pdf")) {
+                            isBinary = true;
+                            Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Binary file detected by content-type: " + contentType);
+                        }
+                        // Unknown content-type - default to text for safety
+                        else {
+                            isBinary = false;
+                            Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Unknown content-type, defaulting to text: " + contentType);
+                        }
+                    }
+                    // Priority 3: No extension match and no content-type - default to text
+                    else {
+                        isBinary = false;
+                        Log.d(TAG, "[Bluetooth] HTTP-over-GATT: No content-type, defaulting to text");
+                    }
+
+                    Log.d(TAG, "[Bluetooth] HTTP-over-GATT: FINAL isBinary=" + isBinary + " for path=" + path);
+
+                    java.io.InputStream inputStream = statusCode < 400 ? conn.getInputStream() : conn.getErrorStream();
+                    if (inputStream != null) {
+                        // Read stream as bytes using ByteArrayOutputStream (compatible with all Android versions)
+                        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+                        byte[] data = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = inputStream.read(data, 0, data.length)) != -1) {
+                            buffer.write(data, 0, bytesRead);
+                        }
+                        buffer.flush();
+                        byte[] responseBytes = buffer.toByteArray();
+                        inputStream.close();
+
+                        if (isBinary) {
+                            // Base64 encode binary data to safely transmit as text
+                            responseBody = android.util.Base64.encodeToString(responseBytes, android.util.Base64.NO_WRAP);
+                            encoding = "base64";
+                            Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Encoded binary response (" + responseBytes.length + " bytes) as Base64");
+                        } else {
+                            // Keep text as-is
+                            responseBody = new String(responseBytes, java.nio.charset.StandardCharsets.UTF_8);
+                        }
+                    } else {
+                        responseBody = "";
+                    }
+
+                    conn.disconnect();
+
+                    // Send HTTP response back to sender's CALLSIGN (not MAC address)
+                    // Format: HTTP_RESP:{requestId}:{statusCode}:{encoding}:{body}
+                    String httpResponse = HTTP_RESP_PREFIX + requestId + ":" + statusCode + ":" + encoding + ":" + responseBody;
+                    sendMessageToDevice(httpResponse, senderCallsign);
+
+                    Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Sent response " + statusCode + " (" + encoding + ") to " + senderCallsign + " (requestId: " + requestId + ")");
+
+                } catch (Exception e) {
+                    Log.e(TAG, "[Bluetooth] HTTP-over-GATT: Error processing request", e);
+                    // Send error response to sender's CALLSIGN (not MAC address)
+                    // Format: HTTP_RESP:{requestId}:{statusCode}:{encoding}:{body}
+                    String errorResponse = HTTP_RESP_PREFIX + requestId + ":500:text:Error: " + e.getMessage();
+                    sendMessageToDevice(errorResponse, senderCallsign);
+                }
+            }).start();
+
+        } catch (Exception e) {
+            Log.e(TAG, "[Bluetooth] Error handling HTTP request: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Handle incoming HTTP response from remote device
+     */
+    private void handleIncomingHttpResponse(String parcel) {
+        try {
+            // Format: HTTP_RESP:{requestId}:{statusCode}:{encoding}:{body}
+            String content = parcel.substring(HTTP_RESP_PREFIX.length());
+            String[] parts = content.split(":", 4);
+
+            if (parts.length < 4) {
+                Log.e(TAG, "[Bluetooth] Invalid HTTP response format (expected 4 parts): " + parcel);
+                return;
+            }
+
+            String requestId = parts[0];
+            int statusCode = Integer.parseInt(parts[1]);
+            String encoding = parts[2];
+            String body = parts[3];
+
+            // Keep Base64-encoded responses as-is (don't decode here)
+            // P2PHttpClient will decode properly for binary data to avoid corruption
+            if ("base64".equals(encoding)) {
+                Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Base64-encoded response, length=" + body.length() + " chars");
+                // Leave body as Base64 string - DO NOT decode to avoid corruption of binary data
+            }
+
+            Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Received response " + statusCode + " (" + encoding + ") (requestId: " + requestId + ")");
+            Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Body length=" + body.length() + " bytes");
+            if (body.length() > 0) {
+                Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Body preview (first 200 chars): " + body.substring(0, Math.min(200, body.length())));
+            }
+
+            // Find pending request and complete it
+            java.util.concurrent.CompletableFuture<offgrid.geogram.p2p.P2PHttpClient.HttpResponse> future =
+                pendingHttpRequests.remove(requestId);
+
+            if (future != null) {
+                Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Completing pending request " + requestId + " with status " + statusCode);
+                offgrid.geogram.p2p.P2PHttpClient.HttpResponse response =
+                    new offgrid.geogram.p2p.P2PHttpClient.HttpResponse(statusCode, body);
+                future.complete(response);
+                Log.d(TAG, "[Bluetooth] HTTP-over-GATT: ✓ Future completed successfully for request " + requestId);
+            } else {
+                Log.w(TAG, "[Bluetooth] HTTP-over-GATT: Received response for unknown/expired request: " + requestId + " (possibly timed out already)");
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "[Bluetooth] Error handling HTTP response: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Handle incoming multi-parcel message (for large HTTP responses split across multiple parcels)
+     */
+    private void handleMultiParcelMessage(String parcel, String messageId) {
+        try {
+            // Get or create BluetoothMessage for this message ID
+            BluetoothMessage message = pendingMultiParcelHttpResponses.get(messageId);
+            if (message == null) {
+                message = new BluetoothMessage();
+                pendingMultiParcelHttpResponses.put(messageId, message);
+                Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Started buffering multi-parcel message " + messageId);
+            }
+
+            // Add this parcel to the message
+            message.addMessageParcel(parcel);
+            Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Added parcel to message " + messageId + " (" + message.getMessageParcelsTotal() + " parcels so far)");
+
+            // Check if message is complete
+            if (message.isMessageCompleted()) {
+                Log.i(TAG, "[Bluetooth] HTTP-over-GATT: ✓ Multi-parcel message " + messageId + " completed!");
+                pendingMultiParcelHttpResponses.remove(messageId);
+
+                // Get complete message and check if it's an HTTP response
+                String completeMessage = message.getMessage();
+                if (completeMessage.startsWith(HTTP_RESP_PREFIX)) {
+                    Log.d(TAG, "[Bluetooth] HTTP-over-GATT: Multi-parcel HTTP response assembled (" + completeMessage.length() + " bytes)");
+                    handleIncomingHttpResponse(completeMessage);
+                } else {
+                    Log.w(TAG, "[Bluetooth] HTTP-over-GATT: Multi-parcel message was not an HTTP response, ignoring");
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "[Bluetooth] Error handling multi-parcel message: " + e.getMessage(), e);
+            // Clean up on error
+            pendingMultiParcelHttpResponses.remove(messageId);
         }
     }
 

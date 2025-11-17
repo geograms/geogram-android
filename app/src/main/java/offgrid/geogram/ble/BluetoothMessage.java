@@ -85,8 +85,8 @@ public class BluetoothMessage {
         int dataLength = message.length();
         int messageParcelsTotal = (int) Math.ceil((double) message.length() / TEXT_LENGTH_PER_PARCEL);
 
-        // add the header
-        String uidHeader = id + "0";
+        // add the header (use zero-padded 2-digit format for proper sorting)
+        String uidHeader = id + "00";
         String header =
                 uidHeader
                 + ":"
@@ -102,8 +102,9 @@ public class BluetoothMessage {
             int start = i * TEXT_LENGTH_PER_PARCEL;
             int end = Math.min(start + TEXT_LENGTH_PER_PARCEL, dataLength);
             String text = message.substring(start, end);
-            int value = i + 1;
-            String uid = id + value;
+            // Zero-pad parcel numbers to 2 digits for proper lexicographic sorting in TreeMap
+            // This ensures XX01 < XX02 < ... < XX09 < XX10 < ... < XX99 (not XX1 < XX10 < XX2)
+            String uid = id + String.format("%02d", i + 1);
             messageBox.put(uid,
                     uid
                     + ":"
@@ -321,18 +322,18 @@ public class BluetoothMessage {
     public String getFirstMissingParcel() {
         // easiest situation: we missed the header
         if(checksum == null){
-            return id + "0";
+            return id + "00";  // Zero-padded format
         }
 
         // second easy case, there isn't a followup messsage
         if(messageBox.size() == 1){
-            return id + "1";
+            return id + "01";  // Zero-padded format
         }
 
         // Find the highest index we've seen
         int maxSeen = -1;
         for (String key : messageBox.keySet()) {
-            if (key.length() < 3) continue;
+            if (key.length() < 4) continue;  // Now expecting 4 chars (2-letter ID + 2-digit number)
             try {
                 int idx = Integer.parseInt(key.substring(2));
                 if (idx > maxSeen) maxSeen = idx;
@@ -341,14 +342,14 @@ public class BluetoothMessage {
 
         // Check all indices from 0 to maxSeen for gaps
         for(int i = 0; i <= maxSeen; i++){
-            String key = id + i;
+            String key = id + String.format("%02d", i);  // Zero-padded format
             if(messageBox.containsKey(key) == false){
                 return key;
             }
         }
 
         // No gaps found, ask for the next parcel after maxSeen
-        return id + (maxSeen + 1);
+        return id + String.format("%02d", maxSeen + 1);  // Zero-padded format
     }
 
     /** List all missing parcel IDs up to the highest index we've seen (past gaps only). */
@@ -360,14 +361,14 @@ public class BluetoothMessage {
         String baseId = this.id;
         if (baseId == null) {
             String firstKey = messageBox.firstKey();
-            if (firstKey == null || firstKey.length() < 3) return missing;
+            if (firstKey == null || firstKey.length() < 4) return missing;  // Now expecting 4 chars
             baseId = firstKey.substring(0, 2);
         }
 
         // Find the highest index we've seen (e.g., ...-5 means 0..4 are "past" indices)
         int maxSeen = -1;
         for (String key : messageBox.keySet()) {
-            if (key.length() < 3) continue;
+            if (key.length() < 4) continue;  // Now expecting 4 chars (2-letter ID + 2-digit number)
             try {
                 int idx = Integer.parseInt(key.substring(2));
                 if (idx > maxSeen) maxSeen = idx;
@@ -379,7 +380,7 @@ public class BluetoothMessage {
 
         // Collect all gaps from 0..(maxSeen-1)
         for (int i = 0; i < maxSeen; i++) {
-            String k = baseId + i;
+            String k = baseId + String.format("%02d", i);  // Zero-padded format
             if (!messageBox.containsKey(k)) {
                 missing.add(k);
             }

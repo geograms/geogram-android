@@ -50,6 +50,19 @@
             android:ellipsize="end"
             android:layout_marginTop="2dp" />
 
+        <!-- Download Status -->
+        <TextView
+            android:id="@+id/download_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="30% • downloading"
+            android:textColor="#4CAF50"
+            android:textSize="12sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:layout_marginTop="2dp"
+            android:visibility="gone" />
+
         <!-- Description -->
         <TextView
             android:id="@+id/file_description"
@@ -64,5 +77,51 @@
             android:visibility="gone" />
 
     </LinearLayout>
+
+    <!-- Download Button / Progress -->
+    <FrameLayout
+        android:id="@+id/download_container"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/download_icon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_download"
+            android:contentDescription="Download file"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="4dp"
+            app:tint="@color/white" />
+
+        <TextView
+            android:id="@+id/download_progress"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:textColor="@color/white"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <!-- Download Folder Button (for folders only) -->
+    <ImageView
+        android:id="@+id/download_folder_button"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:src="@drawable/ic_download"
+        android:contentDescription="Download entire folder"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:padding="8dp"
+        app:tint="@color/white"
+        android:visibility="gone" />
 
 </LinearLayout>

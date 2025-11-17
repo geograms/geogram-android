@@ -32,7 +32,9 @@ public class DeviceRelayClient extends WebSocketListener {
 
     private static final String TAG = "Relay/Client";
     private static final int PING_INTERVAL_MS = 60000; // 1 minute
-    private static final int RECONNECT_DELAY_MS = 5000; // 5 seconds
+    private static final int RECONNECT_DELAY_SHORT_MS = 5000; // 5 seconds for first attempts
+    private static final int RECONNECT_DELAY_LONG_MS = 60000; // 60 seconds after several failures
+    private static final int FAST_RECONNECT_ATTEMPTS = 3; // Number of fast reconnect attempts before slowing down
 
     // Broadcast action for relay connection status changes
     public static final String ACTION_RELAY_STATUS_CHANGED = "offgrid.geogram.RELAY_STATUS_CHANGED";
@@ -48,6 +50,7 @@ public class DeviceRelayClient extends WebSocketListener {
     private String callsign;
     private boolean isConnected = false;
     private boolean shouldConnect = false;
+    private int reconnectAttempts = 0; // Track number of failed reconnection attempts
 
     private DeviceRelayClient(Context context) {
         this.context = context.getApplicationContext();
@@ -139,15 +142,25 @@ public class DeviceRelayClient extends WebSocketListener {
     }
 
     /**
-     * Reconnect after delay
+     * Reconnect after delay with exponential backoff
      */
     private void reconnect() {
         if (!shouldConnect) {
             return;
         }
 
-        Log.d(TAG, "Reconnecting in " + (RECONNECT_DELAY_MS / 1000) + " seconds...");
-        handler.postDelayed(this::connect, RECONNECT_DELAY_MS);
+        reconnectAttempts++;
+
+        // Use shorter delay for first few attempts, then switch to longer delay
+        int delay;
+        if (reconnectAttempts <= FAST_RECONNECT_ATTEMPTS) {
+            delay = RECONNECT_DELAY_SHORT_MS;
+        } else {
+            delay = RECONNECT_DELAY_LONG_MS;
+        }
+
+        Log.d(TAG, "Reconnecting in " + (delay / 1000) + " seconds... (attempt " + reconnectAttempts + ")");
+        handler.postDelayed(this::connect, delay);
     }
 
     // WebSocketListener methods
@@ -160,6 +173,9 @@ public class DeviceRelayClient extends WebSocketListener {
         Log.i(TAG, "Response code: " + response.code());
         Log.i(TAG, "Protocol: " + response.protocol());
         isConnected = true;
+
+        // Reset reconnection attempts on successful connection
+        reconnectAttempts = 0;
 
         // Broadcast connection status change
         broadcastStatusChange(true);

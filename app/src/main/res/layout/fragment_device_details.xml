@@ -43,14 +43,15 @@
                 android:paddingStart="8dp" />
         </LinearLayout>
 
-        <!-- Details Frame -->
+        <!-- Details Frame - Hidden (legacy code removed) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:background="@drawable/rounded_border_background"
             android:padding="16dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="16dp"
+            android:visibility="gone">
 
             <TextView
                 android:id="@+id/tv_device_description"

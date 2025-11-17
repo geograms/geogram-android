@@ -1810,7 +1810,69 @@ public class SimpleSparkServer implements Runnable {
                     mimeType = "video/mp4";
                 }
 
-                Log.i(TAG_ID, "API: Serving file " + filePath + " from collection " + npub);
+                long fileSize = requestedFile.length();
+
+                // Check for Range header (for chunked downloads)
+                String rangeHeader = req.headers("Range");
+                String rangeParam = req.queryParams("range"); // Also support range as query param (for GATT)
+
+                if (rangeHeader != null || rangeParam != null) {
+                    // Parse Range header: "bytes=start-end" or query param: "start-end"
+                    String rangeValue = rangeHeader != null ? rangeHeader : rangeParam;
+                    String bytesRange = rangeValue.replace("bytes=", "");
+                    String[] rangeParts = bytesRange.split("-");
+
+                    if (rangeParts.length == 2) {
+                        try {
+                            long startByte = Long.parseLong(rangeParts[0]);
+                            long endByte = Long.parseLong(rangeParts[1]);
+
+                            // Validate range
+                            if (startByte < 0 || endByte >= fileSize || startByte > endByte) {
+                                res.status(416); // Range Not Satisfiable
+                                res.type("application/json");
+                                return gson.toJson(createErrorResponse("Invalid range"));
+                            }
+
+                            long chunkSize = endByte - startByte + 1;
+
+                            Log.i(TAG_ID, "API: Serving file chunk " + filePath + " (bytes " + startByte + "-" + endByte + ", " + chunkSize + " bytes)");
+
+                            // Read only the requested chunk
+                            byte[] chunk = new byte[(int) chunkSize];
+                            try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(requestedFile, "r")) {
+                                raf.seek(startByte);
+                                raf.readFully(chunk);
+                            }
+
+                            // Set response properties for partial content
+                            res.status(206); // Partial Content
+                            res.type(mimeType);
+                            res.header("Content-Range", "bytes " + startByte + "-" + endByte + "/" + fileSize);
+                            res.header("Content-Length", String.valueOf(chunkSize));
+                            res.header("Accept-Ranges", "bytes");
+
+                            // Write chunk
+                            try {
+                                javax.servlet.http.HttpServletResponse rawResponse = res.raw();
+                                rawResponse.getOutputStream().write(chunk);
+                                rawResponse.getOutputStream().flush();
+                            } catch (Exception writeEx) {
+                                Log.e(TAG_ID, "Error writing chunk to response: " + writeEx.getMessage());
+                                throw writeEx;
+                            }
+
+                            return null;
+
+                        } catch (NumberFormatException e) {
+                            Log.e(TAG_ID, "Invalid range format: " + rangeValue);
+                            // Fall through to serve full file
+                        }
+                    }
+                }
+
+                // No Range header or invalid range - serve full file
+                Log.i(TAG_ID, "API: Serving full file " + filePath + " from collection " + npub + " (" + fileSize + " bytes)");
 
                 // Read file content
                 byte[] fileContent = Files.readAllBytes(requestedFile.toPath());
@@ -1820,6 +1882,7 @@ public class SimpleSparkServer implements Runnable {
                 res.type(mimeType);
                 res.header("Content-Disposition", "inline; filename=\"" + fileName + "\"");
                 res.header("Content-Length", String.valueOf(fileContent.length));
+                res.header("Accept-Ranges", "bytes");
 
                 // Get raw response and write bytes directly
                 try {
@@ -1837,6 +1900,499 @@ public class SimpleSparkServer implements Runnable {
                 Log.e(TAG_ID, "Error serving file: " + e.getMessage());
                 res.status(500);
                 res.type("application/json");
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // GET /api/downloads - Get current download status for all files
+        get("/api/downloads", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                offgrid.geogram.util.DownloadProgress downloadProgress =
+                    offgrid.geogram.util.DownloadProgress.getInstance();
+
+                java.util.Map<String, offgrid.geogram.util.DownloadProgress.DownloadStatus> allDownloads =
+                    downloadProgress.getAllDownloads();
+
+                List<JsonObject> downloadsList = new ArrayList<>();
+                for (offgrid.geogram.util.DownloadProgress.DownloadStatus status : allDownloads.values()) {
+                    JsonObject downloadJson = new JsonObject();
+                    downloadJson.addProperty("fileId", status.fileId);
+                    downloadJson.addProperty("fileName", status.fileName);
+                    downloadJson.addProperty("totalBytes", status.totalBytes);
+                    downloadJson.addProperty("downloadedBytes", status.downloadedBytes);
+                    downloadJson.addProperty("percentComplete", status.percentComplete);
+                    downloadJson.addProperty("completed", status.completed);
+                    downloadJson.addProperty("failed", status.failed);
+                    downloadJson.addProperty("errorMessage", status.errorMessage);
+                    downloadJson.addProperty("speed", status.getFormattedSpeed());
+                    downloadJson.addProperty("progress", status.getFormattedProgress());
+                    downloadJson.addProperty("elapsedTimeMs", status.getElapsedTimeMs());
+                    downloadJson.addProperty("estimatedTimeRemainingMs", status.getEstimatedTimeRemainingMs());
+                    downloadsList.add(downloadJson);
+                }
+
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.addProperty("count", downloadsList.size());
+                response.add("downloads", gson.toJsonTree(downloadsList));
+
+                Log.i(TAG_ID, "API: Returned " + downloadsList.size() + " active downloads");
+
+                res.status(200);
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error getting downloads: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // POST /api/remote/list-collections - List collections on a remote device
+        post("/api/remote/list-collections", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                if (context == null) {
+                    res.status(503);
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                // Parse JSON request body
+                String body = req.body();
+                JsonObject jsonRequest = gson.fromJson(body, JsonObject.class);
+
+                if (jsonRequest == null || !jsonRequest.has("deviceId")) {
+                    res.status(400);
+                    return gson.toJson(createErrorResponse("Missing 'deviceId' field"));
+                }
+
+                String deviceId = jsonRequest.get("deviceId").getAsString();
+                String remoteIp = jsonRequest.has("remoteIp") ? jsonRequest.get("remoteIp").getAsString() : null;
+
+                Log.i(TAG_ID, "API: Listing collections on remote device " + deviceId + " (IP: " + remoteIp + ")");
+
+                // Use P2PHttpClient to get collections from remote device
+                offgrid.geogram.p2p.P2PHttpClient httpClient = new offgrid.geogram.p2p.P2PHttpClient(context);
+                offgrid.geogram.p2p.P2PHttpClient.HttpResponse httpResponse =
+                    httpClient.get(deviceId, remoteIp, "/api/collections", 15000);
+
+                if (!httpResponse.isSuccess()) {
+                    res.status(502);
+                    return gson.toJson(createErrorResponse("Failed to fetch collections from remote device: HTTP " + httpResponse.statusCode));
+                }
+
+                // Parse and return the response
+                JsonObject remoteResponse = gson.fromJson(httpResponse.body, JsonObject.class);
+
+                Log.i(TAG_ID, "API: Successfully fetched collections from remote device");
+
+                res.status(200);
+                return gson.toJson(remoteResponse);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error listing remote collections: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // POST /api/remote/list-files - List files in a remote collection
+        post("/api/remote/list-files", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                if (context == null) {
+                    res.status(503);
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                // Parse JSON request body
+                String body = req.body();
+                JsonObject jsonRequest = gson.fromJson(body, JsonObject.class);
+
+                if (jsonRequest == null || !jsonRequest.has("deviceId") || !jsonRequest.has("collectionId")) {
+                    res.status(400);
+                    return gson.toJson(createErrorResponse("Missing 'deviceId' or 'collectionId' field"));
+                }
+
+                String deviceId = jsonRequest.get("deviceId").getAsString();
+                String collectionId = jsonRequest.get("collectionId").getAsString();
+                String remoteIp = jsonRequest.has("remoteIp") ? jsonRequest.get("remoteIp").getAsString() : null;
+                String path = jsonRequest.has("path") ? jsonRequest.get("path").getAsString() : "";
+
+                Log.i(TAG_ID, "API: Listing files in collection " + collectionId + " on device " + deviceId);
+
+                // Use P2PHttpClient to get files from remote device
+                offgrid.geogram.p2p.P2PHttpClient httpClient = new offgrid.geogram.p2p.P2PHttpClient(context);
+                String apiPath = "/api/collections/" + collectionId + "/files" +
+                    (path.isEmpty() ? "" : "?path=" + java.net.URLEncoder.encode(path, "UTF-8"));
+                offgrid.geogram.p2p.P2PHttpClient.HttpResponse httpResponse =
+                    httpClient.get(deviceId, remoteIp, apiPath, 15000);
+
+                if (!httpResponse.isSuccess()) {
+                    res.status(502);
+                    return gson.toJson(createErrorResponse("Failed to fetch files from remote device: HTTP " + httpResponse.statusCode));
+                }
+
+                // Parse and return the response
+                JsonObject remoteResponse = gson.fromJson(httpResponse.body, JsonObject.class);
+
+                Log.i(TAG_ID, "API: Successfully fetched files from remote collection");
+
+                res.status(200);
+                return gson.toJson(remoteResponse);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error listing remote files: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // POST /api/remote/download-file - Trigger download of a file from remote device
+        post("/api/remote/download-file", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                if (context == null) {
+                    res.status(503);
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                // Parse JSON request body
+                String body = req.body();
+                JsonObject jsonRequest = gson.fromJson(body, JsonObject.class);
+
+                if (jsonRequest == null || !jsonRequest.has("deviceId") ||
+                    !jsonRequest.has("collectionId") || !jsonRequest.has("filePath")) {
+                    res.status(400);
+                    return gson.toJson(createErrorResponse("Missing required fields: deviceId, collectionId, filePath"));
+                }
+
+                String deviceId = jsonRequest.get("deviceId").getAsString();
+                String collectionId = jsonRequest.get("collectionId").getAsString();
+                String filePath = jsonRequest.get("filePath").getAsString();
+                String remoteIp = jsonRequest.has("remoteIp") ? jsonRequest.get("remoteIp").getAsString() : null;
+                long fileSize = jsonRequest.has("fileSize") ? jsonRequest.get("fileSize").getAsLong() : 0;
+
+                // Security: Prevent path traversal
+                if (filePath.contains("..") || filePath.startsWith("/")) {
+                    res.status(403);
+                    return gson.toJson(createErrorResponse("Invalid file path"));
+                }
+
+                Log.i(TAG_ID, "API: Starting download of " + filePath + " from collection " + collectionId + " on device " + deviceId);
+
+                // Start download in background thread
+                String fileId = collectionId + "/" + filePath;
+
+                // Start progress tracking
+                offgrid.geogram.util.DownloadProgress downloadProgress =
+                    offgrid.geogram.util.DownloadProgress.getInstance();
+                offgrid.geogram.util.DownloadProgress.DownloadStatus downloadStatus =
+                    downloadProgress.startDownload(fileId, filePath, fileSize);
+
+                // Start download in background
+                new Thread(() -> {
+                    try {
+                        // Ensure collection folder exists
+                        File collectionsDir = new File(context.getFilesDir(), "collections");
+                        File collectionFolder = new File(collectionsDir, collectionId);
+                        File targetFile = new File(collectionFolder, filePath);
+
+                        // Create parent directories
+                        File parentDir = targetFile.getParentFile();
+                        if (parentDir != null && !parentDir.exists()) {
+                            parentDir.mkdirs();
+                        }
+
+                        // Download the file using P2PHttpClient
+                        String apiPath = "/api/collections/" + collectionId + "/file/" + filePath;
+
+                        offgrid.geogram.p2p.P2PHttpClient httpClient = new offgrid.geogram.p2p.P2PHttpClient(context);
+                        offgrid.geogram.p2p.P2PHttpClient.InputStreamResponse streamResponse =
+                            httpClient.getInputStream(deviceId, remoteIp, apiPath, 180000); // 3 minutes for BLE with flow control
+
+                        if (streamResponse.isSuccess()) {
+                            try {
+                                // Download file with progress tracking
+                                try (java.io.InputStream in = streamResponse.stream;
+                                     java.io.FileOutputStream out = new java.io.FileOutputStream(targetFile)) {
+
+                                    byte[] buffer = new byte[8192];
+                                    int bytesRead;
+                                    long totalBytesRead = 0;
+
+                                    while ((bytesRead = in.read(buffer)) != -1) {
+                                        out.write(buffer, 0, bytesRead);
+                                        totalBytesRead += bytesRead;
+
+                                        // Update progress every chunk
+                                        downloadStatus.updateProgress(totalBytesRead);
+                                    }
+
+                                    // Mark as completed
+                                    downloadStatus.markCompleted();
+                                    Log.i(TAG_ID, "Download completed: " + filePath + " (" + totalBytesRead + " bytes)");
+
+                                } finally {
+                                    streamResponse.close();
+                                }
+
+                            } catch (Exception e) {
+                                downloadStatus.markFailed(e.getMessage());
+                                Log.e(TAG_ID, "Download failed: " + e.getMessage());
+                            }
+                        } else {
+                            downloadStatus.markFailed("HTTP " + streamResponse.statusCode + ": " + streamResponse.errorMessage);
+                            Log.e(TAG_ID, "Download failed: HTTP " + streamResponse.statusCode);
+                        }
+
+                    } catch (Exception e) {
+                        downloadStatus.markFailed(e.getMessage());
+                        Log.e(TAG_ID, "Download error: " + e.getMessage());
+                    }
+                }).start();
+
+                // Return immediate response with download ID
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.addProperty("message", "Download started");
+                response.addProperty("fileId", fileId);
+                response.addProperty("fileName", filePath);
+
+                Log.i(TAG_ID, "API: Download initiated for " + fileId);
+
+                res.status(202); // 202 Accepted
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error starting remote download: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // POST /api/remote/download-file-chunked - Download file in chunks (better for BLE)
+        post("/api/remote/download-file-chunked", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                if (context == null) {
+                    res.status(503);
+                    return gson.toJson(createErrorResponse("Server context not initialized"));
+                }
+
+                // Parse JSON request body
+                String body = req.body();
+                JsonObject jsonRequest = gson.fromJson(body, JsonObject.class);
+
+                if (jsonRequest == null || !jsonRequest.has("deviceId") ||
+                    !jsonRequest.has("collectionId") || !jsonRequest.has("filePath")) {
+                    res.status(400);
+                    return gson.toJson(createErrorResponse("Missing required fields: deviceId, collectionId, filePath"));
+                }
+
+                String deviceId = jsonRequest.get("deviceId").getAsString();
+                String collectionId = jsonRequest.get("collectionId").getAsString();
+                String filePath = jsonRequest.get("filePath").getAsString();
+                String remoteIp = jsonRequest.has("remoteIp") ? jsonRequest.get("remoteIp").getAsString() : null;
+                long fileSize = jsonRequest.has("fileSize") ? jsonRequest.get("fileSize").getAsLong() : 0;
+                int chunkSize = jsonRequest.has("chunkSize") ? jsonRequest.get("chunkSize").getAsInt() : 4096; // 4KB default for BLE
+
+                // Security: Prevent path traversal
+                if (filePath.contains("..") || filePath.startsWith("/")) {
+                    res.status(403);
+                    return gson.toJson(createErrorResponse("Invalid file path"));
+                }
+
+                Log.i(TAG_ID, "API: Starting chunked download of " + filePath + " (chunk size: " + chunkSize + " bytes)");
+
+                // Setup directories
+                File collectionsDir = new File(context.getFilesDir(), "collections");
+                File collectionFolder = new File(collectionsDir, collectionId);
+                if (!collectionFolder.exists()) {
+                    collectionFolder.mkdirs();
+                }
+
+                // Create download directory for chunks
+                File downloadDir = new File(collectionFolder, new File(filePath).getParent() != null ?
+                    new File(filePath).getParent() : "");
+                if (!downloadDir.exists()) {
+                    downloadDir.mkdirs();
+                }
+
+                String fileId = collectionId + "/" + filePath;
+                String fileName = new File(filePath).getName();
+
+                // Start chunked download tracking
+                offgrid.geogram.util.ChunkDownloadManager chunkManager =
+                    offgrid.geogram.util.ChunkDownloadManager.getInstance();
+                offgrid.geogram.util.ChunkDownloadManager.ChunkDownload chunkDownload =
+                    chunkManager.startDownload(fileId, fileName, fileSize, downloadDir, chunkSize);
+
+                // Also track in regular download progress for UI
+                offgrid.geogram.util.DownloadProgress downloadProgress =
+                    offgrid.geogram.util.DownloadProgress.getInstance();
+                offgrid.geogram.util.DownloadProgress.DownloadStatus downloadStatus =
+                    downloadProgress.startDownload(fileId, fileName, fileSize);
+
+                // Download chunks in background
+                new Thread(() -> {
+                    try {
+                        offgrid.geogram.p2p.P2PHttpClient httpClient = new offgrid.geogram.p2p.P2PHttpClient(context);
+                        String baseApiPath = "/api/collections/" + collectionId + "/file/" + filePath;
+
+                        int nextChunk;
+                        while ((nextChunk = chunkDownload.getNextChunkToDownload()) != -1) {
+                            long offset = (long) nextChunk * chunkSize;
+                            long endOffset = Math.min(offset + chunkSize - 1, fileSize - 1);
+
+                            Log.i(TAG_ID, "Downloading chunk " + nextChunk + "/" + (chunkDownload.getTotalChunks() - 1) +
+                                        " (bytes " + offset + "-" + endOffset + ")");
+
+                            try {
+                                // Use Range request to get specific chunk
+                                // Note: Server must support Range requests (will add this next)
+                                offgrid.geogram.p2p.P2PHttpClient.InputStreamResponse streamResponse =
+                                    httpClient.getInputStreamWithRange(deviceId, remoteIp, baseApiPath,
+                                                                      offset, endOffset, 180000); // 3 minutes per chunk for BLE
+
+                                if (streamResponse.isSuccess()) {
+                                    try (java.io.InputStream in = streamResponse.stream) {
+                                        // Read chunk data
+                                        java.io.ByteArrayOutputStream chunkData = new java.io.ByteArrayOutputStream();
+                                        byte[] buffer = new byte[4096];
+                                        int bytesRead;
+                                        while ((bytesRead = in.read(buffer)) != -1) {
+                                            chunkData.write(buffer, 0, bytesRead);
+                                        }
+
+                                        // Write chunk to partial file
+                                        if (chunkDownload.writeChunk(nextChunk, chunkData.toByteArray())) {
+                                            // Update overall progress
+                                            downloadStatus.updateProgress(chunkDownload.getDownloadedBytes());
+                                            Log.i(TAG_ID, "Chunk " + nextChunk + " complete (" +
+                                                        chunkDownload.getPercentComplete() + "%)");
+                                        } else {
+                                            Log.e(TAG_ID, "Failed to write chunk " + nextChunk);
+                                        }
+
+                                    } finally {
+                                        streamResponse.close();
+                                    }
+                                } else {
+                                    Log.e(TAG_ID, "Failed to download chunk " + nextChunk + ": HTTP " +
+                                                streamResponse.statusCode);
+                                    // Don't fail entire download, will retry chunk later
+                                }
+
+                            } catch (Exception e) {
+                                Log.e(TAG_ID, "Error downloading chunk " + nextChunk + ": " + e.getMessage());
+                                // Continue with next chunk
+                            }
+
+                            // Small delay between chunks to avoid overwhelming BLE
+                            try { Thread.sleep(100); } catch (InterruptedException e) {}
+                        }
+
+                        // Check if download completed
+                        if (chunkDownload.isComplete()) {
+                            downloadStatus.markCompleted();
+                            Log.i(TAG_ID, "Chunked download completed: " + filePath);
+                        } else if (chunkDownload.isFailed()) {
+                            downloadStatus.markFailed(chunkDownload.getErrorMessage());
+                            Log.e(TAG_ID, "Chunked download failed: " + chunkDownload.getErrorMessage());
+                        } else {
+                            // Some chunks didn't complete
+                            String errorMsg = "Incomplete download: " + chunkDownload.getCompletedChunks() +
+                                            "/" + chunkDownload.getTotalChunks() + " chunks";
+                            downloadStatus.markFailed(errorMsg);
+                            chunkDownload.markFailed(errorMsg);
+                            Log.e(TAG_ID, errorMsg);
+                        }
+
+                        // Cleanup chunk manager
+                        chunkManager.removeDownload(fileId);
+
+                    } catch (Exception e) {
+                        downloadStatus.markFailed(e.getMessage());
+                        chunkDownload.markFailed(e.getMessage());
+                        Log.e(TAG_ID, "Chunked download error: " + e.getMessage());
+                    }
+                }).start();
+
+                // Return immediate response
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.addProperty("message", "Chunked download started");
+                response.addProperty("fileId", fileId);
+                response.addProperty("fileName", fileName);
+                response.addProperty("totalChunks", chunkDownload.getTotalChunks());
+                response.addProperty("chunkSize", chunkSize);
+
+                Log.i(TAG_ID, "API: Chunked download initiated for " + fileId +
+                            " (" + chunkDownload.getTotalChunks() + " chunks)");
+
+                res.status(202); // 202 Accepted
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error starting chunked download: " + e.getMessage());
+                res.status(500);
+                return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
+            }
+        });
+
+        // GET /api/downloads/:fileId - Get download status for specific file
+        get("/api/downloads/:fileId", (req, res) -> {
+            res.type("application/json");
+
+            try {
+                String fileId = req.params(":fileId");
+                if (fileId == null || fileId.isEmpty()) {
+                    res.status(400);
+                    return gson.toJson(createErrorResponse("File ID is required"));
+                }
+
+                offgrid.geogram.util.DownloadProgress downloadProgress =
+                    offgrid.geogram.util.DownloadProgress.getInstance();
+
+                offgrid.geogram.util.DownloadProgress.DownloadStatus status =
+                    downloadProgress.getDownloadStatus(fileId);
+
+                if (status == null) {
+                    res.status(404);
+                    return gson.toJson(createErrorResponse("Download not found"));
+                }
+
+                JsonObject statusJson = new JsonObject();
+                statusJson.addProperty("fileId", status.fileId);
+                statusJson.addProperty("fileName", status.fileName);
+                statusJson.addProperty("totalBytes", status.totalBytes);
+                statusJson.addProperty("downloadedBytes", status.downloadedBytes);
+                statusJson.addProperty("percentComplete", status.percentComplete);
+                statusJson.addProperty("completed", status.completed);
+                statusJson.addProperty("failed", status.failed);
+                statusJson.addProperty("errorMessage", status.errorMessage);
+                statusJson.addProperty("speed", status.getFormattedSpeed());
+                statusJson.addProperty("progress", status.getFormattedProgress());
+                statusJson.addProperty("elapsedTimeMs", status.getElapsedTimeMs());
+                statusJson.addProperty("estimatedTimeRemainingMs", status.getEstimatedTimeRemainingMs());
+
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.add("download", statusJson);
+
+                res.status(200);
+                return gson.toJson(response);
+
+            } catch (Exception e) {
+                Log.e(TAG_ID, "Error getting download status: " + e.getMessage());
+                res.status(500);
                 return gson.toJson(createErrorResponse("Error: " + e.getMessage()));
             }
         });

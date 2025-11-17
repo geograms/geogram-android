@@ -18,6 +18,10 @@
         android:id="@+id/nav_connections"
         android:icon="@drawable/ic_tethering"
         android:title="Connections" />
+    <item
+        android:id="@+id/nav_download_queue"
+        android:icon="@drawable/ic_download_queue"
+        android:title="Download queue" />
     <!--
     <item
         android:id="@+id/nav_relay"
