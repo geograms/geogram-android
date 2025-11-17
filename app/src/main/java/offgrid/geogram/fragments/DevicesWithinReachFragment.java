@@ -702,13 +702,18 @@ public class DevicesWithinReachFragment extends Fragment {
                  }
 
                  // Ping device via relay to check if reachable over internet
-                // Use callsign if available, otherwise use ID
-                String callsignToCheck = (device.callsign != null && !device.callsign.isEmpty())
-                    ? device.callsign
-                    : device.ID;
+                // Skip relay ping for RELAY_SERVER itself (doesn't make sense to ping the relay through itself)
+                if (device.ID.equals("RELAY_SERVER")) {
+                    // RELAY_SERVER connection status already shown via WebSocket status badge
+                    // Don't try to ping it through the relay proxy
+                } else {
+                    // Use callsign if available, otherwise use ID
+                    String callsignToCheck = (device.callsign != null && !device.callsign.isEmpty())
+                        ? device.callsign
+                        : device.ID;
 
-                // Ping via relay in background thread
-                if (callsignToCheck != null && !callsignToCheck.isEmpty()) {
+                    // Ping via relay in background thread
+                    if (callsignToCheck != null && !callsignToCheck.isEmpty()) {
                     android.util.Log.d("Relay/DevicesFragment", "Starting relay ping check for device: " + callsignToCheck);
                     final android.widget.LinearLayout channelIndicatorsFinal = channelIndicators;
                     final String callsignFinal = callsignToCheck;
@@ -766,8 +771,9 @@ public class DevicesWithinReachFragment extends Fragment {
                             android.util.Log.e("Relay/DevicesFragment", "Error during relay ping for " + callsignFinal + ": " + e.getMessage(), e);
                         }
                     }).start();
-                } else {
-                    android.util.Log.d("Relay/DevicesFragment", "Skipping relay ping - no callsign/ID for device");
+                    } else {
+                        android.util.Log.d("Relay/DevicesFragment", "Skipping relay ping - no callsign/ID for device");
+                    }
                 }
 
                 // Show/hide channel indicators based on whether any badges were added
