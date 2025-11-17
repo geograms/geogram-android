@@ -207,7 +207,13 @@ public class DevicesWithinReachFragment extends Fragment {
         if (getContext() != null) {
             android.content.IntentFilter relayFilter = new android.content.IntentFilter(
                     offgrid.geogram.p2p.DeviceRelayClient.ACTION_RELAY_STATUS_CHANGED);
-            getContext().registerReceiver(relayStatusReceiver, relayFilter);
+            // Use RECEIVER_NOT_EXPORTED since this is an internal app broadcast
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                getContext().registerReceiver(relayStatusReceiver, relayFilter,
+                        android.content.Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                getContext().registerReceiver(relayStatusReceiver, relayFilter);
+            }
         }
     }
 
