@@ -28,6 +28,7 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import com.google.android.material.navigation.NavigationView;
+import com.cactus.CactusContextInitializer;
 
 import java.lang.ref.WeakReference;
 
@@ -48,6 +49,7 @@ import offgrid.geogram.devices.EventDeviceUpdated;
 import offgrid.geogram.events.EventControl;
 import offgrid.geogram.events.EventType;
 import offgrid.geogram.fragments.AboutFragment;
+import offgrid.geogram.fragments.AiChatFragment;
 import offgrid.geogram.fragments.BackupFragment;
 import offgrid.geogram.fragments.CollectionsFragment;
 import offgrid.geogram.fragments.ConnectionsFragment;
@@ -96,6 +98,9 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize file logging for debugging
         Log.initFileLogging(this);
+
+        // Initialize Cactus SDK for AI functionality
+        CactusContextInitializer.INSTANCE.initialize(this);
 
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
 
@@ -434,6 +439,15 @@ public class MainActivity extends AppCompatActivity {
             FragmentManager fragmentManager = getSupportFragmentManager();
             FragmentTransaction transaction = fragmentManager.beginTransaction();
             transaction.replace(R.id.fragment_container, new CollectionsFragment()).addToBackStack(null);
+            transaction.commit();
+        });
+
+        // AI Chat button
+        ImageButton btnAiChat = findViewById(R.id.btn_ai_chat);
+        btnAiChat.setOnClickListener(v -> {
+            FragmentManager fragmentManager = getSupportFragmentManager();
+            FragmentTransaction transaction = fragmentManager.beginTransaction();
+            transaction.replace(R.id.fragment_container, new AiChatFragment()).addToBackStack(null);
             transaction.commit();
         });
 

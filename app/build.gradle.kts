@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -13,11 +14,15 @@ android {
         applicationId = "offgrid.geogram"
         minSdk = 29
         targetSdk = 34
-        versionCode = 22
-        versionName = "0.5.22"
+        versionCode = 23
+        versionName = "0.5.23"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         applicationIdSuffix = "geogram"
+
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     buildTypes {
@@ -33,6 +38,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
     }
 
     testOptions {
@@ -52,8 +61,14 @@ android {
                 "META-INF/NOTICE.txt",
                 "META-INF/INDEX.LIST",
                 "META-INF/license/*",
-                "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+                // Cactus SDK excludes
+                "/META-INF/{AL2.0,LGPL2.1}",
+                "/com/sun/jna/android-*/**"
             )
+        }
+        jniLibs {
+            useLegacyPackaging = true
         }
     }
 }
@@ -84,6 +99,21 @@ dependencies {
     // Room
     implementation(libs.room.runtime)
     annotationProcessor(libs.room.compiler) // <-- was implementation(...)
+
+    // Kotlin
+    implementation(libs.kotlin.stdlib)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.core)
+
+    // Lifecycle
+    implementation(libs.lifecycle.viewmodel.ktx)
+    implementation(libs.lifecycle.livedata.ktx)
+    implementation(libs.lifecycle.runtime.ktx)
+    implementation(libs.fragment.ktx)
+
+    // Cactus AI SDK - NOTE: Has known issues with Ktor on Android
+    // The SDK uses JVM-specific Ktor APIs that may not work perfectly on Android
+    implementation("com.cactuscompute:cactus:1.0.1-beta")
 
     debugImplementation(libs.stetho)
     testImplementation(libs.junit)

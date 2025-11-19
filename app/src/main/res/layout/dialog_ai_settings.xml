@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/dark_gray_background">
+
+    <!-- Toolbar -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/black"
+        android:elevation="4dp"
+        app:navigationIcon="@drawable/ic_arrow_back"
+        app:title="AI Chat Settings"
+        app:titleTextColor="@color/white" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="16dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+        <!-- Model Selection -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Model"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingTop="8dp" />
+
+        <Spinner
+            android:id="@+id/spinner_model"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="#FFFFFF"
+            android:popupBackground="#FFFFFF"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp" />
+
+        <!-- Max Tokens -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Max Tokens"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingTop="16dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <SeekBar
+                android:id="@+id/seek_max_tokens"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="2048"
+                android:progress="512" />
+
+            <TextView
+                android:id="@+id/tv_max_tokens"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="512"
+                android:textColor="@color/white"
+                android:textAlignment="textEnd"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <!-- Temperature -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Temperature (Creativity)"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingTop="16dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <SeekBar
+                android:id="@+id/seek_temperature"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="100"
+                android:progress="70" />
+
+            <TextView
+                android:id="@+id/tv_temperature"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="0.7"
+                android:textColor="@color/white"
+                android:textAlignment="textEnd"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <!-- Context Size -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Context Size"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingTop="16dp" />
+
+        <Spinner
+            android:id="@+id/spinner_context_size"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="#FFFFFF"
+            android:popupBackground="#FFFFFF"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp" />
+
+        <!-- GPU Layers -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="GPU Acceleration"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingTop="16dp" />
+
+        <Spinner
+            android:id="@+id/spinner_gpu_layers"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="#FFFFFF"
+            android:popupBackground="#FFFFFF"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp" />
+
+        <!-- CPU Threads -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="CPU Threads"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingTop="16dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <SeekBar
+                android:id="@+id/seek_cpu_threads"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:max="8"
+                android:min="1"
+                android:progress="4" />
+
+            <TextView
+                android:id="@+id/tv_cpu_threads"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="4"
+                android:textColor="@color/white"
+                android:textAlignment="textEnd"
+                android:paddingStart="8dp" />
+        </LinearLayout>
+
+        <!-- Whisper Voice Model -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Voice Recognition Model"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:paddingTop="16dp" />
+
+        <Spinner
+            android:id="@+id/spinner_whisper_model"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="#FFFFFF"
+            android:popupBackground="#FFFFFF"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Larger models are more accurate but slower"
+            android:textColor="#888888"
+            android:textSize="12sp"
+            android:paddingTop="4dp" />
+
+        <!-- Show Thinking Toggle -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingTop="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Show Thinking Process"
+                android:textColor="@color/white"
+                android:textSize="14sp" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/switch_show_thinking"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Display AI reasoning process (may slow down responses)"
+            android:textColor="#888888"
+            android:textSize="12sp"
+            android:paddingTop="4dp" />
+
+        <!-- Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingTop="24dp"
+            android:paddingBottom="16dp">
+
+            <Button
+                android:id="@+id/btn_reset"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Reset to Defaults"
+                android:textColor="@color/white"
+                android:backgroundTint="#555555"
+                android:paddingStart="32dp"
+                android:paddingEnd="32dp"
+                android:minWidth="200dp" />
+        </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

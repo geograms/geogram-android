@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:ordering="together">
+    <!-- Scale up and down -->
+    <objectAnimator
+        android:propertyName="scaleX"
+        android:duration="1000"
+        android:valueFrom="1.0"
+        android:valueTo="1.2"
+        android:valueType="floatType"
+        android:repeatMode="reverse"
+        android:repeatCount="infinite" />
+    <objectAnimator
+        android:propertyName="scaleY"
+        android:duration="1000"
+        android:valueFrom="1.0"
+        android:valueTo="1.2"
+        android:valueType="floatType"
+        android:repeatMode="reverse"
+        android:repeatCount="infinite" />
+    <!-- Fade in and out -->
+    <objectAnimator
+        android:propertyName="alpha"
+        android:duration="1000"
+        android:valueFrom="1.0"
+        android:valueTo="0.6"
+        android:valueType="floatType"
+        android:repeatMode="reverse"
+        android:repeatCount="infinite" />
+</set>

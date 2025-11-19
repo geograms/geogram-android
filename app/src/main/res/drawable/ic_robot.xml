@@ -1,0 +1,60 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Friendly Robot Icon -->
+
+    <!-- Antenna -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,1C11.45,1 11,1.45 11,2V3H13V2C13,1.45 12.55,1 12,1Z"/>
+
+    <!-- Antenna circle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,0.5C11.17,0.5 10.5,1.17 10.5,2C10.5,2.83 11.17,3.5 12,3.5C12.83,3.5 13.5,2.83 13.5,2C13.5,1.17 12.83,0.5 12,0.5Z"/>
+
+    <!-- Robot head (rounded rectangle) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18,6H6C4.9,6 4,6.9 4,8V14C4,15.1 4.9,16 6,16H18C19.1,16 20,15.1 20,14V8C20,6.9 19.1,6 18,6Z"/>
+
+    <!-- Left eye (friendly circle) -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M9,10.5C9.83,10.5 10.5,9.83 10.5,9C10.5,8.17 9.83,7.5 9,7.5C8.17,7.5 7.5,8.17 7.5,9C7.5,9.83 8.17,10.5 9,10.5Z"/>
+
+    <!-- Right eye (friendly circle) -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M15,10.5C15.83,10.5 16.5,9.83 16.5,9C16.5,8.17 15.83,7.5 15,7.5C14.17,7.5 13.5,8.17 13.5,9C13.5,9.83 14.17,10.5 15,10.5Z"/>
+
+    <!-- Friendly smile -->
+    <path
+        android:strokeColor="#000000"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M9,12C9.5,13 10.5,13.5 12,13.5C13.5,13.5 14.5,13 15,12"/>
+
+    <!-- Robot body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,17H8C7.45,17 7,17.45 7,18V22C7,22.55 7.45,23 8,23H16C16.55,23 17,22.55 17,22V18C17,17.45 16.55,17 16,17Z"/>
+
+    <!-- Left arm -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5,17H3C2.45,17 2,17.45 2,18V20C2,20.55 2.45,21 3,21H5C5.55,21 6,20.55 6,20V18C6,17.45 5.55,17 5,17Z"/>
+
+    <!-- Right arm -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M21,17H19C18.45,17 18,17.45 18,18V20C18,20.55 18.45,21 19,21H21C21.55,21 22,20.55 22,20V18C22,17.45 21.55,17 21,17Z"/>
+
+    <!-- Body detail (heart or power button) -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M12,19C11.45,19 11,19.45 11,20C11,20.55 11.45,21 12,21C12.55,21 13,20.55 13,20C13,19.45 12.55,19 12,19Z"/>
+</vector>

@@ -1,5 +1,7 @@
 [versions]
 agp = "8.8.1"
+kotlin = "2.1.0"
+coroutines = "1.7.3"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
@@ -25,6 +27,7 @@ roomCompiler = "2.6.1"
 stetho = "1.6.0"
 swiperefreshlayout = "1.1.0"
 robolectric = "4.11.1"
+lifecycle = "2.8.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -52,7 +55,15 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 stetho = { group = "com.facebook.stetho", name = "stetho", version.ref = "stetho" }
 swiperefreshlayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "swiperefreshlayout" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
+lifecycle-livedata-ktx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "lifecycle" }
+lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+fragment-ktx = { group = "androidx.fragment", name = "fragment-ktx", version = "1.8.0" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 
